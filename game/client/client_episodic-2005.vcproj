@@ -5074,6 +5074,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\shared\episodic\uh_freeaim.h"
+				>
+			</File>
+			<File
 				RelativePath="..\shared\weapon_proficiency.h"
 				>
 			</File>

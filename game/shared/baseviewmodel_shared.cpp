@@ -17,6 +17,9 @@
 
 #if defined( HL2_EPISODIC )
 #include "episodic/uh_weapon_parse.h"
+#if defined( CLIENT_DLL )
+#include "episodic/uh_freeaim.h"
+#endif
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -468,6 +471,13 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 
 	Vector vmDiffPos = vmorigin - eyePosition;
 	vmorigin = eyePosition + ( vmDiffPos * m_expFactor );
+
+	// Underhell OTS free-aim: in hip-fire the weapon is offset from the view
+	// center; ironsighting locks it back to center (see docs §2.8).
+	if ( !m_bExpSighted && UH_FreeAim_IsEnabled() )
+	{
+		vmangles += UH_FreeAim_GetOffset();
+	}
 #endif
 
 	SetLocalOrigin( vmorigin );

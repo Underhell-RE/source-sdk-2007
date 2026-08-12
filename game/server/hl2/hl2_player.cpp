@@ -399,6 +399,7 @@ CHL2_Player::CHL2_Player()
 	m_bIronSighted = false;
 	m_fIronsightedTime = 0.0f;
 	m_flNextKickTime = 0.0f;
+	m_angFreeAimOffset.Init();
 #endif
 }
 
@@ -513,6 +514,12 @@ void CHL2_Player::ThrowGrenadeQuick( void )
 
 	RemoveAmmo( 1, iGrenade );
 
+	// Throw animation (body + viewmodel).
+	SetAnimation( PLAYER_ATTACK1 );
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	if ( pWeapon )
+		pWeapon->SendWeaponAnim( ACT_VM_THROW );
+
 	Vector vecEye = EyePosition();
 	Vector vForward, vRight;
 	EyeVectors( &vForward, &vRight, NULL );
@@ -544,7 +551,12 @@ void CHL2_Player::PerformKick( void )
 	if ( IsIronSighted() )
 		ToggleIronsight();
 
+	// Kick animation (body + viewmodel melee swing).
 	SetAnimation( PLAYER_ATTACK1 );
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	if ( pWeapon )
+		pWeapon->SendWeaponAnim( ACT_VM_HITCENTER );
+
 	ViewPunch( QAngle( -2.0f, 0.0f, 0.0f ) );
 
 	if ( GetFlags() & FL_ONGROUND )
@@ -591,6 +603,27 @@ CON_COMMAND_F( uh_jake_kick, "Performs an unarmed kick.", FCVAR_GAMEDLL )
 	CHL2_Player *pPlayer = UnderhellCommandPlayer();
 	if ( pPlayer )
 		pPlayer->PerformKick();
+}
+
+//-----------------------------------------------------------------------------
+// Underhell OTS free-aim sync. The client sends the current free-aim offset;
+// the server stores it and rotates the shot direction to match (docs §2.8).
+//-----------------------------------------------------------------------------
+CON_COMMAND_F( update_freeaim, "Underhell free-aim sync (client internal).", FCVAR_GAMEDLL )
+{
+	CHL2_Player *pPlayer = UnderhellCommandPlayer();
+	if ( !pPlayer )
+		return;
+
+	QAngle angOffset( 0, 0, 0 );
+	if ( args.ArgC() > 1 )
+		angOffset.x = atof( args[1] );
+	if ( args.ArgC() > 2 )
+		angOffset.y = atof( args[2] );
+	if ( args.ArgC() > 3 )
+		angOffset.z = atof( args[3] );
+
+	pPlayer->SetFreeAimOffset( angOffset );
 }
 
 #endif // HL2_EPISODIC

@@ -143,6 +143,26 @@ this+1832 MeleeWeapon, this+1833 BuiltRightHanded, this+1834 AllowFlipping, this
 > ConVar `hap_HasDevice` (хаптика HUD), `uh_ragdollcollisiontype`. Спам
 > «No caption found for 'metal_box.scraperough'» — безобиден (closecaption для звука скребка).
 
+### 2.8. OTS free-aim (`cam_ots_freeaim_*`)
+
+| Декомпилированная функция | Роль |
+|---|---|
+| `client/sub_10014D80` | OTS-расчёт вьюмодели: free-aim смещение применяется только когда НЕ прицелился (`!(this+1960)` = `!m_bExpSighted`) |
+| `client/sub_100BC870` | вычисляет free-aim смещение из мыши/вида и шлёт `update_freeaim %f %f %f` на сервер |
+| `client/sub_102B85xx` | ConVar'ы `cam_ots_freeaim_enable` (1), `_interval_enable` (0), `_move_threshold` (0.05), `_move_max` (0.1), `_speed_turn` (1), `_speed_evenYawSpeed` (0), `_autoturn_speed` (250) |
+| `server/sub_101F11D0` | обработчик `update_freeaim` — кладёт 3 float в игрока |
+| `server/sub_101F1D70` | отдаёт free-aim смещение стрельбе, клампы: pitch ±25°, yaw ±12° |
+
+Семантика: **в бедре оружие уходит от центра экрана** (мышь двигает свободный прицел, оружие
+авто-возвращается к центру с `autoturn_speed`), **в прицеле — фиксируется на центр**. Именно это
+поведение пользователь видел как «вне прицеливания оружие не привязано к центру» — это фича
+Underhell, а не баг. Реализация: клиентские ConVar'ы + накопление мыши в
+`C_BaseHLPlayer::CreateMove` (`UH_FreeAim_Update`), смещение углов вьюмодели в
+`CalcViewModelView` (`!m_bExpSighted`), синхронизация `update_freeaim` → сервер хранит смещение и
+доворачивает направление пули в `CUhFirearmWeapon::FireBullets`. Точную кривую отклика мыши из
+Hex-Rays не восстановить (те же искажения, что у проникания) — константы вынесены в
+`c_basehlplayer.cpp` (`UH_FREEAIM_*`).
+
 ### 2.6. Проникание пуль (`UH_Weapon_Special.Penetration`)
 
 | Декомпилированная функция | Роль |
@@ -291,7 +311,11 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
      (§2.6), значение из оригинальных `weapon_*.txt`.
    - ✅ Быстрые действия: `dropweapon` / `throw_nade` / `uh_jake_kick` (§2.7) — серверные
      `CON_COMMAND` + обработка в `CHL2_Player::ClientCommand`; `additionalequipment` понимает
-     список через запятую (случайный выбор, §2.7).
+     список через запятую (случайный выбор, §2.7); кик/граната проигрывают анимации
+     (`ACT_VM_HITCENTER` / `ACT_VM_THROW` + `PLAYER_ATTACK1`).
+   - ✅ OTS free-aim (§2.8) — клиентские `cam_ots_freeaim_*` + смещение вьюмодели в бедре +
+     `update_freeaim` → доворот направления пули на сервере.
+   - ✅ T-pose NPC — полные ванильные acttable (readiness-состояния) для ПП/винтовок/дробовиков/BFG.
    - ⬜ Система выносливости (kick/mеле расходуют `m_iEndurance`).
 5. **Скрипты** `weapon_*.txt` — перенос из `Underhell/scripts/` в `scripts/` мода
    (контент, вне SDK-кода; классы уже читают их данные через `CUHWeaponInfo`).

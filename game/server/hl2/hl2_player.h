@@ -140,6 +140,10 @@ public:
 	void				ThrowGrenadeQuick( void );
 	void				PerformKick( void );
 
+	// Underhell OTS free-aim (server-side copy, synced via update_freeaim).
+	const QAngle &		GetFreeAimOffset( void ) const { return m_angFreeAimOffset; }
+	void				SetFreeAimOffset( const QAngle &angOffset ) { m_angFreeAimOffset = angOffset; }
+
 	// -------------------------------------------------------------------------
 	// Underhell TODO (still to port — see docs/underhell-weapons-aiming.md §6):
 	//   #  Feature                      Where it lives
@@ -360,6 +364,7 @@ private:
 	CNetworkVar( float, m_fIronsightedTime );	// last time the ironsight state changed
 
 	float				m_flNextKickTime;		// Underhell kick cooldown (transient)
+	QAngle				m_angFreeAimOffset;		// Underhell OTS free-aim (server-only)
 #endif
 
 protected:	// Jeep: Portal_Player needs access to this variable to overload PlayerUse for picking up objects through portals

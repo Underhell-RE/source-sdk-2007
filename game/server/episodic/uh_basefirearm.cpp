@@ -151,6 +151,19 @@ void CUhFirearmWeapon::FireBullets( const FireBulletsInfo_t &info )
 		}
 
 		uhInfo.m_vecSpread *= flAccuracyMult;
+
+		// Underhell OTS free-aim: rotate the shot toward the free-aim point.
+		if ( pHL2Player )
+		{
+			const QAngle &angFreeAim = pHL2Player->GetFreeAimOffset();
+			if ( angFreeAim != vec3_angle )
+			{
+				QAngle angDir;
+				VectorAngles( uhInfo.m_vecDirShooting, angDir );
+				angDir += angFreeAim;
+				AngleVectors( angDir, &uhInfo.m_vecDirShooting );
+			}
+		}
 	}
 
 	int iPenetration = GetUHWpnData().m_iPenetration;

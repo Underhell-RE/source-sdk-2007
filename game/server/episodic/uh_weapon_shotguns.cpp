@@ -93,6 +93,8 @@ void CUhShotgunWeapon::PrimaryAttack( void )
 }
 
 
+// Full vanilla shotgun activity table (readiness states included, otherwise
+// NPCs fall back to T-pose when they are not actively fighting).
 #define UH_DEFINE_SHOTGUN_ACTTABLE( cls )							\
 	acttable_t cls::m_acttable[] =									\
 	{																\
@@ -101,6 +103,35 @@ void CUhShotgunWeapon::PrimaryAttack( void )
 		{ ACT_RELOAD,				ACT_RELOAD_SHOTGUN,			false },	\
 		{ ACT_WALK,					ACT_WALK_RIFLE,				true },	\
 		{ ACT_IDLE_ANGRY,			ACT_IDLE_ANGRY_SHOTGUN,		true },	\
+		{ ACT_IDLE_RELAXED,			ACT_IDLE_SHOTGUN_RELAXED,	false },	\
+		{ ACT_IDLE_STIMULATED,		ACT_IDLE_SHOTGUN_STIMULATED,false },	\
+		{ ACT_IDLE_AGITATED,		ACT_IDLE_SHOTGUN_AGITATED,	false },	\
+		{ ACT_WALK_RELAXED,			ACT_WALK_RIFLE_RELAXED,		false },	\
+		{ ACT_WALK_STIMULATED,		ACT_WALK_RIFLE_STIMULATED,	false },	\
+		{ ACT_WALK_AGITATED,		ACT_WALK_AIM_RIFLE,			false },	\
+		{ ACT_RUN_RELAXED,			ACT_RUN_RIFLE_RELAXED,		false },	\
+		{ ACT_RUN_STIMULATED,		ACT_RUN_RIFLE_STIMULATED,	false },	\
+		{ ACT_RUN_AGITATED,			ACT_RUN_AIM_RIFLE,			false },	\
+		{ ACT_IDLE_AIM_RELAXED,		ACT_IDLE_SMG1_RELAXED,		false },	\
+		{ ACT_IDLE_AIM_STIMULATED,	ACT_IDLE_AIM_RIFLE_STIMULATED, false },	\
+		{ ACT_IDLE_AIM_AGITATED,	ACT_IDLE_ANGRY_SMG1,		false },	\
+		{ ACT_WALK_AIM_RELAXED,		ACT_WALK_RIFLE_RELAXED,		false },	\
+		{ ACT_WALK_AIM_STIMULATED,	ACT_WALK_AIM_RIFLE_STIMULATED, false },	\
+		{ ACT_WALK_AIM_AGITATED,	ACT_WALK_AIM_RIFLE,			false },	\
+		{ ACT_RUN_AIM_RELAXED,		ACT_RUN_RIFLE_RELAXED,		false },	\
+		{ ACT_RUN_AIM_STIMULATED,	ACT_RUN_AIM_RIFLE_STIMULATED, false },	\
+		{ ACT_RUN_AIM_AGITATED,		ACT_RUN_AIM_RIFLE,			false },	\
+		{ ACT_WALK_AIM,				ACT_WALK_AIM_SHOTGUN,		true },		\
+		{ ACT_WALK_CROUCH,			ACT_WALK_CROUCH_RIFLE,		true },		\
+		{ ACT_WALK_CROUCH_AIM,		ACT_WALK_CROUCH_AIM_RIFLE,	true },		\
+		{ ACT_RUN,					ACT_RUN_RIFLE,				true },		\
+		{ ACT_RUN_AIM,				ACT_RUN_AIM_SHOTGUN,		true },		\
+		{ ACT_RUN_CROUCH,			ACT_RUN_CROUCH_RIFLE,		true },		\
+		{ ACT_RUN_CROUCH_AIM,		ACT_RUN_CROUCH_AIM_RIFLE,	true },		\
+		{ ACT_GESTURE_RANGE_ATTACK1,ACT_GESTURE_RANGE_ATTACK_SHOTGUN,true },	\
+		{ ACT_RANGE_ATTACK1_LOW,	ACT_RANGE_ATTACK_SHOTGUN_LOW,true },	\
+		{ ACT_RELOAD_LOW,			ACT_RELOAD_SHOTGUN_LOW,		false },	\
+		{ ACT_GESTURE_RELOAD,		ACT_GESTURE_RELOAD_SHOTGUN,	false },	\
 	};																\
 	IMPLEMENT_ACTTABLE( cls )
 
