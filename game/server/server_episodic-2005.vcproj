@@ -4441,6 +4441,22 @@
 					>
 				</File>
 				<File
+					RelativePath=".\episodic\uh_weapon_smg.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_weapon_shotguns.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_weapon_rifles.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_weapon_bfg.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\weapon_stunstick.cpp"
 					>
 				</File>

@@ -26,3 +26,22 @@ STUB_WEAPON_CLASS( weapon_pistol_beretta, WeaponPistolBeretta, C_BaseHLCombatWea
 STUB_WEAPON_CLASS( weapon_pistol_socom, WeaponPistolSocom, C_BaseHLCombatWeapon );
 STUB_WEAPON_CLASS( weapon_pistol_python, WeaponPython, C_BaseHLCombatWeapon );
 STUB_WEAPON_CLASS( weapon_pistol_dualberetta, WeaponPistolDualies, C_BaseHLCombatWeapon );
+
+// SMGs
+STUB_WEAPON_CLASS( weapon_smg_mp5, WeaponSMGMP5, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_smg_mp5_eod, WeaponSMGMP5EOD, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_smg_mp7, WeaponSMGMP7, C_BaseHLCombatWeapon );
+
+// Shotguns
+STUB_WEAPON_CLASS( weapon_shotgun_m3, WeaponShotgunM3, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_shotgun_m5, WeaponShotgunM5, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_shotgun_spas12, WeaponShotgunSpas12, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_shotgun_xm1014, WeaponShotgunXM1014, C_BaseHLCombatWeapon );
+
+// Rifles
+STUB_WEAPON_CLASS( weapon_rifle_g36k, WeaponG36K, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_rifle_sniper, WeaponSniper, C_BaseHLCombatWeapon );
+
+// BFG
+STUB_WEAPON_CLASS( weapon_bfg_mgl, WeaponBfgMgl, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_bfg_minigun, WeaponBfgMinigun, C_BaseHLCombatWeapon );
