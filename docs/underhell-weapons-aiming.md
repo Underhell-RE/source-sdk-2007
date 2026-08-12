@@ -315,3 +315,26 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
 > прямо в начало структуры данных оружия (offsets 8–103 до `szClassName`). Для чистоты мы не
 > трогаем валиевскую `FileWeaponInfo_t`, а делаем `CUHWeaponInfo : FileWeaponInfo_t` — поведение
 > идентично, а память и совместимость со стандартными оружиями сохранены.
+
+---
+
+## 6. Что ещё добавить в будущем (по коду)
+
+Таблица незакрытых фич Underhell, выявленных при портировании. Каждая — отдельная система,
+завязанная на свой декомпилированный код; оружейное ядро от них не зависит.
+
+| # | Фича | Декомп-ориентир | Где добавить | Статус |
+|---|---|---|---|---|
+| 1 | **Выносливость** (`m_iEndurance`) — меле и удар ногой расходуют 6–20 ед., регенерация | дататейбл `DT_BasePlayer` (`m_iEndurance`), `uh_jake_kick` (drain 20), `StaminaToDrain` из `weapon_*.txt` | `CHL2_Player` + `CUHMeleeWeapon`/`PerformKick` + HUD | ⬜ (парсер `StaminaToDrain` уже готов) |
+| 2 | **Кровотечение** (`m_iBleedCounter`) | `DT_BasePlayer` (`m_iBleedCounter`) | `CHL2_Player`, damage-хендлинг | ⬜ |
+| 3 | **Инвентарь** (`cl_inventoryToggle`) | `client/sub_102BC5D0` (ConCommand на клиенте) | клиент: VGUI-панель + конкоманда | ⬜ |
+| 4 | **ПНВ / противогаз / глушитель** (`NightVision_Toggle` / `GasMask_Toggle` / `silencer_toggle`) | `server/sub_101F11D0` (диспетчер) | `CHL2_Player` + постпроцесс (ПНВ) + смена звука выстрела (глушитель) | ⬜ |
+| 5 | **MGL — дуговая граната** (`weapon_bfg_mgl` на `SMG1_Grenade`) | — (класс `CWeaponBfgMgl`) | `uh_weapon_bfg.cpp`: projectile вместо hitscan | ⬜ |
+| 6 | **FireMode** (полуавто/авто) | ключ `FireMode` в `weapon_*.txt` (в бинаре не читается) | `CUhFirearmWeapon`/machinegun-база | ⬜ (опционально) |
+| 7 | **Хаптика** (`hap_HasDevice` + `hap_*`) | клиент (ConVar/ConCommand HUD) | клиент: forcefeedback | ⬜ |
+| 8 | **`uh_ragdollcollisiontype`** | `server/sub_10452C60` | `CHL2_Player` (параметр ragdoll при смерти) | ⬜ |
+| 9 | **Контент-конфиги** — `kb_act.lst` (бинды `throw_nade`/`uh_jake_kick`/`dropweapon`/`ironsight_toggle`), `skill.cfg` с дефолтами `sk_plr_dmg_*`, перенос `weapon_*.txt` + `game_sounds_weapons.txt` | `Underhell/scripts/` | `scripts/` мода (вне SDK) | ⬜ |
+| 10 | **Полировка** — отдельная анимация удара ногой (сейчас `PLAYER_ATTACK1`), рандомные дефолты `sk_plr_dmg_*` подобрать под оригинал | — | см. `uh_weapon_melee.cpp`, `uh_basefirearm.cpp` | ⬜ |
+
+Все уже перенесённые куски помечены `✅` в roadmap (§5); незакрытое выше — это следующий слой
+поверх оружейного ядра (п.1–2 — «живучесть», п.3–4 — снаряжение/UI, п.5–6 — поведение оружия).

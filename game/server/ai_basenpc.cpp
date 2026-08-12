@@ -131,7 +131,7 @@ static void PrecacheWeaponEquipmentList( const char *pszList )
 		int len = pComma ? (int)( pComma - p ) : (int)strlen( p );
 		if ( len > 0 )
 		{
-			Q_strncpy( szWeapon, p, MIN( len + 1, (int)sizeof( szWeapon ) ) );
+			Q_strncpy( szWeapon, p, min( len + 1, (int)sizeof( szWeapon ) ) );
 			UTIL_PrecacheOther( szWeapon );
 		}
 
@@ -172,7 +172,7 @@ static void PickWeaponFromEquipmentList( const char *pszList, char *szOut, int n
 
 	const char *pEnd = strchr( pStart, ',' );
 	int len = pEnd ? (int)( pEnd - pStart ) : (int)strlen( pStart );
-	Q_strncpy( szOut, pStart, MIN( len + 1, nOutSize ) );
+	Q_strncpy( szOut, pStart, min( len + 1, nOutSize ) );
 }
 
 #define	MIN_PHYSICS_FLINCH_DAMAGE	5.0f

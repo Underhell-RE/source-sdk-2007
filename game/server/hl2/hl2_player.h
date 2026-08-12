@@ -139,6 +139,21 @@ public:
 	void				DropActiveWeapon( void );
 	void				ThrowGrenadeQuick( void );
 	void				PerformKick( void );
+
+	// -------------------------------------------------------------------------
+	// Underhell TODO (still to port — see docs/underhell-weapons-aiming.md §6):
+	//   #  Feature                      Where it lives
+	//   1  Endurance (m_iEndurance)     CHL2_Player + melee/kick (StaminaToDrain)
+	//   2  Bleeding (m_iBleedCounter)   CHL2_Player + damage handling
+	//   3  Inventory (cl_inventoryToggle) client VGUI panel + concommand
+	//   4  NVG / gasmask / silencer     CHL2_Player (+ postprocess / sound)
+	//   5  MGL arcing grenade           uh_weapon_bfg.cpp (projectile)
+	//   6  FireMode (semi/auto)         CUhFirearmWeapon (optional)
+	//   7  Haptics (hap_*)              client forcefeedback
+	//   8  uh_ragdollcollisiontype      CHL2_Player ragdoll params
+	//   9  kb_act.lst / skill.cfg binds content (scripts/)
+	//  10  Polish (kick anim, sk_plr_dmg_* defaults)
+	// -------------------------------------------------------------------------
 #endif
 
 	// from cbasecombatcharacter
