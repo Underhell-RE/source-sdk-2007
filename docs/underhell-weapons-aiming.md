@@ -119,6 +119,32 @@ this+1832 MeleeWeapon, this+1833 BuiltRightHanded, this+1834 AllowFlipping, this
   (`m_iFOV`, `m_iFOVStart`, `m_flFOVTime`, `m_iDefaultFOV`, `m_hZoomOwner`) и корректирует
   разброс (`accuracy`).
 
+### 2.6. Проникание пуль (`UH_Weapon_Special.Penetration`)
+
+| Декомпилированная функция | Роль |
+|---|---|
+| `server/sub_100EAFB0` | `CBaseEntity::FireBullets` — цикл выстрела с поддержкой проникания (88-байтовая копия `FireBulletsInfo_t`, флаг-байт `+81`, продолжение трассировки после попадания) |
+
+Ключевая находка из декомпиляции: в Underhell `FireBulletsInfo_t` расширен, а поле на
+смещении `+52` (в ванили `m_iDamage`) используется как **бюджет проникания** — цикл сегмента
+(`while (BYTE2(flag) && v132 <= *(info+52))`) продолжает трассировку сквозь поверхность, пока
+счётчик не превысит значение из конфига. Значения из оригинальных `weapon_*.txt`:
+
+| Оружие | `Penetration` |
+|---|---|
+| `weapon_pistol_socom` | 2 |
+| `weapon_shotgun_m5` / `spas12` | 5 |
+| `weapon_rifle_g36k` | 6 |
+| `weapon_pistol_python` / `weapon_rifle_sniper` | 10 |
+
+Семантика: **число поверхностей, которые пуля может пройти насквозь** (0 = выключено). Пуля
+останавливается на NPC/игроке; на каждой пробитой поверхности урон падает
+(`UH_PENETRATION_DAMAGE_FALLOFF`, 0.5 — точную константу Underhell из Hex-Rays не достать,
+вынесена в `uh_basefirearm.cpp`). Реализация: `CUhFirearmWeapon::FireBulletsPenetrating()` —
+посегментная трассировка, каждый сегмент уходит в `CBasePlayer::FireBullets` с
+`VECTOR_CONE_PRECALCULATED`, поэтому декали/эффекты/урон по аммо-типу полностью штатные.
+Парсинг значения — из оригинальных конфигов через `CUHWeaponInfo::m_iPenetration`.
+
 ### 2.5. Кастомные поля игрока (из `DT_BasePlayer`)
 
 | Поле (send/recv) | Тип | Назначение | В нашем SDK |
@@ -222,9 +248,11 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
 4. **Оружейные классы** (§3.1) — серверные классы в `game/server/episodic/` +
    клиентские стабы в `game/client/episodic/`, регистрация через
    `LINK_ENTITY_TO_CLASS` + `PRECACHE_WEAPON_REGISTER` + `IMPLEMENT_SERVERCLASS_ST`:
-   - ✅ Ядро огнестрела: `CUhFirearmWeapon` — `uh_basefirearm.h/.cpp` — впрыскивает
-     урон из `sk_plr_dmg_*`/`sk_npc_dmg_*`, отдачу (`Punch/Snap` + `CrouchRecoilMult`)
-     и точность (`CrouchAccuracyMult`/`RunAccuracyMult`/`ExpOffset.accuracy`) из скрипта.
+   - ✅ Ядро огнестрела: `CUhFirearmWeapon` — `uh_basefirearm.h/.cpp` — переопределяет
+     `PrimaryAttack` (маршрут выстрела через свой `FireBullets`), впрыскивает
+     урон из `sk_plr_dmg_*`/`sk_npc_dmg_*`, отдачу (`Punch/Snap` + `CrouchRecoilMult`),
+     точность (`CrouchAccuracyMult`/`RunAccuracyMult`/`ExpOffset.accuracy`) и проникание
+     (`Penetration` → `FireBulletsPenetrating`, §2.6) из скрипта.
    - ✅ Ближний бой: `CWeaponBaton/Pipe/Axe/Wrench/Cleaver` — `uh_weapon_melee.cpp`,
      база `CUHMeleeWeapon : CBaseHLBludgeonWeapon` читает `MeleeRange`/`MeleeRoF` из
      скрипта; урон — ConVar'ы `sk_plr_dmg_*`/`sk_npc_dmg_*` (имена из декомпа).
@@ -235,8 +263,9 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
    - ✅ Винтовки: g36k / sniper — `uh_weapon_rifles.cpp`.
    - ✅ Прочее: bfg_mgl / bfg_minigun — `uh_weapon_bfg.cpp` (у MGL пока hitscan;
      дуговая граната — follow-up).
-   - ⬜ `C_WeaponKick` — безоружный удар, и проникание
-     `UH_Weapon_Special.Penetration` — отдельной системой.
+   - ✅ Проникание `UH_Weapon_Special.Penetration` — `CUhFirearmWeapon::FireBulletsPenetrating`
+     (§2.6), значение из оригинальных `weapon_*.txt`.
+   - ⬜ `C_WeaponKick` — безоружный удар.
 5. **Скрипты** `weapon_*.txt` — перенос из `Underhell/scripts/` в `scripts/` мода
    (контент, вне SDK-кода; классы уже читают их данные через `CUHWeaponInfo`).
 

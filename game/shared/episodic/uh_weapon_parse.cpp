@@ -58,17 +58,18 @@ CUHWeaponInfo::CUHWeaponInfo()
 	m_flCrouchAccuracyMult = 1.0f;
 	m_flRunAccuracyMult = 1.0f;
 
+	m_iPenetration = 0;
+
 	m_expOffset = Vector( 0, 0, 0 );
 	m_expOriOffset = QAngle( 0, 0, 0 );
-	m_flExpAccuracy = 1.0f;
 
 	m_bOneHanded = false;
+	m_flExpAccuracy = 1.0f;
+
 	m_flMeleeDelayedFire = 0.0f;
 	m_flMeleeRoF = 0.0f;
 	m_flMeleeRange = 32.0f;
 	m_flStaminaToDrain = 15.0f;
-
-	m_iPenetration = 0;
 }
 
 

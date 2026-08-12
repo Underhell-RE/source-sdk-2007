@@ -30,6 +30,7 @@ class CUhFirearmWeapon : public CBaseHLCombatWeapon
 public:
 	CUhFirearmWeapon();
 
+	virtual void	PrimaryAttack( void );
 	virtual void	FireBullets( const FireBulletsInfo_t &info );
 	virtual void	AddViewKick( void );
 
@@ -41,6 +42,14 @@ public:
 
 protected:
 	const CUHWeaponInfo &GetUHWpnData( void ) const { return GetUHWeaponInfo( this ); }
+
+	// Penetration: fire one bullet that passes through up to iPenetration surfaces.
+	void			FireBulletsPenetrating( const FireBulletsInfo_t &info, int iPenetration );
+
+private:
+	// Fire a single pre-aimed bullet segment with scaled damage.
+	void			FireSegment( const FireBulletsInfo_t &info, const Vector &vecSrc,
+								 const Vector &vecDir, const Vector &vecEnd, float flDamageScale );
 };
 
 

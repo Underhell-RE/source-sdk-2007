@@ -35,6 +35,7 @@ public:
 
 public:
 	// Recoil / viewpunch ("PunchPitch"/"PunchYaw" = random in [min,max]).
+	// Field order matches the decompiled Underhell FileWeaponInfo_t layout 1:1.
 	float		m_flPunchPitchMin;
 	float		m_flPunchPitchMax;
 	float		m_flPunchYawMin;
@@ -51,20 +52,24 @@ public:
 	float		m_flCrouchAccuracyMult;
 	float		m_flRunAccuracyMult;
 
-	// Ironsight offsets ("ExpOffset": x/y/z/xori/yori/zori/accuracy).
+	// "UH_Weapon_Special.Penetration" — surfaces the bullet can pass through (0 = off).
+	int			m_iPenetration;
+
+	// Ironsight offsets ("ExpOffset": x/y/z/xori/yori/zori).
 	Vector		m_expOffset;
 	QAngle		m_expOriOffset;
+
+	// "OneHanded".
+	bool		m_bOneHanded;
+
+	// "ExpOffset.accuracy" — spread multiplier while ironsighted.
 	float		m_flExpAccuracy;
 
-	// Melee ("OneHanded"/"MeleeDelayedFire"/"MeleeRoF"/"MeleeRange"/"StaminaToDrain").
-	bool		m_bOneHanded;
+	// Melee ("MeleeDelayedFire"/"MeleeRoF"/"MeleeRange"/"StaminaToDrain").
 	float		m_flMeleeDelayedFire;
 	float		m_flMeleeRoF;
 	float		m_flMeleeRange;
 	float		m_flStaminaToDrain;
-
-	// "UH_Weapon_Special".
-	int			m_iPenetration;
 };
 
 
