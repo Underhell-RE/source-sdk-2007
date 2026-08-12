@@ -219,10 +219,19 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
    поля `m_bIronSighted`/`m_fIronsightedTime`, серверная команда `ironsight_toggle`
    (звук `HL2Player.Ironsighton/off` + FOV-зум через `SetFOV` + синхронизация `m_bExpSighted`
    вьюмодели), скрытие прицела (`HIDEHUD_CROSSHAIR`) на клиенте. Под `HL2_EPISODIC`.
-4. **Оружейные классы** (§3.1) — по одному файлу `weapon_*.cpp` на оружие в
-   `game/server/episodic/` + клиентские стабы, регистрация через
-   `LINK_ENTITY_TO_CLASS` + `IMPLEMENT_NETWORKCLASS`.
-5. **Скрипты** `weapon_*.txt` — перенос из `Underhell/scripts/` в `scripts/` мода.
+4. **Оружейные классы** (§3.1) — серверные классы в `game/server/episodic/` +
+   клиентские стабы в `game/client/episodic/`, регистрация через
+   `LINK_ENTITY_TO_CLASS` + `PRECACHE_WEAPON_REGISTER` + `IMPLEMENT_SERVERCLASS_ST`:
+   - ✅ Ближний бой: `CWeaponBaton/Pipe/Axe/Wrench/Cleaver` — `uh_weapon_melee.cpp`,
+     база `CUHMeleeWeapon : CBaseHLBludgeonWeapon` читает `MeleeRange`/`MeleeRoF` из
+     скрипта; урон — ConVar'ы `sk_plr_dmg_*`/`sk_npc_dmg_*` (имена из декомпа).
+   - ⬜ Пистолеты: glock / beretta / socom / python / dualberetta.
+   - ⬜ ПП: mp5 / mp5_eod / mp7.
+   - ⬜ Дробовики: m3 / m5 / spas12 / xm1014.
+   - ⬜ Винтовки: g36k / sniper.
+   - ⬜ Прочее: bfg_mgl / bfg_minigun (+ `C_WeaponKick` — безоружный удар).
+5. **Скрипты** `weapon_*.txt` — перенос из `Underhell/scripts/` в `scripts/` мода
+   (контент, вне SDK-кода; классы уже читают их данные через `CUHWeaponInfo`).
 
 ### Прицеливание — как реализовано (шаги 2–3)
 

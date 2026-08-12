@@ -2629,6 +2629,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\episodic\c_weapon__stubs_underhell.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\c_weapon_physcannon.cpp"
 					>
 				</File>

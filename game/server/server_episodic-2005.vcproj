@@ -4425,6 +4425,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\episodic\uh_weapon_melee.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\weapon_stunstick.cpp"
 					>
 				</File>
