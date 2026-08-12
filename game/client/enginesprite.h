@@ -13,7 +13,7 @@
 
 #include "mathlib/vector.h"
 #include "avi/iavi.h"
-
+#include "avi/ibik.h"
 
 //-----------------------------------------------------------------------------
 // Forward declarations
@@ -50,11 +50,13 @@ public:
 	float GetRight() { return right; }
 	void DrawFrame( int frame, int x, int y, const wrect_t *prcSubRect );
 	void DrawFrameOfSize( int frame, int x, int y, int iWidth, int iHeight, const wrect_t *prcSubRect);
+	bool IsBIK();
 	bool IsAVI();
 	void GetTexCoordRange( float *pMinU, float *pMinV, float *pMaxU, float *pMaxV );
 
 private:
 	AVIMaterial_t m_hAVIMaterial;
+	BIKMaterial_t m_hBIKMaterial;
 	int m_width;
 	int m_height;
 	int m_numFrames;

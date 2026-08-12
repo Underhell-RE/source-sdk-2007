@@ -270,6 +270,10 @@ bool CEngineSprite::Init( const char *pName )
 	return true;
 }
 
+bool CEngineSprite::IsBIK()
+{
+    return ( m_hBIKMaterial != BIKMATERIAL_INVALID );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
