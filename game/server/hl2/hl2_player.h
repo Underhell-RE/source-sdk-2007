@@ -130,6 +130,12 @@ public:
 
 	virtual bool		ClientCommand( const CCommand &args );
 
+#if defined( HL2_EPISODIC )
+	// Underhell: ironsight.
+	bool				IsIronSighted( void ) const { return m_bIronSighted; }
+	void				ToggleIronsight( void );
+#endif
+
 	// from cbasecombatcharacter
 	void				InitVCollision( const Vector &vecAbsOrigin, const Vector &vecAbsVelocity );
 	WeaponProficiency_t CalcWeaponProficiency( CBaseCombatWeapon *pWeapon );
@@ -327,6 +333,12 @@ private:
 
 	CNetworkVar( bool, m_fIsSprinting );
 	CNetworkVarForDerived( bool, m_fIsWalking );
+
+#if defined( HL2_EPISODIC )
+	// Underhell: ironsight state.
+	CNetworkVar( bool, m_bIronSighted );		// true while aiming down the sights
+	CNetworkVar( float, m_fIronsightedTime );	// last time the ironsight state changed
+#endif
 
 protected:	// Jeep: Portal_Player needs access to this variable to overload PlayerUse for picking up objects through portals
 	bool				m_bPlayUseDenySound;		// Signaled by PlayerUse, but can be unset by HL2 ladder code...

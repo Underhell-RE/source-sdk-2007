@@ -3214,7 +3214,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\shared\weapon_parse_default.cpp"
+				RelativePath="..\shared\episodic\uh_weapon_parse.h"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\episodic\uh_weapon_parse.cpp"
 				>
 			</File>
 			<File

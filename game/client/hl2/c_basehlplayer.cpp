@@ -31,11 +31,19 @@ ConVar cl_npc_speedmod_outtime( "cl_npc_speedmod_outtime", "1.5", FCVAR_CLIENTDL
 IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropDataTable( RECVINFO_DT(m_HL2Local),0, &REFERENCE_RECV_TABLE(DT_HL2Local) ),
 	RecvPropBool( RECVINFO( m_fIsSprinting ) ),
+#if defined( HL2_EPISODIC )
+	RecvPropBool( RECVINFO( m_bIronSighted ) ),
+	RecvPropFloat( RECVINFO( m_fIronsightedTime ) ),
+#endif
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )
 	DEFINE_PRED_TYPEDESCRIPTION( m_HL2Local, C_HL2PlayerLocalData ),
 	DEFINE_PRED_FIELD( m_fIsSprinting, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
+#if defined( HL2_EPISODIC )
+	DEFINE_PRED_FIELD( m_bIronSighted, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
+	DEFINE_PRED_FIELD( m_fIronsightedTime, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
+#endif
 END_PREDICTION_DATA()
 
 //-----------------------------------------------------------------------------
@@ -84,6 +92,17 @@ void C_BaseHLPlayer::OnDataChanged( DataUpdateType_t updateType )
 	{
 		SetNextClientThink( CLIENT_THINK_ALWAYS );
 	}
+
+#if defined( HL2_EPISODIC )
+	// Underhell: hide the crosshair while aiming down the sights.
+	if ( IsLocalPlayer() )
+	{
+		if ( m_bIronSighted )
+			m_Local.m_iHideHUD |= HIDEHUD_CROSSHAIR;
+		else
+			m_Local.m_iHideHUD &= ~HIDEHUD_CROSSHAIR;
+	}
+#endif
 
 	BaseClass::OnDataChanged( updateType );
 }

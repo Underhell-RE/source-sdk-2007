@@ -49,6 +49,7 @@
 
 #ifdef HL2_EPISODIC
 #include "npc_alyx_episodic.h"
+#include "baseviewmodel_shared.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -313,6 +314,10 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),
 	DEFINE_FIELD( m_fIsSprinting, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIsWalking, FIELD_BOOLEAN ),
+#if defined( HL2_EPISODIC )
+	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
+#endif
 
 	/*
 	// These are initialized every time the player calls Activate()
@@ -386,7 +391,71 @@ CHL2_Player::CHL2_Player()
 
 	m_flArmorReductionTime = 0.0f;
 	m_iArmorReductionFrom = 0;
+
+#if defined( HL2_EPISODIC )
+	m_bIronSighted = false;
+	m_fIronsightedTime = 0.0f;
+#endif
 }
+
+#if defined( HL2_EPISODIC )
+
+// Underhell ironsight (see docs/underhell-weapons-aiming.md, server/sub_101ECF40).
+#define UH_IRONSIGHT_FOV_SCALE			0.6f	// fraction of default FOV while aiming
+#define UH_IRONSIGHT_FOV_TIME			0.15f	// zoom transition time
+#define UH_IRONSIGHT_TOGGLE_COOLDOWN	0.1f	// min time between toggles
+
+//-----------------------------------------------------------------------------
+// Purpose: Underhell ironsight toggle. Cooldown, sound, FOV zoom and the
+//			viewmodel raise state, mirroring the decompiled server toggle.
+//-----------------------------------------------------------------------------
+void CHL2_Player::ToggleIronsight( void )
+{
+	// Cooldown so rapid toggling doesn't spam (decomp: >= 0.1s).
+	if ( ( gpGlobals->curtime - m_fIronsightedTime ) < UH_IRONSIGHT_TOGGLE_COOLDOWN )
+		return;
+
+	m_bIronSighted = !m_bIronSighted;
+	m_fIronsightedTime = gpGlobals->curtime;
+
+	if ( m_bIronSighted )
+	{
+		EmitSound( "HL2Player.Ironsighton" );
+
+		int sightFOV = (int)( (float)GetDefaultFOV() * UH_IRONSIGHT_FOV_SCALE );
+		SetFOV( this, sightFOV, UH_IRONSIGHT_FOV_TIME );
+	}
+	else
+	{
+		EmitSound( "HL2Player.Ironsightoff" );
+		SetFOV( this, 0, UH_IRONSIGHT_FOV_TIME );	// reset to default
+	}
+
+	// Keep the viewmodel's raise state in sync so it replicates to the client.
+	CBaseViewModel *pViewModel = GetViewModel();
+	if ( pViewModel )
+	{
+		pViewModel->m_bExpSighted = (bool)m_bIronSighted;
+	}
+}
+
+CON_COMMAND_F( ironsight_toggle, "Toggles ironsight mode for the current weapon.", FCVAR_GAMEDLL )
+{
+	CBasePlayer *pPlayer = UTIL_GetCommandClient();
+	if ( !pPlayer )
+	{
+		// Executed directly (server console / listen server): use the first active player.
+		pPlayer = UTIL_PlayerByIndex( 1 );
+	}
+
+	CHL2_Player *pHL2Player = dynamic_cast< CHL2_Player * >( pPlayer );
+	if ( pHL2Player )
+	{
+		pHL2Player->ToggleIronsight();
+	}
+}
+
+#endif // HL2_EPISODIC
 
 //
 // SUIT POWER DEVICES
@@ -410,6 +479,10 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100 
 IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropDataTable(SENDINFO_DT(m_HL2Local), &REFERENCE_SEND_TABLE(DT_HL2Local), SendProxy_SendLocalDataTable),
 	SendPropBool( SENDINFO(m_fIsSprinting) ),
+#if defined( HL2_EPISODIC )
+	SendPropBool( SENDINFO(m_bIronSighted) ),
+	SendPropFloat( SENDINFO(m_fIronsightedTime) ),
+#endif
 END_SEND_TABLE()
 
 
@@ -426,6 +499,10 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.TrainUse" );
 	PrecacheScriptSound( "HL2Player.Use" );
 	PrecacheScriptSound( "HL2Player.BurnPain" );
+#if defined( HL2_EPISODIC )
+	PrecacheScriptSound( "HL2Player.Ironsighton" );
+	PrecacheScriptSound( "HL2Player.Ironsightoff" );
+#endif
 }
 
 //-----------------------------------------------------------------------------
