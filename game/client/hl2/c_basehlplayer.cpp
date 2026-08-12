@@ -114,7 +114,7 @@ void UH_FreeAim_Update( CUserCmd *pCmd, float flFrameTime )
 	if ( ( gpGlobals->curtime - s_flLastFreeAimSend ) >= UH_FREEAIM_SEND_INTERVAL )
 	{
 		s_flLastFreeAimSend = gpGlobals->curtime;
-		engine->ServerCmd( UTIL_VarArgs( "update_freeaim %f %f %f",
+		engine->ServerCmd( VarArgs( "update_freeaim %f %f %f",
 			s_FreeAimOffset.x, s_FreeAimOffset.y, s_FreeAimOffset.z ) );
 	}
 }
