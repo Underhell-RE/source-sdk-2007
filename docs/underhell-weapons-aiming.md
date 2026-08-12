@@ -119,6 +119,30 @@ this+1832 MeleeWeapon, this+1833 BuiltRightHanded, this+1834 AllowFlipping, this
   (`m_iFOV`, `m_iFOVStart`, `m_flFOVTime`, `m_iDefaultFOV`, `m_hZoomOwner`) и корректирует
   разброс (`accuracy`).
 
+### 2.7. Быстрые действия игрока (`dropweapon` / `throw_nade` / `uh_jake_kick`)
+
+| Декомпилированная функция | Роль |
+|---|---|
+| `server/sub_101F11D0` | `CHL2_Player::ClientCommand` — диспетчер команд `uh_jake_kick`, `ironsight_toggle`, `Throw_Nade`, `DropWeapon`, `NightVision_Toggle`, `GasMask_Toggle`, `silencer_toggle`, `update_freeaim` |
+
+Имена в `kb_act.lst` (клиентские) → фактические команды на сервере:
+
+| kb_act.lst (клиент) | Команда в ClientCommand | Реализация |
+|---|---|---|
+| `throw_nade` | `Throw_Nade` | `CHL2_Player::ThrowGrenadeQuick()` — быстрый бросок `grenade_frag` (1200 юн/с), если есть аммо «grenade» |
+| `dropweapon` | `DropWeapon` | `CHL2_Player::DropActiveWeapon()` — выброс активного оружия вперёд (300 юн/с); **melee-оружие выбросить нельзя** (проверка флага `MeleeWeapon`, offset 1832 в оригинале) |
+| `uh_jake_kick` | `uh_jake_kick` | `CHL2_Player::PerformKick()` — удар ногой: viewpunch −2°, звуки `HL2Player.kick_fire(_fly)`, melee-урон (`sk_plr_dmg_kick`, по умолч. 20); в оригинале также тратит 20 выносливости (система выносливости — follow-up) |
+
+Плюс `additionalequipment` (NPC-снаряжение) поддерживает **список через запятую** — NPC берёт
+случайное оружие из списка (FGD: `weapon_melee_pipe,weapon_melee_baton,weapon_melee_wrench`). Это
+чинило «Attempted to create unknown entity type weapon_smg_mp5,weapon_smg_mp5_eod,…» — ванильный
+`CAI_BaseNPC` не умел парсить список и пробовал заспавнить всю строку как один classname.
+
+> Вне оружейного скоупа (отдельные фичи Underhell, будут позже): `cl_inventoryToggle`
+> (экран инвентаря, клиент), `NightVision_Toggle` / `GasMask_Toggle` / `silencer_toggle`,
+> ConVar `hap_HasDevice` (хаптика HUD), `uh_ragdollcollisiontype`. Спам
+> «No caption found for 'metal_box.scraperough'» — безобиден (closecaption для звука скребка).
+
 ### 2.6. Проникание пуль (`UH_Weapon_Special.Penetration`)
 
 | Декомпилированная функция | Роль |
@@ -265,7 +289,10 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
      дуговая граната — follow-up).
    - ✅ Проникание `UH_Weapon_Special.Penetration` — `CUhFirearmWeapon::FireBulletsPenetrating`
      (§2.6), значение из оригинальных `weapon_*.txt`.
-   - ⬜ `C_WeaponKick` — безоружный удар.
+   - ✅ Быстрые действия: `dropweapon` / `throw_nade` / `uh_jake_kick` (§2.7) — серверные
+     `CON_COMMAND` + обработка в `CHL2_Player::ClientCommand`; `additionalequipment` понимает
+     список через запятую (случайный выбор, §2.7).
+   - ⬜ Система выносливости (kick/mеле расходуют `m_iEndurance`).
 5. **Скрипты** `weapon_*.txt` — перенос из `Underhell/scripts/` в `scripts/` мода
    (контент, вне SDK-кода; классы уже читают их данные через `CUHWeaponInfo`).
 

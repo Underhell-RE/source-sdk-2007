@@ -50,6 +50,8 @@
 #ifdef HL2_EPISODIC
 #include "npc_alyx_episodic.h"
 #include "baseviewmodel_shared.h"
+#include "grenade_frag.h"
+#include "ammodef.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -317,6 +319,7 @@ BEGIN_DATADESC( CHL2_Player )
 #if defined( HL2_EPISODIC )
 	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
+	DEFINE_FIELD( m_flNextKickTime, FIELD_TIME ),
 #endif
 
 	/*
@@ -395,6 +398,7 @@ CHL2_Player::CHL2_Player()
 #if defined( HL2_EPISODIC )
 	m_bIronSighted = false;
 	m_fIronsightedTime = 0.0f;
+	m_flNextKickTime = 0.0f;
 #endif
 }
 
@@ -455,6 +459,140 @@ CON_COMMAND_F( ironsight_toggle, "Toggles ironsight mode for the current weapon.
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Underhell quick actions. Mirrors the decompiled server ClientCommand
+// dispatcher (server/sub_101F11D0: DropWeapon / Throw_Nade / uh_jake_kick).
+// Registered with the kb_act.lst command names so the client console/keybinds
+// forward them to the server in single-player.
+//-----------------------------------------------------------------------------
+ConVar sk_plr_dmg_kick( "sk_plr_dmg_kick", "20" );
+
+#define UH_KICK_RANGE			72.0f
+#define UH_KICK_COOLDOWN		0.5f
+
+//-----------------------------------------------------------------------------
+// Purpose: Drop the active weapon (tossed forward). Mirrors "DropWeapon".
+//-----------------------------------------------------------------------------
+void CHL2_Player::DropActiveWeapon( void )
+{
+	if ( !IsAlive() )
+		return;
+
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	if ( !pWeapon )
+		return;
+
+	// Underhell: melee weapons cannot be dropped (decomp checks the MeleeWeapon flag).
+	if ( pWeapon->GetWpnData().m_bMeleeWeapon )
+		return;
+
+	if ( IsIronSighted() )
+		ToggleIronsight();
+
+	Vector vecThrow;
+	EyeVectors( &vecThrow, NULL, NULL );
+	vecThrow *= 300.0f;
+
+	Weapon_Drop( pWeapon, NULL, &vecThrow );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Quick-throw a grenade. Mirrors "Throw_Nade".
+//-----------------------------------------------------------------------------
+void CHL2_Player::ThrowGrenadeQuick( void )
+{
+	if ( !IsAlive() )
+		return;
+
+	int iGrenade = GetAmmoDef()->Index( "grenade" );
+	if ( GetAmmoCount( iGrenade ) <= 0 )
+		return;
+
+	if ( IsIronSighted() )
+		ToggleIronsight();
+
+	RemoveAmmo( 1, iGrenade );
+
+	Vector vecEye = EyePosition();
+	Vector vForward, vRight;
+	EyeVectors( &vForward, &vRight, NULL );
+	Vector vecSrc = vecEye + vForward * 18.0f + vRight * 8.0f;
+	vForward[2] += 0.1f;
+
+	Vector vecThrow;
+	GetVelocity( &vecThrow, NULL );
+	vecThrow += vForward * 1200.0f;
+
+	Fraggrenade_Create( vecSrc, vec3_angle, vecThrow,
+		AngularImpulse( 600, random->RandomInt( -1200, 1200 ), 0 ), this, 3.0f, false );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Underhell unarmed kick. Mirrors "uh_jake_kick".
+//          (The original also drains 20 stamina - stamina system is a follow-up.)
+//-----------------------------------------------------------------------------
+void CHL2_Player::PerformKick( void )
+{
+	if ( !IsAlive() )
+		return;
+
+	// Cooldown so the kick can't be spammed faster than the animation plays.
+	if ( m_flNextKickTime > gpGlobals->curtime )
+		return;
+	m_flNextKickTime = gpGlobals->curtime + UH_KICK_COOLDOWN;
+
+	if ( IsIronSighted() )
+		ToggleIronsight();
+
+	SetAnimation( PLAYER_ATTACK1 );
+	ViewPunch( QAngle( -2.0f, 0.0f, 0.0f ) );
+
+	if ( GetFlags() & FL_ONGROUND )
+	{
+		EmitSound( "HL2Player.kick_fire" );
+		EmitSound( "Player.Voice.Kick" );
+	}
+	else
+	{
+		EmitSound( "HL2Player.kick_fire_fly" );
+	}
+
+	CheckTraceHullAttack( UH_KICK_RANGE, Vector( -16, -16, -16 ), Vector( 16, 16, 16 ),
+		(int)sk_plr_dmg_kick.GetFloat(), DMG_CLUB );
+}
+
+static CHL2_Player *UnderhellCommandPlayer( void )
+{
+	CBasePlayer *pPlayer = UTIL_GetCommandClient();
+	if ( !pPlayer )
+	{
+		// Executed directly (server console / listen server): use the first active player.
+		pPlayer = UTIL_PlayerByIndex( 1 );
+	}
+	return dynamic_cast< CHL2_Player * >( pPlayer );
+}
+
+CON_COMMAND_F( dropweapon, "Drops the currently active weapon.", FCVAR_GAMEDLL )
+{
+	CHL2_Player *pPlayer = UnderhellCommandPlayer();
+	if ( pPlayer )
+		pPlayer->DropActiveWeapon();
+}
+
+CON_COMMAND_F( throw_nade, "Quick-throws a grenade.", FCVAR_GAMEDLL )
+{
+	CHL2_Player *pPlayer = UnderhellCommandPlayer();
+	if ( pPlayer )
+		pPlayer->ThrowGrenadeQuick();
+}
+
+CON_COMMAND_F( uh_jake_kick, "Performs an unarmed kick.", FCVAR_GAMEDLL )
+{
+	CHL2_Player *pPlayer = UnderhellCommandPlayer();
+	if ( pPlayer )
+		pPlayer->PerformKick();
+}
+
 #endif // HL2_EPISODIC
 
 //
@@ -502,6 +640,10 @@ void CHL2_Player::Precache( void )
 #if defined( HL2_EPISODIC )
 	PrecacheScriptSound( "HL2Player.Ironsighton" );
 	PrecacheScriptSound( "HL2Player.Ironsightoff" );
+	PrecacheScriptSound( "HL2Player.kick_fire" );
+	PrecacheScriptSound( "HL2Player.kick_fire_fly" );
+	PrecacheScriptSound( "Player.Voice.Kick" );
+	PrecacheScriptSound( "Player.Voice.Kick.Exhausted" );
 #endif
 }
 
@@ -2846,6 +2988,33 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 		}
 		return true;
 	}
+
+#if defined( HL2_EPISODIC )
+	// Underhell client commands (names match the decompiled dispatcher sub_101F11D0).
+	if ( !Q_stricmp( args[0], "DropWeapon" ) )
+	{
+		DropActiveWeapon();
+		return true;
+	}
+
+	if ( !Q_stricmp( args[0], "Throw_Nade" ) )
+	{
+		ThrowGrenadeQuick();
+		return true;
+	}
+
+	if ( !Q_stricmp( args[0], "uh_jake_kick" ) )
+	{
+		PerformKick();
+		return true;
+	}
+
+	if ( !Q_stricmp( args[0], "ironsight_toggle" ) )
+	{
+		ToggleIronsight();
+		return true;
+	}
+#endif
 
 	return BaseClass::ClientCommand( args );
 }

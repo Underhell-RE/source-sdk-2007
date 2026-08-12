@@ -134,6 +134,11 @@ public:
 	// Underhell: ironsight.
 	bool				IsIronSighted( void ) const { return m_bIronSighted; }
 	void				ToggleIronsight( void );
+
+	// Underhell: quick actions (see docs/underhell-weapons-aiming.md).
+	void				DropActiveWeapon( void );
+	void				ThrowGrenadeQuick( void );
+	void				PerformKick( void );
 #endif
 
 	// from cbasecombatcharacter
@@ -338,6 +343,8 @@ private:
 	// Underhell: ironsight state.
 	CNetworkVar( bool, m_bIronSighted );		// true while aiming down the sights
 	CNetworkVar( float, m_fIronsightedTime );	// last time the ironsight state changed
+
+	float				m_flNextKickTime;		// Underhell kick cooldown (transient)
 #endif
 
 protected:	// Jeep: Portal_Player needs access to this variable to overload PlayerUse for picking up objects through portals

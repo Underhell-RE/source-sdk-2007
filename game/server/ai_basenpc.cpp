@@ -114,6 +114,67 @@ extern ConVar sk_healthkit;
 
 bool RagdollManager_SaveImportant( CAI_BaseNPC *pNPC );
 
+//-----------------------------------------------------------------------------
+// Underhell: "additionalequipment" may be a comma-separated list of weapons.
+// Precache every entry, then pick one at random when the NPC spawns.
+//-----------------------------------------------------------------------------
+static void PrecacheWeaponEquipmentList( const char *pszList )
+{
+	if ( !pszList || !pszList[0] || !Q_stricmp( pszList, "0" ) )
+		return;
+
+	char szWeapon[128];
+	const char *p = pszList;
+	while ( p && *p )
+	{
+		const char *pComma = strchr( p, ',' );
+		int len = pComma ? (int)( pComma - p ) : (int)strlen( p );
+		if ( len > 0 )
+		{
+			Q_strncpy( szWeapon, p, MIN( len + 1, (int)sizeof( szWeapon ) ) );
+			UTIL_PrecacheOther( szWeapon );
+		}
+
+		if ( !pComma )
+			break;
+		p = pComma + 1;
+	}
+}
+
+static void PickWeaponFromEquipmentList( const char *pszList, char *szOut, int nOutSize )
+{
+	szOut[0] = '\0';
+	if ( !pszList || !pszList[0] || !Q_stricmp( pszList, "0" ) )
+		return;
+
+	// Single weapon (the vanilla case) - no list to pick from.
+	const char *pComma = strchr( pszList, ',' );
+	if ( !pComma )
+	{
+		Q_strncpy( szOut, pszList, nOutSize );
+		return;
+	}
+
+	// Count entries.
+	int count = 1;
+	for ( const char *p = pComma; *p; p++ )
+	{
+		if ( *p == ',' )
+			count++;
+	}
+
+	int pick = random->RandomInt( 0, count - 1 );
+	const char *pStart = pszList;
+	for ( int i = 0; i < pick; i++ )
+	{
+		pStart = strchr( pStart, ',' ) + 1;
+	}
+
+	const char *pEnd = strchr( pStart, ',' );
+	int len = pEnd ? (int)( pEnd - pStart ) : (int)strlen( pStart );
+	Q_strncpy( szOut, pStart, MIN( len + 1, nOutSize ) );
+}
+
 #define	MIN_PHYSICS_FLINCH_DAMAGE	5.0f
 
 #define	NPC_GRENADE_FEAR_DIST		200
@@ -6851,7 +6912,11 @@ void CAI_BaseNPC::NPCInit ( void )
 	{	// Does this npc spawn with a weapon
 		if ( m_spawnEquipment != NULL_STRING && strcmp(STRING(m_spawnEquipment), "0"))
 		{
-			CBaseCombatWeapon *pWeapon = Weapon_Create( STRING(m_spawnEquipment) );
+			// Underhell: support comma-separated weapon lists (random pick).
+			char szWeapon[128];
+			PickWeaponFromEquipmentList( STRING(m_spawnEquipment), szWeapon, sizeof(szWeapon) );
+
+			CBaseCombatWeapon *pWeapon = Weapon_Create( szWeapon );
 			if ( pWeapon )
 			{
 				// If I have a name, make my weapon match it with "_weapon" appended
@@ -10866,7 +10931,8 @@ void CAI_BaseNPC::Precache( void )
 
 	if ( m_spawnEquipment != NULL_STRING && strcmp(STRING(m_spawnEquipment), "0") )
 	{
-		UTIL_PrecacheOther( STRING(m_spawnEquipment) );
+		// Underhell: precache every weapon in a comma-separated list.
+		PrecacheWeaponEquipmentList( STRING(m_spawnEquipment) );
 	}
 
 	// Make sure schedules are loaded for this NPC type
