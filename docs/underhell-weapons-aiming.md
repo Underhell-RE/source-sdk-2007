@@ -222,14 +222,18 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
 4. **Оружейные классы** (§3.1) — серверные классы в `game/server/episodic/` +
    клиентские стабы в `game/client/episodic/`, регистрация через
    `LINK_ENTITY_TO_CLASS` + `PRECACHE_WEAPON_REGISTER` + `IMPLEMENT_SERVERCLASS_ST`:
+   - ✅ Ядро огнестрела: `CUhFirearmWeapon` — `uh_basefirearm.h/.cpp` — впрыскивает
+     урон из `sk_plr_dmg_*`/`sk_npc_dmg_*`, отдачу (`Punch/Snap` + `CrouchRecoilMult`)
+     и точность (`CrouchAccuracyMult`/`RunAccuracyMult`/`ExpOffset.accuracy`) из скрипта.
    - ✅ Ближний бой: `CWeaponBaton/Pipe/Axe/Wrench/Cleaver` — `uh_weapon_melee.cpp`,
      база `CUHMeleeWeapon : CBaseHLBludgeonWeapon` читает `MeleeRange`/`MeleeRoF` из
      скрипта; урон — ConVar'ы `sk_plr_dmg_*`/`sk_npc_dmg_*` (имена из декомпа).
-   - ⬜ Пистолеты: glock / beretta / socom / python / dualberetta.
+   - ✅ Пистолеты: glock / beretta / socom / python / dualberetta — `uh_weapon_pistols.cpp`.
    - ⬜ ПП: mp5 / mp5_eod / mp7.
    - ⬜ Дробовики: m3 / m5 / spas12 / xm1014.
    - ⬜ Винтовки: g36k / sniper.
-   - ⬜ Прочее: bfg_mgl / bfg_minigun (+ `C_WeaponKick` — безоружный удар).
+   - ⬜ Прочее: bfg_mgl / bfg_minigun (+ `C_WeaponKick` — безоружный удар, и проникание
+     `UH_Weapon_Special.Penetration` — отдельной системой).
 5. **Скрипты** `weapon_*.txt` — перенос из `Underhell/scripts/` в `scripts/` мода
    (контент, вне SDK-кода; классы уже читают их данные через `CUHWeaponInfo`).
 

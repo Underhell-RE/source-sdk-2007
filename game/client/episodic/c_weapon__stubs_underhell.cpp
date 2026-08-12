@@ -19,3 +19,10 @@ STUB_WEAPON_CLASS( weapon_melee_pipe, WeaponPipe, C_BaseHLBludgeonWeapon );
 STUB_WEAPON_CLASS( weapon_melee_axe, WeaponAxe, C_BaseHLBludgeonWeapon );
 STUB_WEAPON_CLASS( weapon_melee_wrench, WeaponWrench, C_BaseHLBludgeonWeapon );
 STUB_WEAPON_CLASS( weapon_cleaver, WeaponCleaver, C_BaseHLBludgeonWeapon );
+
+// Pistols
+STUB_WEAPON_CLASS( weapon_pistol_glock, WeaponPistolGlock, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_pistol_beretta, WeaponPistolBeretta, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_pistol_socom, WeaponPistolSocom, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_pistol_python, WeaponPython, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_pistol_dualberetta, WeaponPistolDualies, C_BaseHLCombatWeapon );
