@@ -22,19 +22,15 @@ ConVar	sk_healthvial( "sk_healthvial","0" );
 ConVar	sk_healthcharger( "sk_healthcharger","0" );		
 
 //-----------------------------------------------------------------------------
-// Underhell: try to stash a health pickup into the player's inventory instead
-// of healing on the spot. Only stashes while the player is hurt (a full-health
-// player leaves the pickup on the ground, matching vanilla) and there is a
-// free inventory slot. Returns true when the item was consumed.
+// Underhell: stash a health pickup into the player's inventory for later use.
+// Always stashes while there is a free slot, regardless of current health (a
+// hurt player can hoard kits for later). Returns true when the item was
+// consumed.
 //-----------------------------------------------------------------------------
 static bool UH_TryInventoryHealthPickup( CItem *pItem, CBasePlayer *pPlayer, int iItem )
 {
 	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
 	if ( !pHL2Player )
-		return false;
-
-	// Don't hoover up health when already at full health.
-	if ( pHL2Player->GetHealth() >= pHL2Player->GetMaxHealth() )
 		return false;
 
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )

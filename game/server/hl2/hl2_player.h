@@ -388,6 +388,14 @@ public:
 	void				UH_UpdateFlashlightBattery( void );	// drain a battery while the flashlight is on
 
 	//-----------------------------------------------------------------------------
+	// Underhell glowstick. The lit glowstick prop is parented to the player and
+	// tracked here (original m_hActiveGlowStick @2164) so it can be removed when
+	// the player uses the lit-glowstick inventory slot again.
+	//-----------------------------------------------------------------------------
+	CBaseEntity			*UH_GetActiveGlowStick( void ) const { return m_hActiveGlowStick.Get(); }
+	void				UH_SetActiveGlowStick( CBaseEntity *pGlowStick ) { m_hActiveGlowStick.Set( pGlowStick ); }
+
+	//-----------------------------------------------------------------------------
 	// Underhell objectives / map signaling (implementation in
 	// game/server/underhell/uh_player_objectives.cpp).
 	// Original: CBasePlayer::ClientCommand sub_101F11D0 in serveror.dll
@@ -440,6 +448,7 @@ private:
 	float				m_flLastBleedTime;		// curtime of the last bleed think
 	float				m_flLastBleedTickBase;	// curtime of the previous think (dt accumulator base)
 	int					m_iEHealthCount;		// consecutive bleed-deaths (zeroes endurance at 10)
+	EHANDLE				m_hActiveGlowStick;		// lit glowstick prop parented to the player (original @2164)
 
 	// This player's HL2 specific data that should only be replicated to 
 	//  the player and not to other players.

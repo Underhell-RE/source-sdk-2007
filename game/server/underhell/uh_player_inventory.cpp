@@ -102,6 +102,7 @@ void CHL2_Player::UH_InitializeInventory( void )
 	m_bDisplayHermitCard = false;
 	m_bFlashlightOn = false;
 	m_bInventoryEnabled = true;
+	m_hActiveGlowStick = NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -285,11 +286,20 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 	{
 		if ( UH_IsLitGlowstick( iItem ) )
 		{
+			// Lit glowsticks have no world entity ("nothing"): using the slot
+			// again removes the lit prop strapped to the player.
 			UH_RemoveInventoryItem( iSlot );
 
-			// TODO: find the lit glowstick attached to the player and remove
-			// it (original warns if none found — keep the exact wording).
-			Warning( "Attempted to remove Lit glowstick, but did not find one on player! \n" );
+			CBaseEntity *pGlow = UH_GetActiveGlowStick();
+			if ( pGlow )
+			{
+				UTIL_Remove( pGlow );
+				UH_SetActiveGlowStick( NULL );
+			}
+			else
+			{
+				Warning( "Attempted to remove Lit glowstick, but did not find one on player! \n" );
+			}
 		}
 		else
 		{

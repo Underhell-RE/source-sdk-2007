@@ -144,7 +144,9 @@ public:
 	virtual int	 GetInventoryItemType() const { return UH_ITEM_SODA_FIRST; }
 };
 
-// Glowsticks cover five colours (ids 14..18). TODO: verify colour source.
+// Glowsticks cover five colours (ids 14..18). Using one lights it: a lit
+// glowstick prop is strapped to the player and the slot becomes the lit
+// counterpart (id + 5). The original item_glowstick Use() is sub_101742D0.
 class CItemGlowStick : public CUHItem
 {
 public:
@@ -153,6 +155,7 @@ public:
 	virtual void Spawn( void );
 	virtual void Precache( void );
 	virtual bool MyTouch( CBasePlayer *pPlayer );
+	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	virtual int	 GetInventoryItemType() const { return UH_ITEM_GLOWSTICK_FIRST; }
 };
 

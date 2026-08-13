@@ -102,8 +102,8 @@ void CHudUHHermitCards::OnThink( void )
 	{
 		if ( iCards == m_iCardsCount && bDisplay == m_bDisplayCard )
 		{
-			// Stable for long enough: fade out.
-			m_iAlpha = max( 0, m_iAlpha - 5 );
+			// Stable for long enough: fade out slowly.
+			m_iAlpha = max( 0, m_iAlpha - 1 );
 		}
 		else
 		{

@@ -73,13 +73,15 @@ void CHudUHBattery::OnThink( void )
 	if ( !pPlayer )
 		return;
 
+	// Show at full alpha while the flashlight is on or batteries change; fade
+	// out slowly when stable (original sub_100BDF90 fades ~1 unit per think).
 	if ( pPlayer->m_bFlashlightOn || pPlayer->m_iUHBatteryCount != m_iBatteryCount )
 	{
 		m_iAlpha = 255;
 	}
 	else
 	{
-		m_iAlpha = max( 0, m_iAlpha - 5 );
+		m_iAlpha = max( 0, m_iAlpha - 1 );
 	}
 
 	m_iBatteryCount = pPlayer->m_iUHBatteryCount;

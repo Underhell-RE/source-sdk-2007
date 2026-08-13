@@ -109,6 +109,9 @@ Full classname list: `FGD/Item List.txt` (food, ammo, equipment, health) + `Weap
 | 16 | feat(client) | CHudUHBattery (contour + charge + count) + CHudBleeding |
 | 17 | feat(server) | bleeding system + passive hunger decay |
 | 18 | feat(client) | CHudUHHermitCards (deck icon + count + quest progress) |
+| 19 | feat(server) | working glowsticks (lit prop strapped to player) |
+| 20 | fix(server) | healthkit/healthvial always stash into inventory (+use) |
+| 21 | fix(client) | battery/cards HUD fade rate (icons now persist) |
 
 ## Progress
 
@@ -284,6 +287,30 @@ From scripts/HudLayout.res + decompile:
   the networked fields; `m_bDisplayHermitCard` flips true once cards exist.
   The Underhell game-stats system is not ported, so the port exposes
   `CHL2_Player::UH_SetHermitCards()` + a `uh_give_hermit_card` cheat instead.
+
+## Glowsticks (stage 19)
+
+Decoded from the original `item_glowstick` Use() (sub_101742D0):
+
+- **Use** (unlit 14–18, from the inventory): create a `prop_physics` with
+  `models/pg_props/pg_obj/pg_glow_stick.mdl`, set the colour via bodygroup
+  (red/yellow/green/blue/purple = 0/2/4/6/8), place at the player's origin
+  + 36 z, add EF_BONEMERGE | EF_NOSHADOW, make it non-solid, then parent it to
+  the player and remember it in `m_hActiveGlowStick` (@2164). The model is
+  self-illuminated so no separate light entity is needed (matches the
+  original, which only creates an `env_flare` for the flare item).
+- **Use again** (lit 19–23): the slot has no world entity ("nothing"), so the
+  handler removes `m_hActiveGlowStick` and clears the slot.
+- **Drop** (unlit 14–18): `UH_SpawnItemInWorld` already drops a lit coloured
+  `prop_physics` glowstick.
+
+## Health pickup (stage 20)
+
+`item_healthkit` / `item_healthvial` now **always** stash into the inventory
+on +use while a free slot exists (no health gate). Only when the inventory is
+full does it fall back to healing on touch. Using the kit from the inventory
+heals `sk_healthkit` / `sk_healthvial` and stops / slows bleeding
+(sub_102F07A0 / sub_102F08D0).
 
 ## Pickup / item_random decode (from RTTI + datamap blob + vtables)
 

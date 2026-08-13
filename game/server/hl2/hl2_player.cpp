@@ -323,6 +323,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flLastBleedTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flLastBleedTickBase, FIELD_TIME ),
 	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
+	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
 
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),

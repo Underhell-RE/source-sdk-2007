@@ -259,7 +259,9 @@ bool CItemUHSoda::MyTouch( CBasePlayer *pPlayer )
 
 //-----------------------------------------------------------------------------
 // Glowsticks: five colours, ids 14..18.
-// TODO: verify the colour source (spawn skin vs pickup roll).
+// Glowsticks light up when used from the inventory (slot becomes the lit id,
+// a lit glowstick prop is strapped to the player). Decoded from the original
+// item_glowstick Use() (sub_101742D0).
 //-----------------------------------------------------------------------------
 LINK_ENTITY_TO_CLASS( item_glowstick, CItemGlowStick );
 
@@ -267,7 +269,9 @@ void CItemGlowStick::Precache( void )
 {
 	BaseClass::Precache();
 	PrecacheModel( "models/pg_props/pg_obj/pg_glow_stick_pack.mdl" );
+	PrecacheModel( "models/pg_props/pg_obj/pg_glow_stick.mdl" );
 	UH_PrecacheItemSounds();
+	PrecacheScriptSound( "glowstick.crack" );
 }
 
 void CItemGlowStick::Spawn( void )
@@ -293,6 +297,64 @@ bool CItemGlowStick::MyTouch( CBasePlayer *pPlayer )
 	UTIL_Remove( this );
 
 	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Light the glowstick — strap a lit prop to the player and remember
+// it so the lit slot can remove it later. The temporary item entity is
+// consumed here; UH_ItemAction turns the inventory slot into the lit id.
+//-----------------------------------------------------------------------------
+void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path lights it.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	int iItem = (int)value;
+
+	// Replace any existing lit glowstick with the new one.
+	CBaseEntity *pOldGlow = pPlayer->UH_GetActiveGlowStick();
+	if ( pOldGlow )
+	{
+		UTIL_Remove( pOldGlow );
+		pPlayer->UH_SetActiveGlowStick( NULL );
+	}
+
+	CBaseEntity *pGlow = CreateEntityByName( "prop_physics" );
+	if ( !pGlow )
+		return;
+
+	pGlow->SetModel( "models/pg_props/pg_obj/pg_glow_stick.mdl" );
+	static_cast<CBaseAnimating *>( pGlow )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
+
+	Vector vecOrigin = pPlayer->GetAbsOrigin() + Vector( 0, 0, 36 );
+	pGlow->SetAbsOrigin( vecOrigin );
+	pGlow->SetAbsAngles( pPlayer->GetAbsAngles() );
+
+	// The glow-stick model's bodygroup picks the colour; the material is
+	// self-illuminated so no extra light entity is needed (original
+	// sub_101742D0 only adds EF_BONEMERGE + EF_NOSHADOW and goes non-solid).
+	pGlow->AddEffects( EF_BONEMERGE | EF_NOSHADOW );
+	pGlow->AddSolidFlags( FSOLID_NOT_SOLID );
+
+	pGlow->Spawn();
+
+	// Follow the player (strapped to the waist).
+	pGlow->SetParent( pPlayer );
+	pGlow->SetLocalOrigin( Vector( 0, 0, 36 ) );
+
+	pPlayer->UH_SetActiveGlowStick( pGlow );
+	pPlayer->EmitSound( "glowstick.crack" );
+
+	UTIL_Remove( this );
 }
 
 //-----------------------------------------------------------------------------
