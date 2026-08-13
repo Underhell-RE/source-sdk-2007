@@ -2,8 +2,10 @@
 //
 // Purpose: Underhell inventory UI panel.
 //
-// Original: CInventoryPanel, a vgui::Frame named "InventoryPanel" holding 28
-// slot panels, refreshed from the local player's replicated m_iInventory.
+// Original: CInventoryPanel, a vgui::Frame loaded from
+// "resource/UI/InventoryPanel.res" (1024x512 at 368,84), holding 28 slot
+// panels — a 4x6 grid plus a row of 4 — refreshed from the local player's
+// replicated m_iInventory.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -67,7 +69,7 @@ public:
 	// cl_inventoryToggle — flips visibility and asks the server to resync.
 	void Toggle( void );
 
-	// Client "UpdateInventory" command — full refresh on next think.
+	// Client "UpdateInventory" command — full refresh.
 	void RequestRefresh( void )	{ m_bNeedsRefresh = true; }
 
 private:
@@ -79,8 +81,9 @@ private:
 	MESSAGE_FUNC( OnNewSelection, "NewSelection" );
 	MESSAGE_FUNC( OnNewMouseReleased, "NewMouseReleased" );
 
-	CInventorySlotPanel *m_pSlots[UH_INVENTORY_SLOTS];
-	bool				m_bNeedsRefresh;
+	vgui::ImagePanel		*m_pBackground;
+	CInventorySlotPanel		*m_pSlots[UH_INVENTORY_SLOTS];
+	bool					m_bNeedsRefresh;
 };
 
 // Singleton accessor — creates the panel on first use.
