@@ -32,9 +32,7 @@ public:
 	bool MyTouch( CBasePlayer *pPlayer );
 };
 
-// UH: item_healthkit is replaced by the Underhell inventory item
-// (game/server/underhell/uh_items.cpp, CUHItemHealthKit).
-// LINK_ENTITY_TO_CLASS( item_healthkit, CHealthKit );
+LINK_ENTITY_TO_CLASS( item_healthkit, CHealthKit );
 PRECACHE_REGISTER(item_healthkit);
 
 
@@ -149,9 +147,7 @@ public:
 	}
 };
 
-// UH: item_healthvial is replaced by the Underhell inventory item
-// (game/server/underhell/uh_items.cpp, CUHItemHealthVial).
-// LINK_ENTITY_TO_CLASS( item_healthvial, CHealthVial );
+LINK_ENTITY_TO_CLASS( item_healthvial, CHealthVial );
 PRECACHE_REGISTER( item_healthvial );
 
 //-----------------------------------------------------------------------------

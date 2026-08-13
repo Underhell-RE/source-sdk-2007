@@ -40,8 +40,6 @@ public:
 	}
 };
 
-// UH: item_battery is replaced by the Underhell inventory item
-// (game/server/underhell/uh_items.cpp, CUHItemBattery).
-// LINK_ENTITY_TO_CLASS(item_battery, CItemBattery);
+LINK_ENTITY_TO_CLASS(item_battery, CItemBattery);
 PRECACHE_REGISTER(item_battery);
 
