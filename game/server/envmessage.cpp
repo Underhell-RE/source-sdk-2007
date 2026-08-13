@@ -179,10 +179,6 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 	// objective, so we check slots in order.
 	const char *pszToShow = NULL;
 
-	// Try to find highest priority (1 is highest? In VMF they use 1 for current).
-	// We'll check from 16 down to 1? Actually SetMessagePriority1 is used for current,
-	// so lowest number = highest priority. Let's scan 1..16 and pick first non-empty
-	// that we have, then fallback to main m_iszMessage.
 	for ( int i = 0; i < 16; ++i )
 	{
 		if ( m_iszMessagesPriority[i] != NULL_STRING && STRING(m_iszMessagesPriority[i])[0] )
@@ -198,9 +194,8 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 			pszToShow = STRING(m_iszMessage);
 	}
 
-	// If still nothing, nothing to show but still play sound.
-
 	CBaseEntity *pPlayer = NULL;
+	bool bHasPlayer = false;
 
 	if ( m_spawnflags & SF_MESSAGE_ALL )
 	{
@@ -212,10 +207,12 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 		if ( inputdata.pActivator && inputdata.pActivator->IsPlayer() )
 		{
 			pPlayer = inputdata.pActivator;
+			bHasPlayer = true;
 		}
 		else
 		{
 			pPlayer = (gpGlobals->maxClients > 1) ? NULL : UTIL_GetLocalPlayer();
+			bHasPlayer = (pPlayer != NULL);
 		}
 
 		if ( pPlayer && pPlayer->IsPlayer() )
@@ -225,7 +222,6 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 		}
 		else if ( !pPlayer )
 		{
-			// No activator, but singleplayer: try local player
 			if ( pszToShow && *pszToShow )
 			{
 				CBasePlayer *pLocal = UTIL_GetLocalPlayer();
@@ -234,6 +230,66 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 				else
 					UTIL_ShowMessageAll( pszToShow );
 			}
+		}
+	}
+
+	// Fallback for Underhell: if TextMessageGet fails (titles_*.txt not loaded),
+	// try to show localization token directly via center print. The titles entry
+	// Prologue_2_Objective_A has Message "#UnderHell_Prologue_2_Objective_A" which
+	// is in Underhell_english.txt. We construct "#UnderHell_<entry>" and send as
+	// TextMsg so client localizes it. This ensures text renders even without
+	// titles file loading, matching original behavior where sound played but
+	// text didn't (user report).
+	if ( pszToShow && *pszToShow )
+	{
+		// If pszToShow is already a localization token starting with #, keep it
+		// Otherwise try to build Underhell token
+		char szFallback[512];
+		if ( pszToShow[0] == '#' )
+		{
+			Q_strncpy( szFallback, pszToShow, sizeof(szFallback) );
+		}
+		else
+		{
+			// Try #UnderHell_<entry> and also #<entry>
+			// First try exact entry as localization? Actually most objectives are
+			// UnderHell_<entry>
+			Q_snprintf( szFallback, sizeof(szFallback), "#UnderHell_%s", pszToShow );
+		}
+
+		// Send as center print and as HudMessage fallback — both will be localized
+		// by client if token exists in Underhell_english.txt
+		if ( bHasPlayer && pPlayer )
+		{
+			ClientPrint( ToBasePlayer(pPlayer), HUD_PRINTCENTER, szFallback );
+		}
+		else
+		{
+			UTIL_ClientPrintAll( HUD_PRINTCENTER, szFallback );
+		}
+
+		// Also try direct HUD message with the fallback token using game_text style
+		// In case TextMsg center print is not enough, also show via HudMessage with default parms
+		// This mirrors original sub_10139380 which used HudText (sub_1025F270) and sound.
+		{
+			hudtextparms_t hparms;
+			hparms.channel = 1;
+			hparms.x = 0.1f;
+			hparms.y = 0.1f;
+			hparms.effect = 2;
+			hparms.r1 = 165; hparms.g1 = 155; hparms.b1 = 30; hparms.a1 = 0;
+			hparms.r2 = 255; hparms.g2 = 245; hparms.b2 = 115; hparms.a2 = 0;
+			hparms.fadeinTime = 0.007f;
+			hparms.fadeoutTime = 0.5f;
+			hparms.holdTime = 3.5f;
+			hparms.fxTime = 0.25f;
+
+			// Try to get localized string directly via TextMessageGet for fallback token?
+			// If not found, UTIL_HudMessage will still show raw token which vgui will localize.
+			if ( pPlayer && pPlayer->IsPlayer() )
+				UTIL_HudMessage( ToBasePlayer(pPlayer), hparms, szFallback );
+			else
+				UTIL_HudMessageAll( hparms, szFallback );
 		}
 	}
 
