@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -31,6 +31,18 @@ ConVar cl_npc_speedmod_outtime( "cl_npc_speedmod_outtime", "1.5", FCVAR_CLIENTDL
 IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropDataTable( RECVINFO_DT(m_HL2Local),0, &REFERENCE_RECV_TABLE(DT_HL2Local) ),
 	RecvPropBool( RECVINFO( m_fIsSprinting ) ),
+
+	// Underhell inventory props. Order must match the server send table
+	// (DT_HL2_Player) exactly â€” the engine matches tables by index.
+	RecvPropBool( RECVINFO( m_bShoulderFlashlight ) ),
+	RecvPropBool( RECVINFO( m_bFlashlightOn ) ),
+	RecvPropBool( RECVINFO( m_bInventoryEnabled ) ),
+	RecvPropInt( RECVINFO( m_iUHBatteryCount ) ),
+	RecvPropInt( RECVINFO( m_iUHHermitCardsCount ) ),
+	RecvPropInt( RECVINFO( m_iUHHermitCurrentQuestCount ) ),
+	RecvPropInt( RECVINFO( m_iUHHermitTotalQuestCount ) ),
+	RecvPropBool( RECVINFO( m_bDisplayHermitCard ) ),
+	RecvPropArray3( RECVINFO_ARRAY(m_iInventory), RecvPropInt( RECVINFO(m_iInventory[0]) ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )
