@@ -10,12 +10,17 @@
 //   * cl_inventoryToggle     — hexrays sub_1012E690
 //   * "UpdateInventory" cmd  — hexrays sub_102BC600 (registration) / sub_1012E660
 //
+// Drawing notes: the sprites are plain material paths, not vgui scheme
+// images, so they are painted directly through ISurface::DrawSetTextureFile
+// (same resolution path the original HUD sprite API used).
+//
 // $NoKeywords: $
 //=============================================================================//
 
 #include "cbase.h"
 #include "c_basehlplayer.h"
 #include "vgui/ISurface.h"
+#include "inputsystem/buttoncode.h"
 #include "c_inventory_panel.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -30,7 +35,7 @@
 //-----------------------------------------------------------------------------
 struct UHInventorySlotInfo_t
 {
-	const char *pszSprite;		// "Sprites/Hud/Items/..." (original used a "../Sprites/" prefix)
+	const char *pszSprite;		// "Sprites/Hud/Items/..."
 	const char *pszTextToken;	// "#UnderHell_Inventory_..."
 };
 
@@ -74,6 +79,9 @@ static const UHInventorySlotInfo_t s_InventorySlotInfo[UH_INVENTORY_ITEM_TABLE_S
 // Empty slots show the blank sprite (alpha 0 in the mod's material — invisible,
 // but 1:1 with the original code path).
 #define UH_INVENTORY_BLANK_SPRITE "Sprites/Hud/Inventory/Blank"
+
+#define UH_INVENTORY_BG_SPRITE    "Sprites/Hud/Inventory/Inventory"
+#define UH_INVENTORY_ICON_SIZE    28	// original icon size (hexrays sub_1012E360)
 
 //-----------------------------------------------------------------------------
 // Singleton.
@@ -120,10 +128,15 @@ CON_COMMAND( UpdateInventory, "Updates the inventory" )
 CInventorySlotPanel::CInventorySlotPanel( vgui::Panel *pParent, const char *pszName )
 	: BaseClass( pParent, pszName )
 {
-	m_pIcon = new vgui::ImagePanel( this, "Icon" );
-	m_pIcon->SetShouldScaleImage( true );
+	m_pszSprite = NULL;
+	m_iTextureId = vgui::surface()->CreateNewTextureID();
 
 	m_pLabel = new vgui::Label( this, "ItemName", "" );
+	m_pLabel->SetContentAlignment( vgui::Label::a_northwest );
+	m_pLabel->SetWrap( false );
+
+	// Slots never take input — clicks pass through to the frame.
+	SetMouseInputEnabled( false );
 }
 
 CInventorySlotPanel::~CInventorySlotPanel()
@@ -135,31 +148,31 @@ void CInventorySlotPanel::PerformLayout( void )
 	BaseClass::PerformLayout();
 
 	// Original drew the icons at 28x28 (hexrays sub_1012E360).
-	m_pIcon->SetBounds( 0, 0, 28, 28 );
-	m_pLabel->SetBounds( 0, 30, GetWide(), GetTall() - 30 );
+	m_pLabel->SetBounds( 2, UH_INVENTORY_ICON_SIZE + 2, GetWide() - 4, GetTall() - UH_INVENTORY_ICON_SIZE - 2 );
+}
+
+void CInventorySlotPanel::PaintBackground( void )
+{
+	if ( !m_pszSprite || !*m_pszSprite )
+		return;
+
+	vgui::surface()->DrawSetColor( 255, 255, 255, 255 );
+	vgui::surface()->DrawSetTextureFile( m_iTextureId, m_pszSprite, true, false );
+	vgui::surface()->DrawTexturedRect( 0, 0, UH_INVENTORY_ICON_SIZE, UH_INVENTORY_ICON_SIZE );
 }
 
 void CInventorySlotPanel::SetSlotContents( const char *pszSprite, const char *pszTextToken )
 {
-	if ( pszSprite && *pszSprite )
-	{
-		m_pIcon->SetImage( pszSprite );
-		m_pIcon->SetVisible( true );
-	}
-	else
-	{
-		m_pIcon->SetVisible( false );
-	}
-
+	m_pszSprite = pszSprite;
 	m_pLabel->SetText( pszTextToken ? pszTextToken : "" );
 }
 
 void CInventorySlotPanel::Clear( void )
 {
 	// Original first paints the blank sprite on every slot, then fills the
-	// non-empty ones (hexrays sub_1012E6C0).
-	m_pIcon->SetImage( UH_INVENTORY_BLANK_SPRITE );
-	m_pIcon->SetVisible( true );
+	// non-empty ones (hexrays sub_1012E6C0). The mod's blank material has
+	// alpha 0 — empty slots are invisible, like in the original.
+	m_pszSprite = UH_INVENTORY_BLANK_SPRITE;
 	m_pLabel->SetText( "" );
 }
 
@@ -171,19 +184,25 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 {
 	SetParent( parent );
 
+	// The original starts hidden; the .res says visible=1, so force-hide
+	// both before and after loading it.
+	SetVisible( false );
+
+	m_iBackgroundTextureId = vgui::surface()->CreateNewTextureID();
+
 	// Load the original layout (size, position, title bar). The ControlName
 	// in the .res is "CInventoryPanel", matching the original factory name.
 	LoadControlSettings( "resource/UI/InventoryPanel.res" );
 
-	// Original ctor colours the frame ARGB(128, 255, 255, 255)
-	// (hexrays sub_1012EDC0).
-	SetBgColor( Color( 255, 255, 255, 128 ) );
+	// Fallback in case the .res is missing from a mod install.
+	if ( GetWide() < 100 )
+	{
+		SetBounds( 368, 84, 1024, 512 );
+	}
 
-	// Background texture from the .res ("Sprites/Hud/Inventory/Inventory").
-	// OB-era vgui has no "Texture1" key, so it is applied manually here.
-	m_pBackground = new vgui::ImagePanel( this, "Background" );
-	m_pBackground->SetImage( "Sprites/Hud/Inventory/Inventory" );
-	m_pBackground->SetShouldScaleImage( true );
+	// Original ctor colours the frame ARGB(128, 255, 255, 255)
+	// (hexrays sub_1012EDC0) — only shows through if the texture is missing.
+	SetBgColor( Color( 255, 255, 255, 128 ) );
 
 	// 28 slot panels: a 4x6 grid (slots 0..23) plus a row of 4 (24..27),
 	// mirroring the original creation loops (hexrays sub_1012E360).
@@ -195,6 +214,9 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 	}
 
 	m_bNeedsRefresh = true;
+
+	// The .res sets visible=1 — keep the panel hidden until toggled.
+	SetVisible( false );
 
 	DevMsg( "InventoryPanel has been constructed\n" );
 }
@@ -208,32 +230,39 @@ void CInventoryPanel::PerformLayout( void )
 {
 	BaseClass::PerformLayout();
 
-	m_pBackground->SetBounds( 0, 0, GetWide(), GetTall() );
-
-	// 4 columns x 6 rows for slots 0..23, then slots 24..27 in a final row.
-	// TODO: verify the exact slot geometry against the original (the ctor
-	// math used 37px pitch / 44px offsets — full layout still to decode).
+	// 4 columns x 7 rows: slots 0..23 fill rows 0..5, slots 24..27 the last row.
 	int iCols = 4;
-	int iRows = 6;
+	int iRows = 7;
 	int iSlotW = GetWide() / iCols;
-	int iSlotH = GetTall() / ( iRows + 1 );
+	int iSlotH = GetTall() / iRows;
 
 	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
 	{
-		int iX, iY;
-		if ( i < iCols * iRows )
-		{
-			iX = ( i % iCols ) * iSlotW;
-			iY = ( i / iCols ) * iSlotH;
-		}
-		else
-		{
-			iX = ( i - iCols * iRows ) * iSlotW;
-			iY = iRows * iSlotH;
-		}
+		int iX = ( i % iCols ) * iSlotW;
+		int iY = ( i / iCols ) * iSlotH;
 
 		m_pSlots[i]->SetBounds( iX, iY, iSlotW, iSlotH );
 	}
+}
+
+void CInventoryPanel::PaintBackground( void )
+{
+	// Background texture from the original .res, stretched over the panel.
+	vgui::surface()->DrawSetColor( 255, 255, 255, 255 );
+	vgui::surface()->DrawSetTextureFile( m_iBackgroundTextureId, UH_INVENTORY_BG_SPRITE, true, false );
+	vgui::surface()->DrawTexturedRect( 0, 0, GetWide(), GetTall() );
+}
+
+void CInventoryPanel::OnKeyCodePressed( vgui::KeyCode code )
+{
+	// ESC closes the inventory (the original's frame handled this too).
+	if ( code == (vgui::KeyCode)KEY_ESCAPE )
+	{
+		SetVisible( false );
+		return;
+	}
+
+	BaseClass::OnKeyCodePressed( code );
 }
 
 void CInventoryPanel::OnThink( void )
@@ -267,14 +296,19 @@ void CInventoryPanel::OnThink( void )
 
 void CInventoryPanel::Toggle( void )
 {
-	bool bVisible = !IsVisible();
-	SetVisible( bVisible );
-
-	if ( bVisible )
+	if ( IsVisible() )
+	{
+		SetVisible( false );
+	}
+	else
 	{
 		// Refresh immediately when opened so the grid is never stale.
 		ClearSlots();
 		RefreshSlots();
+
+		// Activate() shows the frame, moves it to the front and requests
+		// focus — so ESC (and the titlebar close button) work right away.
+		Activate();
 	}
 }
 

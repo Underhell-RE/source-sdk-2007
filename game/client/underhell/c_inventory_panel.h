@@ -17,7 +17,6 @@
 #endif
 
 #include "vgui_controls/Frame.h"
-#include "vgui_controls/ImagePanel.h"
 #include "vgui_controls/Label.h"
 
 #include "underhell/uh_inventory.h"
@@ -32,7 +31,9 @@ public:
 };
 
 //-----------------------------------------------------------------------------
-// One inventory slot: icon + localized name.
+// One inventory slot: 28x28 icon painted straight from the mod's HUD sprite
+// material + a localized label. Drawing bypasses the scheme image lookup —
+// the sprites live under "Sprites/Hud/Items/", not in vgui/.
 //-----------------------------------------------------------------------------
 class CInventorySlotPanel : public vgui::Panel
 {
@@ -43,13 +44,15 @@ public:
 	virtual ~CInventorySlotPanel();
 
 	virtual void PerformLayout( void );
+	virtual void PaintBackground( void );
 
 	void SetSlotContents( const char *pszSprite, const char *pszTextToken );
 	void Clear( void );
 
 private:
-	vgui::ImagePanel	*m_pIcon;
-	vgui::Label			*m_pLabel;
+	const char		*m_pszSprite;	// static table pointer, NULL = nothing to draw
+	vgui::Label		*m_pLabel;
+	int				m_iTextureId;
 };
 
 //-----------------------------------------------------------------------------
@@ -64,7 +67,9 @@ public:
 	virtual ~CInventoryPanel( void );
 
 	virtual void PerformLayout( void );
+	virtual void PaintBackground( void );
 	virtual void OnThink( void );
+	virtual void OnKeyCodePressed( vgui::KeyCode code );
 
 	// cl_inventoryToggle — flips visibility and asks the server to resync.
 	void Toggle( void );
@@ -81,8 +86,8 @@ private:
 	MESSAGE_FUNC( OnNewSelection, "NewSelection" );
 	MESSAGE_FUNC( OnNewMouseReleased, "NewMouseReleased" );
 
-	vgui::ImagePanel		*m_pBackground;
 	CInventorySlotPanel		*m_pSlots[UH_INVENTORY_SLOTS];
+	int						m_iBackgroundTextureId;
 	bool					m_bNeedsRefresh;
 };
 
