@@ -16,6 +16,7 @@
 #include "uh_basefirearm.h"
 #include "hl2_player.h"
 #include "shot_manipulator.h"
+#include "ai_basenpc.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -298,8 +299,10 @@ void CUhFirearmWeapon::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, b
 	QAngle angShootDir;
 	if ( !GetAttachment( LookupAttachment( "muzzle" ), vecShootOrigin, angShootDir ) )
 	{
+		// No muzzle attachment: aim like vanilla NPCs do.
+		CAI_BaseNPC *npc = pOperator->MyNPCPointer();
 		vecShootOrigin = pOperator->Weapon_ShootPosition();
-		pOperator->EyeVectors( &vecShootDir, NULL, NULL );
+		vecShootDir = ( npc ? npc->GetActualShootTrajectory( vecShootOrigin ) : pOperator->BodyDirection2D() );
 	}
 	else
 	{
