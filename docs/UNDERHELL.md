@@ -109,6 +109,21 @@ Stage 1–6 done (first batch):
 
 Next stage: item pickup flow (`CUHItem::MyTouch` → `UH_AddInventoryItem`), per-item use effects, held-item handle, equip counter at player+848.
 
+## RTTI + vtable validation (from original binaries)
+
+RTTI dumps (clientRTTI.txt / serverRTTI.txt) + PE parsing of Cliento.dll /
+serveror.dll let the vtables be read directly. Key results:
+
+- **CHL2_Player vtable** (serveror.dll @ 0x1055069C):
+  - `[328]` = sub_102DDBF0 = `ClientCommand` override (switch/dropitem/useitem dispatch) — our client-command routing design matches the original exactly.
+  - `[409]` = sub_102E27A0 = item name-table builder (a CHL2_Player method).
+  - `[410]` = sub_102DE310 = the world-drop routine (eye + forward*56 + up*64, per-id prop styling) — same switch as [411], used by a different call path (TODO: find caller).
+  - `[411]` = sub_102E05F0 = `UH_ItemAction` (use; dropitem calls it with bUse=0) — attribution verified.
+  - `[412]..[423]` = further Underhell player virtuals (TODO: decode).
+- **Client classes**: `IInventoryPanel` (4 entries, [0]=dtor), `CInventoryPanelInterface` (4 entries: [1]=create panel via `new`, [2]=cleanup+delete, [3]=re-run slot creation), `CInventoryPanel` (259 entries; [96]=OnThink confirmed, [30]=dtor with slot loop, [27..29]=settings virtuals), `vgui::DragnDropSlot` = the 28 slot panels (a modded-vgui class, NOT in the OB SDK — our CInventorySlotPanel stands in).
+- **Item classes** (serveror.dll): per-class Spawn/Precache override CItem slots [24]/[25] (CItemRandom::Precache = the registry list sub_101753E0); shared bool-returning `CItem::Use` at [64] (vanilla physcannon-impulse logic — original modified the base to return bool; our SDK's Use is void, so the failure path stays TODO).
+- Original keeps vanilla item classes (CItemBattery, CHealthKit, CHealthVial, CItem_Box*Rounds, CItem_RPG_Round, ...) — our port mirrors that split.
+
 ## Save-file validation (inventory_is_full.sav)
 
 Original save parsed. Confirmations:
