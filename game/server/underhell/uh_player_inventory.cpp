@@ -331,11 +331,10 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Inventory + objective command dispatcher. Runs from
-// ClientCommand — the engine forwards unknown client commands here, exactly
-// like the original (hexrays sub_102DDBF0 for switch/dropitem/useitem and
-// sub_101F11D0 for DispObj/GiveSign/SkipScene). Returns true when the command
-// was consumed.
+// Purpose: Pure inventory command dispatcher. Only inventory commands here —
+// objective / signaling commands live in uh_player_objectives.cpp for
+// code quality / portability (see CHL2_Player::UH_HandleObjectiveCommand).
+// Original: hexrays sub_102DDBF0 for switch/dropitem/useitem.
 //-----------------------------------------------------------------------------
 bool CHL2_Player::UH_HandleInventoryCommand( const CCommand &args )
 {
@@ -382,76 +381,6 @@ bool CHL2_Player::UH_HandleInventoryCommand( const CCommand &args )
 	if ( !Q_stricmp( pszCommand, "UpdateInventory" ) )
 	{
 		UH_UpdateInventory();
-		return true;
-	}
-
-	//-----------------------------------------------------------------------------
-	// Underhell objective / signaling commands (hexrays sub_101F11D0).
-	//
-	// Original implementation (serveror.dll, sub_101F11D0):
-	//
-	//   if ( !_stricmp(v5, \"DispObj\") )
-	//   {
-	//     v10 = gEntList.FindEntityByName(0, \"Display_Objective\", 0,0,0,0);
-	//     if ( v10 )
-	//     {
-	//       // v53[0] = player, v54=0, v55=-1, v56=0
-	//       CLogicRelay::InputTrigger(v10, player)
-	//       // checks m_bDisabled @848 and m_bWaitForRefire @849,
-	//       // fires m_OnTrigger @800, then handles SF_REMOVE_ON_FIRE and
-	//       // schedules EnableRefire by max delay +0.001
-	//     }
-	//     return 1;
-	//   }
-	//
-	// Same pattern for \"GiveSign\" -> \"GiveSignal\" and
-	// \"SkipScene\" -> \"Relay_SkipScene\".
-	//
-	// The Display_Objective relay (placed in every chapter map) shows the
-	// current objective — its outputs are driven by the mission system which
-	// stores strings in CBasePlayer::m_UHObjectives @2676 (0x200 bytes,
-	// 8 players * 16 slots * 4 bytes, see sub_101F77C0 / sub_101386C0).
-	//
-	// 1:1 reimplementation: find the entity by targetname and send it the
-	// Trigger input with this player as activator/caller, exactly like the
-	// original's CLogicRelay trigger path. AcceptInput(\"Trigger\") performs
-	// the same disabled / wait-for-refire checks internally.
-	//-----------------------------------------------------------------------------
-	if ( !Q_stricmp( pszCommand, "DispObj" ) )
-	{
-		// FindEntityByName(NULL, \"Display_Objective\") — original used
-		// sub_1012BF20(&gEntList, 0, \"Display_Objective\", 0,0,0,0)
-		CBaseEntity *pDisplay = gEntList.FindEntityByName( NULL, "Display_Objective" );
-		if ( pDisplay )
-		{
-			variant_t emptyVariant;
-			// Original passed player entity (a1) as the first element of the
-			// inputdata variant (v53[0] = player). Passing player as
-			// activator + caller reproduces that behaviour.
-			pDisplay->AcceptInput( "Trigger", this, this, emptyVariant, 0 );
-		}
-		return true;
-	}
-
-	if ( !Q_stricmp( pszCommand, "GiveSign" ) )
-	{
-		CBaseEntity *pEnt = gEntList.FindEntityByName( NULL, "GiveSignal" );
-		if ( pEnt )
-		{
-			variant_t emptyVariant;
-			pEnt->AcceptInput( "Trigger", this, this, emptyVariant, 0 );
-		}
-		return true;
-	}
-
-	if ( !Q_stricmp( pszCommand, "SkipScene" ) )
-	{
-		CBaseEntity *pEnt = gEntList.FindEntityByName( NULL, "Relay_SkipScene" );
-		if ( pEnt )
-		{
-			variant_t emptyVariant;
-			pEnt->AcceptInput( "Trigger", this, this, emptyVariant, 0 );
-		}
 		return true;
 	}
 
