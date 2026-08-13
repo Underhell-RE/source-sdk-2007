@@ -211,7 +211,7 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 	SetMaximizeButtonVisible( false );
 	SetProportional( true );
 
-	HScheme hScheme = vgui::scheme()->LoadSchemeFromFile( "resource/SourceScheme.res", "SourceScheme" );
+	vgui::HScheme hScheme = vgui::scheme()->LoadSchemeFromFile( "resource/SourceScheme.res", "SourceScheme" );
 	if ( hScheme )
 	{
 		SetScheme( hScheme );
