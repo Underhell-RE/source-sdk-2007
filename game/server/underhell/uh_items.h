@@ -98,16 +98,19 @@ UH_DECLARE_ITEM( CItemPainkillers,		UH_ITEM_PAINKILLERS )	// TODO: original clas
 UH_DECLARE_ITEM( CItemSyringe,			UH_ITEM_SYRINGE )		// TODO: original class name unknown (no RTTI)
 
 //-----------------------------------------------------------------------------
-// Items seen in the original RTTI but not yet mapped to a classname — stubs
-// registered once their entity names are recovered.
+// Items seen in the original RTTI / dll strings — classnames recovered from
+// the original serveror.dll string table, models still TODO.
 //-----------------------------------------------------------------------------
-// UH_DECLARE_ITEM( CItemSuit,				UH_ITEM_UNKNOWN )	// TODO: classname?
-// UH_DECLARE_ITEM( CItemShield,			UH_ITEM_UNKNOWN )	// TODO: classname?
-// UH_DECLARE_ITEM( CItemShoulderFlashlight,	UH_ITEM_UNKNOWN )	// TODO: classname?
-// UH_DECLARE_ITEM( CItemCapPMC,			UH_ITEM_UNKNOWN )	// TODO: classname?
-// UH_DECLARE_ITEM( CItemHeadsetPMC,		UH_ITEM_UNKNOWN )	// TODO: classname?
-// UH_DECLARE_ITEM( CItemRespiratorGuard,	UH_ITEM_UNKNOWN )	// TODO: classname?
-// UH_DECLARE_ITEM( CItemGasmaskGuard,		UH_ITEM_UNKNOWN )	// TODO: classname?
+UH_DECLARE_ITEM( CItemSoda,				UH_ITEM_UNKNOWN )	// item_sodacan — TODO: id, model
+UH_DECLARE_ITEM( CItemShield,			UH_ITEM_UNKNOWN )	// item_shield — TODO: id, model
+UH_DECLARE_ITEM( CItemShoulderFlashlight, UH_ITEM_UNKNOWN )	// item_shoulderflashlight — TODO: id, model
+UH_DECLARE_ITEM( CItemCapPMC,			UH_ITEM_UNKNOWN )	// item_cap_pmc — TODO: id, model
+UH_DECLARE_ITEM( CItemHeadsetPMC,		UH_ITEM_UNKNOWN )	// item_headset_pmc — TODO: id, model
+UH_DECLARE_ITEM( CItemRespiratorGuard,	UH_ITEM_UNKNOWN )	// item_respirator_guard — TODO: id, model
+UH_DECLARE_ITEM( CItemGasmaskGuard,		UH_ITEM_UNKNOWN )	// item_gasmask_guard — TODO: id, model
+
+// TODO: item_bandagespack, item_syringepack, item_flags, item_health — class
+// names unknown (no RTTI entries found for them).
 
 //-----------------------------------------------------------------------------
 // item_random — spawns a random item from the fixed pool.

@@ -81,6 +81,15 @@ UH_DEFINE_ITEM( CItemGlowStick,		item_glowstick,		"models/pg_props/pg_obj/pg_glo
 UH_DEFINE_ITEM( CItemFMRadio,		item_fmradio,		"models/items/fmradio.mdl" )
 UH_DEFINE_ITEM( CItemRadioCracker,	item_radiocracker,	"models/items/fmradio.mdl" )
 
+// Classnames from the original serveror.dll string table; models TODO.
+UH_DEFINE_ITEM( CItemSoda,				item_sodacan,			"models/props_junk/popcan01a.mdl" )
+UH_DEFINE_ITEM( CItemShield,			item_shield,			"models/error.mdl" )	// TODO: model
+UH_DEFINE_ITEM( CItemShoulderFlashlight, item_shoulderflashlight, "models/error.mdl" )	// TODO: model
+UH_DEFINE_ITEM( CItemCapPMC,			item_cap_pmc,			"models/error.mdl" )	// TODO: model
+UH_DEFINE_ITEM( CItemHeadsetPMC,		item_headset_pmc,		"models/error.mdl" )	// TODO: model
+UH_DEFINE_ITEM( CItemRespiratorGuard,	item_respirator_guard,	"models/error.mdl" )	// TODO: model
+UH_DEFINE_ITEM( CItemGasmaskGuard,		item_gasmask_guard,		"models/error.mdl" )	// TODO: model
+
 //-----------------------------------------------------------------------------
 // Health
 // TODO: original models for the bandages/painkillers/syringe entities.
