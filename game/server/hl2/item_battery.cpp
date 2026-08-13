@@ -33,11 +33,21 @@ public:
 		PrecacheScriptSound( "ItemBattery.Touch" );
 
 	}
-	bool MyTouch( CBasePlayer *pPlayer )
-	{
-		CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
-		return ( pHL2Player && pHL2Player->ApplyBattery() );
-	}
+		bool MyTouch( CBasePlayer *pPlayer )
+		{
+			// Underhell: batteries power the flashlight (m_iUHBatteryCount)
+			// instead of charging suit armour like vanilla HL2.
+			CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+			if ( !pHL2Player )
+				return false;
+
+			pHL2Player->UH_AddBattery( 1 );
+
+			CPASAttenuationFilter filter( pPlayer, "ItemBattery.Touch" );
+			EmitSound( filter, pPlayer->entindex(), "ItemBattery.Touch" );
+
+			return true;
+		}
 };
 
 LINK_ENTITY_TO_CLASS(item_battery, CItemBattery);

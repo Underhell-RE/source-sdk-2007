@@ -332,6 +332,34 @@ public:
 	void				UH_UpdateInventory( void );			// "UpdateInventory" server handler
 
 	//-----------------------------------------------------------------------------
+	// Underhell endurance / hunger system (implementation in
+	// game/server/underhell/uh_player_endurance.cpp).
+	//
+	// Original model (hexrays): the red HUD bar is suit power (m_HL2Local.
+	// m_flSuitPower) — the vanilla sprint "stamina". The green bar is
+	// m_iEndurance (the "hunger" meter, 0..100): eating/drinking restores it,
+	// and it is consumed as stamina recharges. Lower endurance = slower
+	// stamina recharge (sub_102E0E60).
+	//-----------------------------------------------------------------------------
+	void				UH_InitializeEndurance( void );
+	bool				UH_Eat( float flEndurance, float flHealth, const char *pszEatSound );
+	bool				UH_Drink( float flEndurance, float flHealth, int iFlavor );
+	void				UH_UpdateEndurance( void );	// endurance-gated suit power recharge
+	int					UH_GetEndurance( void ) const { return m_iEndurance; }
+	void				UH_SetEndurance( int iEndurance ) { m_iEndurance = iEndurance; }
+	int					UH_GetBleedCounter( void ) const { return m_iBleedCounter; }
+	void				UH_SetBleedCounter( int iBleedCounter ) { m_iBleedCounter = iBleedCounter; }
+	void				UH_SetLastBleedTime( float flTime ) { m_flLastBleedTime = flTime; }
+
+	//-----------------------------------------------------------------------------
+	// Underhell flashlight battery state. The flashlight runs on discrete
+	// batteries (m_iUHBatteryCount) rather than suit power.
+	//-----------------------------------------------------------------------------
+	int					UH_GetBatteryCount( void ) const { return m_iUHBatteryCount; }
+	void				UH_AddBattery( int iCount ) { m_iUHBatteryCount = m_iUHBatteryCount + iCount; }
+	void				UH_UpdateFlashlightBattery( void );	// drain a battery while the flashlight is on
+
+	//-----------------------------------------------------------------------------
 	// Underhell objectives / map signaling (implementation in
 	// game/server/underhell/uh_player_objectives.cpp).
 	// Original: CBasePlayer::ClientCommand sub_101F11D0 in serveror.dll
@@ -363,8 +391,24 @@ private:
 	CNetworkVar( int, m_iUHHermitCurrentQuestCount );			// TODO: hermit card system
 	CNetworkVar( int, m_iUHHermitTotalQuestCount );				// TODO: hermit card system
 	CNetworkVar( bool, m_bDisplayHermitCard );					// TODO: hermit card system
-	CNetworkVar( bool, m_bFlashlightOn );						// inventory flashlight state
-	CNetworkVar( bool, m_bInventoryEnabled );					// inventory system enabled
+	CNetworkVar( bool, m_bFlashlightOn );					// inventory flashlight state
+	CNetworkVar( bool, m_bInventoryEnabled );				// inventory system enabled
+
+	//-----------------------------------------------------------------------------
+	// Underhell endurance / hunger state (networked so the client HUD can draw
+	// the green endurance bar). Original layout: m_iEndurance @2184,
+	// m_iBleedCounter @2188 on CBasePlayer — kept in CHL2_Player here for
+	// consistency with the rest of the port (field names still match the
+	// original save format).
+	//-----------------------------------------------------------------------------
+	CNetworkVar( int, m_iEndurance );	// "hunger" meter, 0..100. Restored by eating.
+	CNetworkVar( int, m_iBleedCounter );	// bleeding state (0 = clean). TODO: full bleed system.
+
+	// Server-only runtime accumulators (mirror the original binary's members;
+	// not networked, saved for parity).
+	float				m_flPseudoEndurance;	// health<->endurance bridge accumulator (TODO)
+	float				m_fEStaminaCount;		// stamina charge accumulator: -1 endurance per 50
+	float				m_flLastBleedTime;		// last time bleeding was applied (TODO)
 
 	// This player's HL2 specific data that should only be replicated to 
 	//  the player and not to other players.
@@ -401,6 +445,7 @@ private:
 
 	float				m_flNextFlashlightCheckTime;
 	float				m_flFlashlightPowerDrainScale;
+	float				m_flNextFlashlightBatteryTime;	// next time the flashlight drains a battery
 
 	// Aiming heuristics code
 	float				m_flIdleTime;		//Amount of time we've been motionless

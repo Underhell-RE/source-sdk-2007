@@ -273,11 +273,27 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\hud_endurance.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_stamina.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\shared\underhell\uh_inventory.cpp"
 					>
 				</File>
 				<File
 					RelativePath=".\underhell\c_inventory_panel.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_endurance.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_stamina.h"
 					>
 				</File>
 				<File

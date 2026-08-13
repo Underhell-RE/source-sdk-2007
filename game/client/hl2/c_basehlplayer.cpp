@@ -43,6 +43,10 @@ IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropInt( RECVINFO( m_iUHHermitTotalQuestCount ) ),
 	RecvPropBool( RECVINFO( m_bDisplayHermitCard ) ),
 	RecvPropArray3( RECVINFO_ARRAY(m_iInventory), RecvPropInt( RECVINFO(m_iInventory[0]) ) ),
+
+	// Underhell endurance / hunger props (order mirrors the server send table).
+	RecvPropInt( RECVINFO( m_iEndurance ) ),
+	RecvPropInt( RECVINFO( m_iBleedCounter ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )

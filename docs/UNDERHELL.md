@@ -97,6 +97,14 @@ Full classname list: `FGD/Item List.txt` (food, ammo, equipment, health) + `Weap
 | 4 | feat(server) | CHL2_Player inventory state + use/drop + commands |
 | 5 | feat(client) | CInventoryPanel + network props + client commands |
 | 6 | build | vcproj registration |
+| 7 | feat(server) | endurance/hunger + stamina-recharge gating |
+| 8 | feat(server) | functional food/health item use effects |
+| 9 | feat(client) | CHudEndurance green bar + endurance props |
+| 10 | feat(server) | healthkit/healthvial go into inventory + heal on use |
+| 11 | fix(client) | endurance/stamina HUD (vertical/horizontal FgColor bars) |
+| 12 | fix(server) | +use-only pickup (no auto-pickup / no physcannon grab) |
+| 13 | feat(server) | flashlight on batteries (item_battery / item_batterypack) |
+| 14 | fix(client) | inventory toggle closes on second "I" |
 
 ## Progress
 
@@ -108,6 +116,116 @@ Stage 1–6 done (first batch):
 - Build: sources registered in both episodic vcproj files.
 
 Next stage: item pickup flow (`CUHItem::MyTouch` → `UH_AddInventoryItem`), per-item use effects, held-item handle, equip counter at player+848.
+
+## Endurance / hunger system (stage 7–9)
+
+Two HUD bars in the original: **red = suit power** (the vanilla sprint
+"stamina", `m_HL2Local.m_flSuitPower`) and **green = endurance** (`m_iEndurance`,
+the "hunger" meter). The green bar is restored by eating/drinking and consumed
+as stamina recharges — lower endurance = slower stamina recharge.
+
+Decoded from the original (sub_102E0E60 recharge branch, sub_102DF1A0 eat,
+sub_102DF2E0 drink):
+
+- `m_iEndurance` @2184 (int, CBasePlayer), `m_iBleedCounter` @2188 (int) —
+  both networked (client recv table sub_10043D70 reads them @3432/@3436).
+  Server-only accumulators: `m_fEStaminaCount` @2132, `m_flPseudoEndurance`
+  @2148, `m_flPseudoHealth` @2144, `m_iEHealthCount` @2160 (runtime only).
+- ConVars (original registrations): `uh_player_endurance` 100,
+  `uh_player_endurance_rate` 1600, `uh_player_endurance_rate2` 8000,
+  `uh_player_endurance_stamina_effect` 100, `uh_player_bleed_rate` 8000,
+  `uh_bleeding_chance` 5.
+- **Recharge** (`SuitPower_Update` → `UH_UpdateEndurance`): when the suit
+  would recharge (devices off, <100 power, 0.5s delay),
+  `rate = max(endurance, 25) * 0.01 * 12.5 * frametime`; charge by `rate`;
+  `m_fEStaminaCount += rate`; when it reaches 50 → `--endurance` (clamped 0).
+- **Eat** (`UH_Eat`, sub_102DF1A0): endurance += gain (clamp 100), health +=
+  gain (clamp 200 — food can overheal), play sound. **Drink** (`UH_Drink`,
+  sub_102DF2E0): same, but Mega Soda flavour (id 12, flavour 5) multiplies
+  endurance gain by 2.5, plays "Player.Drink".
+- Food per-item eat gains (decoded + localization): apple 5/1 ("Player.Eat.
+  Apple"), banana 5/1, burrito 5/1, chocobar 5/1, orange 5/1, sandwich 10/1,
+  banana bunch 15/3, soda drink 10/1 (flavour = id − 7).
+- Food `Use()` gate (sub_10171E10 etc.): alive + not gas-masked + CHL2_Player.
+  Gas-mask check is a TODO until the gear system is ported.
+- Bandages `Use()` (sub_101725C0): usable while hurt/bleeding; stops bleed +
+  heals 5 while bleeding, else heals 1.
+- Client `CHudEndurance` (sub_100C8680/sub_100C8710): blue bar (HullColor
+  "0 0 255 255") driven by `m_iEndurance`; <20 → "EnduranceLow", <50 →
+  "EnduranceMedium", ≥50 → "EnduranceHigh" animation sequences. The original
+  uses a modded-vgui panel (settings "HullColor"/"HullDisabledAlpha"/
+  "BarInsetX"/"icontall") not present in the OB SDK — our `CHudEndurance` is
+  a faithful behavioural clone of the vanilla suit-power bar.
+
+### TODOs (endurance scope)
+
+- Melee stamina drain: Underhell melee weapons carry a `StaminaToDrain` stat
+  (default 15.0, parsed in sub_10274870) that drains suit power on swing —
+  blocked on the Underhell melee-weapon classes (not yet ported).
+- Kick: explicit TODO (no kick implementation in this repo yet).
+- Full bleeding system: damage→bleed roll (`uh_bleeding_chance`), `BleedThink`
+  health drain (`uh_player_bleed_rate`), and the health-vial slow-bleed effect.
+  `m_iBleedCounter`/`m_flLastBleedTime` are in place and wired to bandages.
+- Painkillers/syringe heal amounts are a reconstruction (no RTTI for the
+  original classes; quest items with text-only slots).
+
+## HUD bars (stage 11) — decoded from scripts/HudLayout.res + HudAnimations.txt
+
+The mod ships its own `scripts/HudLayout.res` / `scripts/HudAnimations.txt` /
+`resource/ClientScheme.res`, so the panel names, geometry and colours below
+are authoritative (not reconstructed):
+
+- **HudStamina** (horizontal bar, xpos 32 ypos 448 wide 240 tall 18): the
+  Underhell stamina bar replacing the vanilla CHudSuitPower. Bar geometry:
+  `BarInsetX 26, BarInsetY 7, BarWidth 210, BarHeight 4, BarChunkWidth 1,
+  BarChunkGap 0`. Reads suit power; `< 35` → "StaminaLow" (red), else
+  "StaminaNormal" (scheme FgColor).
+- **HudEndurance** (vertical gauge, xpos 10 ypos 332 wide 18 tall 134): the
+  hunger bar. `BarInsetX 7, BarInsetY 104, BarWidth 4, BarHeight 84,
+  BarChunkHeight 1, BarChunkGap 0` — fills bottom-up. Reads `m_iEndurance`;
+  `< 20` → "EnduranceLow", `< 50` → "EnduranceMedium", else "EnduranceHigh".
+- **Colour model**: both bars draw with the panel **FgColor**, animated by
+  HudAnimations.txt: scheme `FgColor` = `0 128 255` (blue), endurance medium
+  = `230 230 50` (yellow), `DamagedFg` = `180 0 0` (red). So blue → yellow →
+  red as the meter drains (the user's observation: blue, yellowing/reddening
+  toward zero). The stamina bar only goes blue → red (two states).
+- The original bars also draw an icon/contour sprite (`sprites/hud/hud_stamina`,
+  `sprites/hud/hud_endurance`) and use `PaintBackgroundType 2` (rounded box).
+  The port draws the chunked bar only; the icon sprite is a TODO.
+
+## Pickup model (stage 12) — verified: no auto-pickup
+
+Underhell items are **not** auto-picked by touch and are not grabbed as
+physics props:
+
+- `CItem::ItemTouch` (sub_10177A20) still exists and calls MyTouch, but
+  Underhell items never register it: `CUHItem::Spawn` clears the touch
+  handler (`SetTouch(NULL)`) so walking over an item does nothing.
+- `+use` picks the item up: `CUHItem::Use` → `MyTouch`. Consumables
+  (food/health) only apply their effect when called with `USE_ON` (the
+  inventory `useitem` path from UH_ItemAction); any other use type forwards to
+  MyTouch, so world `+use` always takes the item instead of eating/healing it.
+- The vanilla CHealthKit / CHealthVial follow the same model (Spawn clears
+  touch; Use dispatches on USE_ON).
+- Weapons are still vanilla `BumpWeapon` (touch) — TODO: verify Underhell also
+  requires +use for weapons (likely, same "no auto-pickup" rule).
+
+## Flashlight batteries (stage 13)
+
+Underhell's flashlight runs on discrete batteries (`m_iUHBatteryCount`), not
+suit power:
+
+- `item_battery` (vanilla CItemBattery) grants **1** battery on pickup instead
+  of charging suit armour.
+- `item_batterypack` (CItemBatteryPack) grants **5** batteries (count TODO —
+  verify against original).
+- `FlashlightTurnOn` requires a battery; `UH_UpdateFlashlightBattery` (hooked
+  into PreThink) drains one battery every `uh_flashlight_battery_time` seconds
+  (default 60) while the light is on, and switches it off at zero.
+- The original is a full viewmodel system (shoulder flashlight, holster
+  animation, `FlashlightViewModelThink`, `item_flashlight`/`item_shoulder-
+  flashlight` equipment, `m_bShoulderFlashlight`) — still TODO; this ports the
+  core battery mechanic on the vanilla EF_DIMLIGHT flashlight.
 
 ## Pickup / item_random decode (from RTTI + datamap blob + vtables)
 

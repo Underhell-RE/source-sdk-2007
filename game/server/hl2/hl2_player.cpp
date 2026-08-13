@@ -56,6 +56,7 @@
 
 extern ConVar weapon_showproficiency;
 extern ConVar autoaim_max_dist;
+extern ConVar uh_flashlight_battery_time;
 
 // Do not touch with without seeing me, please! (sjb)
 // For consistency's sake, enemy gunfire is traced against a scaled down
@@ -313,6 +314,13 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_ARRAY( m_iInventory, FIELD_INTEGER, UH_INVENTORY_SLOTS ),
 	DEFINE_FIELD( m_bShoulderFlashlight, FIELD_BOOLEAN ),
 
+	// Underhell endurance / hunger save data (names match the original save format).
+	DEFINE_FIELD( m_iEndurance, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iBleedCounter, FIELD_INTEGER ),
+	DEFINE_FIELD( m_flPseudoEndurance, FIELD_FLOAT ),
+	DEFINE_FIELD( m_fEStaminaCount, FIELD_FLOAT ),
+	DEFINE_FIELD( m_flLastBleedTime, FIELD_TIME ),
+
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),
 	DEFINE_FIELD( m_fIsSprinting, FIELD_BOOLEAN ),
@@ -392,6 +400,7 @@ CHL2_Player::CHL2_Player()
 	m_iArmorReductionFrom = 0;
 
 	UH_InitializeInventory();
+	UH_InitializeEndurance();
 }
 
 //
@@ -429,6 +438,10 @@ IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropInt( SENDINFO(m_iUHHermitTotalQuestCount) ),
 	SendPropBool( SENDINFO(m_bDisplayHermitCard) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_iInventory), SendPropInt( SENDINFO_ARRAY(m_iInventory) ) ),
+
+	// Underhell endurance / hunger props (order mirrors the client recv table).
+	SendPropInt( SENDINFO(m_iEndurance) ),
+	SendPropInt( SENDINFO(m_iBleedCounter) ),
 END_SEND_TABLE()
 
 
@@ -445,6 +458,11 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.TrainUse" );
 	PrecacheScriptSound( "HL2Player.Use" );
 	PrecacheScriptSound( "HL2Player.BurnPain" );
+
+	// Underhell eating / drinking sounds (original sub_102DA7B0 precache list).
+	PrecacheScriptSound( "Player.Eat" );
+	PrecacheScriptSound( "Player.Eat.Apple" );
+	PrecacheScriptSound( "Player.Drink" );
 }
 
 //-----------------------------------------------------------------------------
@@ -743,6 +761,9 @@ void CHL2_Player::PreThink(void)
 #ifdef HL2_EPISODIC
 	CheckFlashlight();
 #endif	// HL2_EPISODIC
+
+	// Underhell: drain the flashlight battery while the light is on.
+	UH_UpdateFlashlightBattery();
 
 	// So the correct flags get sent to client asap.
 	//
@@ -1796,7 +1817,10 @@ void CHL2_Player::SuitPower_Update( void )
 {
 	if( SuitPower_ShouldRecharge() )
 	{
-		SuitPower_Charge( SUITPOWER_CHARGE_RATE * gpGlobals->frametime );
+		// Underhell: recharge rate is gated by endurance (the hunger meter).
+		// The vanilla constant rate is replaced by the endurance-scaled charge
+		// which also consumes endurance as it runs (see UH_UpdateEndurance).
+		UH_UpdateEndurance();
 	}
 	else if( m_HL2Local.m_bitsActiveDevices )
 	{
@@ -2038,18 +2062,18 @@ void CHL2_Player::FlashlightTurnOn( void )
 	if( m_bFlashlightDisabled )
 		return;
 
-	if ( Flashlight_UseLegacyVersion() )
+	// Underhell: the flashlight runs on batteries (m_iUHBatteryCount), not on
+	// suit power like vanilla HL2.
+	if ( UH_GetBatteryCount() <= 0 )
 	{
-		if( !SuitPower_AddDevice( SuitDeviceFlashlight ) )
-			return;
-	}
-#ifdef HL2_DLL
-	if( !IsSuitEquipped() )
+		EmitSound( "HL2Player.UseDeny" );
 		return;
-#endif
+	}
 
 	AddEffects( EF_DIMLIGHT );
 	EmitSound( "HL2Player.FlashLightOn" );
+
+	m_flNextFlashlightBatteryTime = gpGlobals->curtime + uh_flashlight_battery_time.GetFloat();
 
 	variant_t flashlighton;
 	flashlighton.SetFloat( m_HL2Local.m_flSuitPower / 100.0f );
@@ -2061,12 +2085,6 @@ void CHL2_Player::FlashlightTurnOn( void )
 //-----------------------------------------------------------------------------
 void CHL2_Player::FlashlightTurnOff( void )
 {
-	if ( Flashlight_UseLegacyVersion() )
-	{
-		if( !SuitPower_RemoveDevice( SuitDeviceFlashlight ) )
-			return;
-	}
-
 	RemoveEffects( EF_DIMLIGHT );
 	EmitSound( "HL2Player.FlashLightOff" );
 

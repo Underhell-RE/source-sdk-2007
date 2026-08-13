@@ -38,8 +38,37 @@ public:
 	// UH_ITEM_UNKNOWN = not an inventory item (auto-applies on pickup).
 	virtual int		GetInventoryItemType() const = 0;
 
+	// Underhell items are NOT auto-picked on touch: Spawn clears the vanilla
+	// CItem::ItemTouch handler so walking over an item does nothing. Items are
+	// taken with +use (Use -> MyTouch).
+	virtual void	Spawn( void );
+
+	// +use: pick the item up into the player's inventory.
+	// Consumable items (food/health) only apply their effect here when called
+	// with USE_ON (the inventory "useitem" path); any other use type is a
+	// world "+use" pickup.
+	virtual void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+
 	// Default pickup: give the item to the player's inventory.
 	virtual bool	MyTouch( CBasePlayer *pPlayer );
+};
+
+//-----------------------------------------------------------------------------
+// Base class for edible items. Using one from the inventory restores the
+// player's endurance (the "hunger" meter) and a little health, then removes
+// the item entity (original per-class Use() handlers sub_10171E10 etc.).
+//-----------------------------------------------------------------------------
+class CUHFoodItem : public CUHItem
+{
+public:
+	DECLARE_CLASS( CUHFoodItem, CUHItem );
+
+	virtual void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+
+	// Per-item eat parameters (endurance gain, health gain, eat sound).
+	virtual float	GetEnduranceGain() const = 0;
+	virtual float	GetHealthGain() const = 0;
+	virtual const char *GetEatSound() const = 0;
 };
 
 // Declares a plain item class (Spawn/Precache + standard pickup).
@@ -55,29 +84,54 @@ public:
 
 //-----------------------------------------------------------------------------
 // Food
+//
+// Eat parameters come from the original per-item Use() handlers
+// (sub_10171E10 / sub_10172170 / sub_10172370 / sub_101751C0 /
+//  sub_10177130) and the item descriptions in Underhell_english.txt:
+//   Apple/Banana/Burrito/Chocobar/Orange = small  (5 endurance, 1 health)
+//   Sandwich                              = medium (10 endurance, 1 health)
+//   Banana Bunch                          = large  (15 endurance, 3 health)
 //-----------------------------------------------------------------------------
-UH_DECLARE_ITEM( CItemOrange,			UH_ITEM_ORANGE )
-UH_DECLARE_ITEM( CItemBanana,			UH_ITEM_BANANA )
-UH_DECLARE_ITEM( CItemBananaBunch,		UH_ITEM_BANANA_BUNCH )
-UH_DECLARE_ITEM( CItemSandwich,			UH_ITEM_SANDWICH )
-UH_DECLARE_ITEM( CItemChocobar,			UH_ITEM_CHOCOBAR )
-UH_DECLARE_ITEM( CItemBurrito,			UH_ITEM_BURRITO )
+#define UH_DECLARE_FOOD_ITEM( _className, _itemId, _endurance, _health, _sound ) \
+	class _className : public CUHFoodItem										\
+	{																			\
+	public:																		\
+		DECLARE_CLASS( _className, CUHFoodItem );								\
+		virtual void Spawn( void );												\
+		virtual void Precache( void );											\
+		virtual int	 GetInventoryItemType() const { return _itemId; }			\
+		virtual float GetEnduranceGain() const { return _endurance; }			\
+		virtual float GetHealthGain() const { return _health; }					\
+		virtual const char *GetEatSound() const { return _sound; }				\
+	};
+
+UH_DECLARE_FOOD_ITEM( CItemOrange,		UH_ITEM_ORANGE,		5.0f, 1.0f, "Player.Eat" )
+UH_DECLARE_FOOD_ITEM( CItemBanana,		UH_ITEM_BANANA,		5.0f, 1.0f, "Player.Eat" )
+UH_DECLARE_FOOD_ITEM( CItemBananaBunch,	UH_ITEM_BANANA_BUNCH, 15.0f, 3.0f, "Player.Eat" )
+UH_DECLARE_FOOD_ITEM( CItemSandwich,	UH_ITEM_SANDWICH,	10.0f, 1.0f, "Player.Eat" )
+UH_DECLARE_FOOD_ITEM( CItemChocobar,	UH_ITEM_CHOCOBAR,	5.0f, 1.0f, "Player.Eat" )
+UH_DECLARE_FOOD_ITEM( CItemBurrito,		UH_ITEM_BURRITO,	5.0f, 1.0f, "Player.Eat" )
 
 // Apples randomize their skin on spawn (red/green) and give the matching
 // inventory id — original CItemApple::Spawn (sub_10171E90).
-class CItemApple : public CUHItem
+class CItemApple : public CUHFoodItem
 {
 public:
-	DECLARE_CLASS( CItemApple, CUHItem );
+	DECLARE_CLASS( CItemApple, CUHFoodItem );
 
 	virtual void Spawn( void );
 	virtual void Precache( void );
 	virtual bool MyTouch( CBasePlayer *pPlayer );
 	virtual int	 GetInventoryItemType() const { return UH_ITEM_APPLE_RED; }
+
+	// Eat parameters (original sub_10171E10: 5 endurance, 1 health).
+	virtual float GetEnduranceGain() const { return 5.0f; }
+	virtual float GetHealthGain() const { return 1.0f; }
+	virtual const char *GetEatSound() const { return "Player.Eat.Apple"; }
 };
 
-// Sodas cover six flavours (ids 7..12). TODO: verify the original picks the
-// flavour on spawn (skin) or on pickup.
+// Sodas cover six flavours (ids 7..12). The flavour arrives in Use()'s value
+// (the item id); Mega Soda (id 12) multiplies the endurance gain by 2.5.
 class CItemUHSoda : public CUHItem
 {
 public:
@@ -86,6 +140,7 @@ public:
 	virtual void Spawn( void );
 	virtual void Precache( void );
 	virtual bool MyTouch( CBasePlayer *pPlayer );
+	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	virtual int	 GetInventoryItemType() const { return UH_ITEM_SODA_FIRST; }
 };
 
@@ -114,7 +169,19 @@ UH_DECLARE_ITEM( CItem_UHBuckShot,		UH_ITEM_UNKNOWN )
 //-----------------------------------------------------------------------------
 // Equipment
 //-----------------------------------------------------------------------------
-UH_DECLARE_ITEM( CItemBatteryPack,		UH_ITEM_UNKNOWN )	// TODO: battery system
+// Battery pack: grants several flashlight batteries on pickup (the vanilla
+// item_battery grants one). Not stored in the inventory — applies directly.
+class CItemBatteryPack : public CUHItem
+{
+public:
+	DECLARE_CLASS( CItemBatteryPack, CUHItem );
+
+	virtual void Spawn( void );
+	virtual void Precache( void );
+	virtual bool MyTouch( CBasePlayer *pPlayer );
+	virtual int	 GetInventoryItemType() const { return UH_ITEM_UNKNOWN; }
+};
+
 UH_DECLARE_ITEM( CItemFlashlight,		UH_ITEM_UNKNOWN )	// TODO: flashlight system
 UH_DECLARE_ITEM( CItemNightVision,		UH_ITEM_UNKNOWN )	// TODO: gear system
 UH_DECLARE_ITEM( CItemGasMask,			UH_ITEM_UNKNOWN )	// TODO: gear system
@@ -143,9 +210,10 @@ UH_DECLARE_ITEM( CItemHeavyArmor,		UH_ITEM_UNKNOWN )	// TODO: heavy armour picku
 
 //-----------------------------------------------------------------------------
 // Health
-// NOTE: item_healthkit / item_healthvial stay VANILLA (CHealthKit/CHealthVial
-// in hl2/item_healthkit.cpp) — the original kept them, and the inventory
-// use-flow spawns them by classname.
+// NOTE: item_healthkit / item_healthvial are the vanilla CHealthKit/CHealthVial
+// (hl2/item_healthkit.cpp). Underhell modified them to stash into the player's
+// inventory on touch (UH_ITEM_HEALTHKIT / UH_ITEM_HEALTH_VIAL) and heal +
+// stop/slow bleeding when used from the inventory — see that file.
 //-----------------------------------------------------------------------------
 class CItemBandages : public CUHItem
 {
@@ -155,11 +223,33 @@ public:
 	virtual void Spawn( void );
 	virtual void Precache( void );
 	virtual bool MyTouch( CBasePlayer *pPlayer );
+	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	virtual int	 GetInventoryItemType() const { return UH_ITEM_BANDAGES; }
 };
 
-UH_DECLARE_ITEM( CItemPainkillers,		UH_ITEM_PAINKILLERS )	// TODO: original class name unknown (no RTTI)
-UH_DECLARE_ITEM( CItemSyringe,			UH_ITEM_SYRINGE )		// TODO: original class name unknown (no RTTI)
+// Painkillers / syringe heal on use. Original class names have no RTTI dump;
+// the exact heal amounts are a reconstruction (documented TODO).
+class CItemPainkillers : public CUHItem
+{
+public:
+	DECLARE_CLASS( CItemPainkillers, CUHItem );
+
+	virtual void Spawn( void );
+	virtual void Precache( void );
+	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	virtual int	 GetInventoryItemType() const { return UH_ITEM_PAINKILLERS; }
+};
+
+class CItemSyringe : public CUHItem
+{
+public:
+	DECLARE_CLASS( CItemSyringe, CUHItem );
+
+	virtual void Spawn( void );
+	virtual void Precache( void );
+	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	virtual int	 GetInventoryItemType() const { return UH_ITEM_SYRINGE; }
+};
 
 //-----------------------------------------------------------------------------
 // Items seen in the original RTTI / dll strings — classnames recovered from

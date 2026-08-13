@@ -508,7 +508,11 @@ void CInventoryPanel::OnKeyCodePressed( vgui::KeyCode code )
 
 void CInventoryPanel::OnKeyCodeTyped( vgui::KeyCode code )
 {
-	if ( code == KEY_ESCAPE )
+	// While this Frame has input focus, the engine's keybinding for
+	// cl_inventoryToggle is never reached (vgui eats the key first), so the
+	// toggle key has to be handled here too — otherwise a second "I" cannot
+	// close the panel. ESC and the toggle key both close it.
+	if ( code == KEY_ESCAPE || code == KEY_I )
 	{
 		if ( IsVisible() )
 			Toggle();

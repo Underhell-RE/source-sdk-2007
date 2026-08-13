@@ -70,10 +70,14 @@ public:
 	bool						m_bFlashlightOn;					// inventory flashlight state
 	bool						m_bDisplayHermitCard;				// TODO: hermit card system
 	bool						m_bInventoryEnabled;				// inventory system enabled
-	int							m_iUHBatteryCount;					// battery items held
-	int							m_iUHHermitCardsCount;				// TODO: hermit card system
-	int							m_iUHHermitCurrentQuestCount;		// TODO: hermit card system
-	int							m_iUHHermitTotalQuestCount;			// TODO: hermit card system
+	int								m_iUHBatteryCount;					// battery items held
+	int								m_iUHHermitCardsCount;				// TODO: hermit card system
+	int								m_iUHHermitCurrentQuestCount;		// TODO: hermit card system
+	int								m_iUHHermitTotalQuestCount;			// TODO: hermit card system
+
+	// Underhell endurance / hunger state (networked; drawn by CHudEndurance).
+	int								m_iEndurance;						// "hunger" meter, 0..100
+	int								m_iBleedCounter;					// bleeding state (0 = clean)
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible

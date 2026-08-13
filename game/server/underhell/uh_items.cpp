@@ -27,6 +27,35 @@ static void UH_PrecacheItemSounds( void )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Underhell items are taken with +use, not by walking over them.
+// The vanilla CItem::Spawn installs ItemTouch (auto-pickup); clear it here so
+// the item only responds to +use.
+//-----------------------------------------------------------------------------
+void CUHItem::Spawn( void )
+{
+	BaseClass::Spawn();
+
+	// No auto-pickup: disable the touch handler installed by CItem::Spawn.
+	SetTouch( NULL );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: +use on a world item picks it up into the player's inventory.
+//
+// Consumable subclasses (food/health) override Use() for their effect but
+// forward here when the call isn't the inventory "useitem" (USE_ON) path, so
+// +use always picks the item up rather than applying its effect in the world.
+//-----------------------------------------------------------------------------
+void CUHItem::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	CBasePlayer *pPlayer = ToBasePlayer( pActivator );
+	if ( pPlayer )
+	{
+		MyTouch( pPlayer );
+	}
+}
+
+//-----------------------------------------------------------------------------
 // Default pickup: the original casts the toucher to CHL2_Player via RTTI,
 // refuses when the inventory is full, plays the pickup sound, sets the
 // player as owner and gives the item (CHL2_Player vtable [410]).
@@ -51,6 +80,72 @@ bool CUHItem::MyTouch( CBasePlayer *pPlayer )
 	UTIL_Remove( this );
 
 	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Item consumption gate (matches the original per-item Use() handlers): the
+// activator must be a living CHL2_Player that isn't wearing a gas mask. The
+// gas-mask check is a TODO until the gear system is ported.
+//-----------------------------------------------------------------------------
+static CHL2_Player *UH_GetItemConsumer( CBaseEntity *pActivator )
+{
+	if ( !pActivator )
+		return NULL;
+
+	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player *>( pActivator );
+	if ( !pPlayer || !pPlayer->IsAlive() )
+		return NULL;
+
+	// TODO: refuse when the gas mask is worn (original checks player offset
+	// 3370 = m_bGasMaskOn).
+
+	return pPlayer;
+}
+
+//-----------------------------------------------------------------------------
+// CUHFoodItem::Use — eating from the inventory restores endurance + health,
+// plays the eat sound, then consumes the item entity.
+//-----------------------------------------------------------------------------
+void CUHFoodItem::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the eat effect.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	pPlayer->UH_Eat( GetEnduranceGain(), GetHealthGain(), GetEatSound() );
+	UTIL_Remove( this );
+}
+
+//-----------------------------------------------------------------------------
+// CItemUHSoda::Use — drinking restores endurance + health. The flavour is the
+// item id (value); Mega Soda (flavour 5) is handled inside UH_Drink.
+//-----------------------------------------------------------------------------
+void CItemUHSoda::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the drink effect.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	// Original sub_101772F0: flavour = item id - 7 (0..5).
+	int iFlavor = (int)value - UH_ITEM_SODA_FIRST;
+	pPlayer->UH_Drink( 10.0f, 1.0f, iFlavor );
+	UTIL_Remove( this );
 }
 
 //-----------------------------------------------------------------------------
@@ -217,6 +312,24 @@ UH_DEFINE_ITEM( CItem_UHBuckShot,	item_ammo_buckshot,		"models/items/buckshot.md
 // Both classnames registered so old maps keep working.
 LINK_ENTITY_TO_CLASS( item_batterypack, CItemBatteryPack );
 UH_DEFINE_ITEM( CItemBatteryPack,	item_battery_pack,	"models/pg_props/pg_obj/pg_battery_pack.mdl" )
+
+// A battery pack grants several flashlight batteries (the vanilla item_battery
+// grants one). TODO: verify the exact count against the original.
+#define UH_BATTERY_PACK_COUNT 5
+
+bool CItemBatteryPack::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	pHL2Player->UH_AddBattery( UH_BATTERY_PACK_COUNT );
+
+	pHL2Player->EmitSound( "ItemBattery.Touch" );
+	UTIL_Remove( this );
+
+	return true;
+}
 UH_DEFINE_ITEM( CItemHeavyArmor,	item_heavyarmor,	"models/items/kevlar.mdl" )
 UH_DEFINE_ITEM( CItemFlashlight,	item_flashlight,	"models/pg_props/pg_obj/pg_flashlight.mdl" )
 UH_DEFINE_ITEM( CItemNightVision,	item_nightvision,	"models/items/nightvision.mdl" )
@@ -276,10 +389,47 @@ bool CItemArmor::MyTouch( CBasePlayer *pPlayer )
 UH_DEFINE_ITEM( CItemPainkillers,	item_painkillers,	"models/healthvial.mdl" )
 UH_DEFINE_ITEM( CItemSyringe,		item_syringe,		"models/healthvial.mdl" )
 
+// Painkillers / syringe heal on use. The original class names have no RTTI
+// dump, so the heal amounts are a reconstruction (TODO: verify against the
+// original player inputs "Syringe" / "PainKillers").
+void CItemPainkillers::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the heal effect.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	pPlayer->TakeHealth( 10.0f, DMG_GENERIC );
+	UTIL_Remove( this );
+}
+
+void CItemSyringe::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the heal effect.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	pPlayer->TakeHealth( 15.0f, DMG_GENERIC );
+	UTIL_Remove( this );
+}
+
 // Bandages: original gates the pickup on the player being hurt or bleeding
 // (sub_101725C0) and plays its own pickup sound.
-// TODO: port the bleed-stop effect (player bleed state, offset 547 in the
-// original — the SDK has no equivalent member yet).
 LINK_ENTITY_TO_CLASS( item_bandages, CItemBandages );
 
 void CItemBandages::Precache( void )
@@ -304,8 +454,7 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 		return false;
 
 	// Original gate: only while hurt or bleeding.
-	// TODO: bleeding check once the bleed system is ported.
-	if ( pHL2Player->GetHealth() >= 100 )
+	if ( pHL2Player->GetHealth() >= 100 && pHL2Player->UH_GetBleedCounter() <= 0 )
 		return false;
 
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
@@ -317,6 +466,45 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 	UTIL_Remove( this );
 
 	return true;
+}
+
+//-----------------------------------------------------------------------------
+// CItemBandages::Use — stop bleeding and heal. Original sub_101725C0: usable
+// while hurt or bleeding; heals 5 while bleeding (and stops the bleed), else
+// heals 1. Plays "HL2Player.PickupBandages".
+//-----------------------------------------------------------------------------
+void CItemBandages::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the bandage effect.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	// Original gate: only usable while hurt or bleeding.
+	if ( pPlayer->GetHealth() >= 100 && pPlayer->UH_GetBleedCounter() <= 0 )
+		return;
+
+	if ( pPlayer->UH_GetBleedCounter() > 0 )
+	{
+		// Stop the bleed and heal more.
+		pPlayer->UH_SetBleedCounter( 0 );
+		pPlayer->UH_SetLastBleedTime( gpGlobals->curtime );
+		pPlayer->TakeHealth( 5.0f, DMG_GENERIC );
+	}
+	else
+	{
+		pPlayer->TakeHealth( 1.0f, DMG_GENERIC );
+	}
+
+	pPlayer->EmitSound( "HL2Player.PickupBandages" );
+	UTIL_Remove( this );
 }
 
 //-----------------------------------------------------------------------------
