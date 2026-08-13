@@ -4,6 +4,8 @@
 //
 // Original: CInventoryPanel : vgui::Frame, 28 vgui::DragnDropSlot children
 // (ImageButton : ImagePanel). Layout from hexrays sub_1012E360.
+// LMB = NewSelection (sub_10130D00, code 107). RMB = ContextMenu Use/Drop
+// (sub_10130D00, code 108 / sub_10130DC0).
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -16,6 +18,7 @@
 
 #include "vgui_controls/Frame.h"
 #include "vgui_controls/ImagePanel.h"
+#include "vgui_controls/Menu.h"
 
 #include "underhell/uh_inventory.h"
 
@@ -28,20 +31,36 @@ public:
 	virtual ~IInventoryPanel() {}
 };
 
+class CInventoryPanel;
+
 //-----------------------------------------------------------------------------
 // One inventory slot. Original: vgui::DragnDropSlot : ImageButton : ImagePanel.
-// We stand in with ImagePanel (OB SDK has no ImageButton / DragnDropSlot) —
-// same 28x28 scaled sprite, same tooltip text. Drag-drop still TODO.
+// OB SDK has no those classes — ImagePanel + a vgui::Menu is the stand-in.
 //-----------------------------------------------------------------------------
 class CInventorySlotPanel : public vgui::ImagePanel
 {
 	DECLARE_CLASS_SIMPLE( CInventorySlotPanel, vgui::ImagePanel );
 
 public:
-	CInventorySlotPanel( vgui::Panel *pParent, const char *pszName );
+	CInventorySlotPanel( vgui::Panel *pParent, const char *pszName, int iSlot );
 
-	void SetSlotContents( const char *pszSprite, const char *pszTextToken );
+	void SetSlotContents( int iItem, const char *pszSprite, const char *pszTextToken );
 	void Clear( void );
+	void SetSelected( bool bSelected );
+
+	virtual void OnMousePressed( vgui::MouseCode code );
+	virtual void OnMouseDoublePressed( vgui::MouseCode code );
+	virtual void OnCommand( const char *command );
+	virtual void Paint( void );
+
+private:
+	void OpenContextMenu( void );
+	void IssueItemCommand( const char *pszCommand );
+
+	int				m_iSlot;
+	int				m_iItem;		// 0 = empty (original this[98])
+	bool			m_bSelected;
+	vgui::Menu		*m_pContextMenu;	// original this[100], "ContextMenu"
 };
 
 //-----------------------------------------------------------------------------
@@ -61,28 +80,26 @@ public:
 	virtual void OnKeyCodePressed( vgui::KeyCode code );
 	virtual void OnKeyCodeTyped( vgui::KeyCode code );
 	virtual void OnClose( void );
+	virtual void OnCommand( const char *command );
 
-	// cl_inventoryToggle — flips visibility and asks the server to resync.
 	void Toggle( void );
-
-	// Client "UpdateInventory" command — full refresh.
 	void RequestRefresh( void )	{ m_bNeedsRefresh = true; }
+	void SelectSlot( int iSlot );	// NewSelection (this[139])
 
 private:
 	void LayoutSlots( void );
 	void ClearSlots( void );
 	void RefreshSlots( void );
 
-	// Messages the original panel registered (hexrays sub_1012EC80/sub_1012ED20).
 	MESSAGE_FUNC( OnNewSelection, "NewSelection" );
 	MESSAGE_FUNC( OnNewMouseReleased, "NewMouseReleased" );
 
 	CInventorySlotPanel		*m_pSlots[UH_INVENTORY_SLOTS];
 	vgui::ImagePanel		*m_pBackground;
 	bool					m_bNeedsRefresh;
+	int						m_iSelectedSlot;	// original this[139]
 };
 
-// Singleton accessor — creates the panel on first use.
 CInventoryPanel *GetInventoryPanel( void );
 
 #endif // UH_C_INVENTORY_PANEL_H

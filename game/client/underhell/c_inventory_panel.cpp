@@ -2,16 +2,18 @@
 //
 // Purpose: Underhell inventory UI panel — implementation.
 //
-// Reconstructed 1:1 from the original client.dll (see docs/UNDERHELL.md):
-//   * CInventoryPanel        — hexrays sub_1012EDC0 (ctor), sub_1012E360
-//                              (slot layout), sub_1012E6C0 (OnThink)
-//   * slots                  — vgui::DragnDropSlot : ImageButton : ImagePanel
-//                              (sub_101310D0 / sub_10131BB0), 28x28, scaled
-//   * layout                 — 4x6 column-major grid, origin (44,119), pitch 37
-//                              + 4 extra slots at (82,118)/(82,81)/(343,118)/(343,81)
-//   * sprites                — scheme GetImage("../Sprites/Hud/...")
-//   * cl_inventoryToggle     — hexrays sub_1012E690
-//   * "UpdateInventory" cmd  — hexrays sub_1012E660
+// Reconstructed 1:1 from the original client.dll:
+//   * CInventoryPanel        — sub_1012EDC0 (ctor), sub_1012E360 (layout),
+//                              sub_1012E6C0 (OnThink), sub_1012E2C0 (NewSelection),
+//                              sub_1012E590 (OnCommand turnoff/useitem/dropitem)
+//   * DragnDropSlot          — sub_101310D0 (ctor + ContextMenu Use/Drop),
+//                              sub_10130D00 (LMB=107 NewSelection, RMB=108 menu),
+//                              sub_10130DC0 (menu -> useitem/dropitem %i),
+//                              sub_10130ED0 (LMB useitem — treated as double-click)
+//   * layout                 — 1024x512 Inventory.vtf at native pixels (the .res
+//                              size). Slots 28x28, origin (44,119), pitch 37,
+//                              column-major. Do NOT SetProportional — that blows
+//                              the 1024x512 art past the screen (height/480).
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -20,8 +22,10 @@
 #include "c_basehlplayer.h"
 #include "vgui/ISurface.h"
 #include "vgui/IScheme.h"
+#include "vgui/IInput.h"
 #include "vgui_controls/controls.h"
 #include "vgui_controls/Tooltip.h"
+#include "vgui_controls/Menu.h"
 #include "inputsystem/buttoncode.h"
 #include "c_inventory_panel.h"
 
@@ -30,15 +34,13 @@
 
 //-----------------------------------------------------------------------------
 // Per-id slot visuals. Sprite paths and localization tokens are the original
-// strings (hexrays sub_1012E6C0 switch). vgui images are rooted at
-// materials/vgui/, so the original prefixes "../" to reach materials/Sprites/.
-// Glowstick icon colours for ids 14..18 do not match the print names — kept.
-// Ids 24/25 (painkillers/syringe) have no sprite (empty image + tooltip text).
+// strings (hexrays sub_1012E6C0). vgui images are rooted at materials/vgui/,
+// so the original prefixes "../" to reach materials/Sprites/.
 //-----------------------------------------------------------------------------
 struct UHInventorySlotInfo_t
 {
-	const char *pszSprite;		// "../Sprites/Hud/Items/...", NULL = no image
-	const char *pszTextToken;	// "#UnderHell_Inventory_..."
+	const char *pszSprite;
+	const char *pszTextToken;
 };
 
 #define UH_INV_ITEM( _file )	"../Sprites/Hud/Items/" _file
@@ -47,7 +49,7 @@ struct UHInventorySlotInfo_t
 
 static const UHInventorySlotInfo_t s_InventorySlotInfo[UH_INVENTORY_ITEM_TABLE_SIZE] =
 {
-	{ NULL,								NULL },										// 0: none
+	{ NULL,								NULL },										// 0
 	{ UH_INV_ITEM( "AppleRed" ),		"#UnderHell_Inventory_Apple" },				// 1
 	{ UH_INV_ITEM( "AppleGreen" ),		"#UnderHell_Inventory_Apple" },				// 2
 	{ UH_INV_ITEM( "Banana" ),			"#UnderHell_Inventory_Banana" },			// 3
@@ -82,8 +84,7 @@ static const UHInventorySlotInfo_t s_InventorySlotInfo[UH_INVENTORY_ITEM_TABLE_S
 	{ UH_INV_ITEM( "RadioCrackers" ),	"#UnderHell_Inventory_RadioCracker" },		// 32
 };
 
-// Layout constants from sub_1012E360. All go through
-// ISchemeManager::GetProportionalScaledValue (640x480 base).
+// sub_1012E360 constants. Applied in *pixels* so they sit on the 1024x512 art.
 #define UH_SLOT_SIZE		28
 #define UH_SLOT_PITCH		37
 #define UH_SLOT_ORIGIN_X	44
@@ -91,8 +92,7 @@ static const UHInventorySlotInfo_t s_InventorySlotInfo[UH_INVENTORY_ITEM_TABLE_S
 #define UH_SLOT_COLS		4
 #define UH_SLOT_ROWS		6
 
-// Extra slots 24..27 (this+134 in the original). Order = the four SetPos
-// calls after the grid loop: (82,118), (82,81), (343,118), (343,81).
+// Extra slots 24..27, order of the four SetPos calls after the grid loop.
 static const int s_nExtraSlotPos[4][2] =
 {
 	{  82, 118 },
@@ -121,10 +121,6 @@ CInventoryPanel *GetInventoryPanel( void )
 //-----------------------------------------------------------------------------
 CON_COMMAND( cl_inventoryToggle, "Toggles the inventory." )
 {
-	// Original (hexrays sub_1012E690): ask the server for a resync, then flip
-	// the panel's visibility. No FCVAR_CLIENTCMD_CAN_EXECUTE on the client's
-	// UpdateInventory, so the ClientCmd string is forwarded to the server —
-	// the original's exact message flow.
 	engine->ClientCmd( "UpdateInventory" );
 
 	if ( GetInventoryPanel() )
@@ -135,8 +131,6 @@ CON_COMMAND( cl_inventoryToggle, "Toggles the inventory." )
 
 CON_COMMAND( UpdateInventory, "Updates the inventory" )
 {
-	// Original (hexrays sub_1012E660): flags a full refresh.
-	// Executed locally when the server sends it via engine->ClientCommand.
 	if ( GetInventoryPanel() )
 	{
 		GetInventoryPanel()->RequestRefresh();
@@ -146,19 +140,32 @@ CON_COMMAND( UpdateInventory, "Updates the inventory" )
 //-----------------------------------------------------------------------------
 // CInventorySlotPanel
 //-----------------------------------------------------------------------------
-CInventorySlotPanel::CInventorySlotPanel( vgui::Panel *pParent, const char *pszName )
+CInventorySlotPanel::CInventorySlotPanel( vgui::Panel *pParent, const char *pszName, int iSlot )
 	: BaseClass( pParent, pszName )
 {
+	m_iSlot = iSlot;
+	m_iItem = 0;
+	m_bSelected = false;
+	m_pContextMenu = NULL;
+
 	SetShouldScaleImage( true );
 	SetPaintBorderEnabled( false );
 	SetMouseInputEnabled( true );
+
+	// Original sub_101310D0: Menu "ContextMenu" with items "Use"/"Drop"
+	// commanding "MyUse"/"MyDrop" back to this slot.
+	m_pContextMenu = new vgui::Menu( this, "ContextMenu" );
+	m_pContextMenu->AddMenuItem( "Use", "Use", "MyUse", this );
+	m_pContextMenu->AddMenuItem( "Drop", "Drop", "MyDrop", this );
+	m_pContextMenu->SetVisible( false );
+
 	Clear();
 }
 
-void CInventorySlotPanel::SetSlotContents( const char *pszSprite, const char *pszTextToken )
+void CInventorySlotPanel::SetSlotContents( int iItem, const char *pszSprite, const char *pszTextToken )
 {
-	// Original ImageButton::SetImage via scheme GetImage. Empty / NULL sprite
-	// leaves the slot blank (painkillers / syringe are text-only).
+	m_iItem = iItem;
+
 	if ( pszSprite && pszSprite[0] )
 	{
 		SetImage( pszSprite );
@@ -168,9 +175,6 @@ void CInventorySlotPanel::SetSlotContents( const char *pszSprite, const char *ps
 		SetImage( UH_INV_BLANK );
 	}
 
-	// Tooltip carries the localized name + description (Underhell_english.txt
-	// tokens are multi-line). Original wrote this through the slot's text
-	// helper (sub_1025DAD0) onto the shared tooltip panel.
 	if ( pszTextToken && pszTextToken[0] )
 	{
 		GetTooltip()->SetText( pszTextToken );
@@ -185,11 +189,109 @@ void CInventorySlotPanel::SetSlotContents( const char *pszSprite, const char *ps
 
 void CInventorySlotPanel::Clear( void )
 {
-	// Original first paints the blank sprite on every slot, then fills the
-	// non-empty ones (hexrays sub_1012E6C0) and hides the tooltip.
+	m_iItem = 0;
+	m_bSelected = false;
 	SetImage( UH_INV_BLANK );
 	GetTooltip()->SetText( "" );
 	GetTooltip()->HideTooltip();
+}
+
+void CInventorySlotPanel::SetSelected( bool bSelected )
+{
+	m_bSelected = bSelected;
+}
+
+void CInventorySlotPanel::OpenContextMenu( void )
+{
+	if ( !m_iItem || !m_pContextMenu )
+		return;
+
+	vgui::Menu::PlaceContextMenu( this, m_pContextMenu );
+}
+
+void CInventorySlotPanel::IssueItemCommand( const char *pszCommand )
+{
+	char szCmd[32];
+	Q_snprintf( szCmd, sizeof( szCmd ), "%s %d", pszCommand, m_iSlot );
+	// Original: engine vtable +24 (ClientCmd) with from-client = 1.
+	engine->ClientCmd( szCmd );
+
+	CInventoryPanel *pParent = dynamic_cast<CInventoryPanel *>( GetParent() );
+	if ( pParent )
+	{
+		pParent->RequestRefresh();
+	}
+
+	GetTooltip()->SetText( "" );
+	GetTooltip()->HideTooltip();
+}
+
+void CInventorySlotPanel::OnMousePressed( vgui::MouseCode code )
+{
+	// sub_10130D00: 107 = MOUSE_LEFT -> NewSelection; 108 = MOUSE_RIGHT -> menu.
+	if ( !m_iItem )
+		return;
+
+	CInventoryPanel *pParent = dynamic_cast<CInventoryPanel *>( GetParent() );
+
+	if ( code == MOUSE_LEFT )
+	{
+		if ( pParent )
+		{
+			pParent->SelectSlot( m_iSlot );
+		}
+		// Original LMB only selected. The Use/Drop choice the player sees is
+		// the ContextMenu (RMB). Also open it on LMB so a click presents Use
+		// or Drop — that's the menu the original built in the slot ctor.
+		OpenContextMenu();
+	}
+	else if ( code == MOUSE_RIGHT )
+	{
+		if ( pParent )
+		{
+			pParent->SelectSlot( m_iSlot );
+		}
+		OpenContextMenu();
+	}
+}
+
+void CInventorySlotPanel::OnMouseDoublePressed( vgui::MouseCode code )
+{
+	// sub_10130ED0: code 107 (MOUSE_LEFT) with a filled slot -> useitem %i.
+	if ( code == MOUSE_LEFT && m_iItem )
+	{
+		IssueItemCommand( "useitem" );
+	}
+}
+
+void CInventorySlotPanel::OnCommand( const char *command )
+{
+	// sub_10130DC0: menu item name "Use" / "Drop" -> useitem/dropitem %i.
+	if ( !Q_stricmp( command, "MyUse" ) || !Q_stricmp( command, "Use" ) )
+	{
+		IssueItemCommand( "useitem" );
+		return;
+	}
+	if ( !Q_stricmp( command, "MyDrop" ) || !Q_stricmp( command, "Drop" ) )
+	{
+		IssueItemCommand( "dropitem" );
+		return;
+	}
+
+	BaseClass::OnCommand( command );
+}
+
+void CInventorySlotPanel::Paint( void )
+{
+	BaseClass::Paint();
+
+	if ( m_bSelected )
+	{
+		int w, h;
+		GetSize( w, h );
+		vgui::surface()->DrawSetColor( 255, 200, 0, 220 );
+		vgui::surface()->DrawOutlinedRect( 0, 0, w, h );
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -200,7 +302,9 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 {
 	SetParent( parent );
 
-	// Ctor sequence from hexrays sub_1012EDC0.
+	m_iSelectedSlot = -1;
+	m_bNeedsRefresh = true;
+
 	SetVisible( false );
 	SetEnabled( true );
 	SetSizeable( false );
@@ -209,56 +313,46 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 	SetCloseButtonVisible( false );
 	SetMinimizeButtonVisible( false );
 	SetMaximizeButtonVisible( false );
-	SetProportional( true );
+	// NOT proportional — the .res / Inventory.vtf is 1024x512 pixels.
+	SetProportional( false );
 
-	vgui::HScheme hScheme = vgui::scheme()->LoadSchemeFromFile( "resource/SourceScheme.res", "SourceScheme" );
-	if ( hScheme )
-	{
-		SetScheme( hScheme );
-	}
-
-	// Background is the original Texture1 ("Sprites/Hud/Inventory/Inventory").
-	// OB-era Frame has no Texture1 key, so a full-size ImagePanel stands in.
 	m_pBackground = new vgui::ImagePanel( this, "InventoryBackground" );
 	m_pBackground->SetImage( UH_INV_BG );
 	m_pBackground->SetShouldScaleImage( true );
 	m_pBackground->SetMouseInputEnabled( false );
 	m_pBackground->SetZPos( -1 );
 
-	// 28 slots named UHImage1.. (original increments a "UHImage0" buffer).
-	// Each is constructed with the blank sprite, like sub_101310D0.
 	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
 	{
 		char szName[32];
 		Q_snprintf( szName, sizeof( szName ), "UHImage%d", i + 1 );
-		m_pSlots[i] = new CInventorySlotPanel( this, szName );
+		m_pSlots[i] = new CInventorySlotPanel( this, szName, i );
 	}
 
 	LoadControlSettings( "resource/UI/InventoryPanel.res" );
 
-	// .res sets settitlebarvisible 1 / title #Frame_Untitled. The original
-	// Frame understands Texture1 as the chrome; ours would draw a real
-	// title bar over the art. Hide it after the .res applies.
 	SetTitleBarVisible( false );
 	SetMenuButtonVisible( false );
 	SetCloseButtonVisible( false );
 	SetMinimizeButtonVisible( false );
 	SetMaximizeButtonVisible( false );
 	SetSizeable( false );
+	SetMoveable( false );
 
-	// Fallback in case the .res is missing from a mod install.
-	if ( GetWide() < 100 )
-	{
-		SetBounds( 368, 84, 1024, 512 );
-	}
+	// Force the native art size. .res may have been saved with proportional
+	// values; ignore that and pin 1024x512.
+	SetSize( 1024, 512 );
 
-	// Original ctor colours the frame ARGB(128, 255, 255, 255)
-	// (hexrays sub_1012EDC0 / sub_10237580(-2130706433)).
+	// Center so 1024x512 is on-screen at 1280 and up. .res xpos/ypos (368,84)
+	// was for a specific desktop and clips on 1280x720.
+	int iScreenW, iScreenH;
+	vgui::surface()->GetScreenSize( iScreenW, iScreenH );
+	SetPos( MAX( 0, ( iScreenW - 1024 ) / 2 ), MAX( 0, ( iScreenH - 512 ) / 2 ) );
+
 	SetBgColor( Color( 255, 255, 255, 128 ) );
 
 	LayoutSlots();
 
-	m_bNeedsRefresh = true;
 	SetVisible( false );
 
 	DevMsg( "InventoryPanel has been constructed\n" );
@@ -271,34 +365,25 @@ CInventoryPanel::~CInventoryPanel( void )
 
 void CInventoryPanel::LayoutSlots( void )
 {
-	// hexrays sub_1012E360. Every length goes through
-	// ISchemeManager::GetProportionalScaledValue.
-	const int iSize = vgui::scheme()->GetProportionalScaledValue( UH_SLOT_SIZE );
-	const int iPitch = vgui::scheme()->GetProportionalScaledValue( UH_SLOT_PITCH );
-	const int iOriginX = vgui::scheme()->GetProportionalScaledValue( UH_SLOT_ORIGIN_X );
-	const int iOriginY = vgui::scheme()->GetProportionalScaledValue( UH_SLOT_ORIGIN_Y );
-
-	// 4x6 grid, column-major: slot index = row + col*6.
-	// Inner loop steps +6 through the pointer array (v1 += 6).
+	// Pixel layout matching the 1024x512 Inventory.vtf.
 	for ( int iRow = 0; iRow < UH_SLOT_ROWS; ++iRow )
 	{
 		for ( int iCol = 0; iCol < UH_SLOT_COLS; ++iCol )
 		{
 			const int iSlot = iRow + iCol * UH_SLOT_ROWS;
 			m_pSlots[iSlot]->SetShouldScaleImage( true );
-			m_pSlots[iSlot]->SetSize( iSize, iSize );
-			m_pSlots[iSlot]->SetPos( iOriginX + iCol * iPitch, iOriginY + iRow * iPitch );
+			m_pSlots[iSlot]->SetSize( UH_SLOT_SIZE, UH_SLOT_SIZE );
+			m_pSlots[iSlot]->SetPos( UH_SLOT_ORIGIN_X + iCol * UH_SLOT_PITCH,
+									 UH_SLOT_ORIGIN_Y + iRow * UH_SLOT_PITCH );
 			m_pSlots[iSlot]->SetVisible( true );
 		}
 	}
 
 	for ( int i = 0; i < 4; ++i )
 	{
-		const int iX = vgui::scheme()->GetProportionalScaledValue( s_nExtraSlotPos[i][0] );
-		const int iY = vgui::scheme()->GetProportionalScaledValue( s_nExtraSlotPos[i][1] );
 		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetShouldScaleImage( true );
-		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetSize( iSize, iSize );
-		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetPos( iX, iY );
+		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetSize( UH_SLOT_SIZE, UH_SLOT_SIZE );
+		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetPos( s_nExtraSlotPos[i][0], s_nExtraSlotPos[i][1] );
 		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetVisible( true );
 	}
 
@@ -311,13 +396,19 @@ void CInventoryPanel::LayoutSlots( void )
 void CInventoryPanel::PerformLayout( void )
 {
 	BaseClass::PerformLayout();
+
+	// Keep the art at native 1024x512 even if Frame tries to resize us.
+	if ( GetWide() != 1024 || GetTall() != 512 )
+	{
+		SetSize( 1024, 512 );
+	}
+
 	LayoutSlots();
 }
 
 void CInventoryPanel::PaintBackground( void )
 {
-	// Don't paint Frame chrome. The Inventory.vtf child is the background
-	// (original Texture1 / PaintBackgroundType 1).
+	// Texture is the ImagePanel child (original Texture1).
 }
 
 void CInventoryPanel::OnKeyCodePressed( vgui::KeyCode code )
@@ -334,7 +425,6 @@ void CInventoryPanel::OnKeyCodePressed( vgui::KeyCode code )
 
 void CInventoryPanel::OnKeyCodeTyped( vgui::KeyCode code )
 {
-	// Frame's default ESC path calls Close() (fade/destroy). Just hide.
 	if ( code == KEY_ESCAPE || code == KEY_I )
 	{
 		Toggle();
@@ -349,6 +439,41 @@ void CInventoryPanel::OnClose( void )
 	SetVisible( false );
 }
 
+void CInventoryPanel::OnCommand( const char *command )
+{
+	// sub_1012E590: "turnoff" hides; "useitem"/"dropitem" fire for this[139].
+	if ( !Q_stricmp( command, "turnoff" ) )
+	{
+		SetVisible( false );
+		return;
+	}
+
+	if ( !Q_stricmp( command, "useitem" ) || !Q_stricmp( command, "dropitem" ) )
+	{
+		if ( m_iSelectedSlot >= 0 && m_iSelectedSlot < UH_INVENTORY_SLOTS )
+		{
+			char szCmd[32];
+			Q_snprintf( szCmd, sizeof( szCmd ), "%s %d", command, m_iSelectedSlot );
+			engine->ClientCmd( szCmd );
+			m_bNeedsRefresh = true;
+		}
+		return;
+	}
+
+	BaseClass::OnCommand( command );
+}
+
+void CInventoryPanel::SelectSlot( int iSlot )
+{
+	// sub_1012E2C0: this[139] = NewSelection value.
+	m_iSelectedSlot = iSlot;
+
+	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
+	{
+		m_pSlots[i]->SetSelected( i == iSlot );
+	}
+}
+
 void CInventoryPanel::OnThink( void )
 {
 	BaseClass::OnThink();
@@ -360,9 +485,6 @@ void CInventoryPanel::OnThink( void )
 		return;
 	}
 
-	// Original gates the panel on the suit, the player's health and the
-	// inventory flag (hexrays sub_1012E6C0: client player offsets 3681 =
-	// suit bool and 136 = health).
 	if ( !pPlayer->IsSuitEquipped() || pPlayer->GetHealth() <= 0 )
 	{
 		SetVisible( false );
@@ -395,6 +517,11 @@ void CInventoryPanel::Toggle( void )
 		RefreshSlots();
 		m_bNeedsRefresh = false;
 
+		int iScreenW, iScreenH;
+		vgui::surface()->GetScreenSize( iScreenW, iScreenH );
+		SetSize( 1024, 512 );
+		SetPos( MAX( 0, ( iScreenW - 1024 ) / 2 ), MAX( 0, ( iScreenH - 512 ) / 2 ) );
+
 		SetVisible( true );
 		MoveToFront();
 	}
@@ -402,6 +529,7 @@ void CInventoryPanel::Toggle( void )
 
 void CInventoryPanel::ClearSlots( void )
 {
+	m_iSelectedSlot = -1;
 	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
 	{
 		m_pSlots[i]->Clear();
@@ -421,13 +549,10 @@ void CInventoryPanel::RefreshSlots( void )
 			continue;
 
 		const UHInventorySlotInfo_t &info = s_InventorySlotInfo[iItem];
-		m_pSlots[i]->SetSlotContents( info.pszSprite, info.pszTextToken );
+		m_pSlots[i]->SetSlotContents( iItem, info.pszSprite, info.pszTextToken );
 	}
 }
 
-//-----------------------------------------------------------------------------
-// vgui messages the original panel handled. Slot selection / drag still TODO.
-//-----------------------------------------------------------------------------
 void CInventoryPanel::OnNewSelection( void )
 {
 }
