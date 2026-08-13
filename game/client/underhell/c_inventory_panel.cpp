@@ -250,10 +250,8 @@ void CInventorySlotPanel::OnMousePressed( vgui::MouseCode code )
 		{
 			pParent->SelectSlot( m_iSlot );
 		}
-		// Original LMB only selected. The Use/Drop choice the player sees is
-		// the ContextMenu (RMB). Also open it on LMB so a click presents Use
-		// or Drop — that's the menu the original built in the slot ctor.
-		OpenContextMenu();
+		// Original LMB only changes selection. Use/Drop remains on RMB;
+		// double-click is the direct-use shortcut.
 	}
 	else if ( code == MOUSE_RIGHT )
 	{

@@ -248,6 +248,15 @@ int CHL2_Player::UH_FindInventoryItem( int iItem ) const
 //-----------------------------------------------------------------------------
 bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 {
+	// ClientCommand arguments are untrusted. Validate before indexing the
+	// network array so malformed `useitem`/`dropitem` commands cannot read
+	// outside m_iInventory.
+	if ( iSlot < 0 || iSlot >= UH_INVENTORY_SLOTS )
+	{
+		Warning( "Invalid inventory slot %d\n", iSlot );
+		return false;
+	}
+
 	int iItem = m_iInventory[iSlot];
 	if ( !iItem )
 	{
