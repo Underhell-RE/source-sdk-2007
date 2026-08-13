@@ -86,22 +86,15 @@ static const UHInventorySlotInfo_t s_InventorySlotInfo[UH_INVENTORY_ITEM_TABLE_S
 	{ UH_INV_ITEM( "RadioCrackers" ),	"#UnderHell_Inventory_RadioCracker" },		// 32
 };
 
-// sub_1012E360 constants. Applied in *pixels* so they sit on the 1024x512 art.
-#define UH_SLOT_SIZE		28
-#define UH_SLOT_PITCH		37
-#define UH_SLOT_ORIGIN_X	44
-#define UH_SLOT_ORIGIN_Y	119
-#define UH_SLOT_COLS		6		// outer loop v34 < 6 — X
-#define UH_SLOT_ROWS		4		// inner loop i < 4  — Y
-
-// Extra slots 24..27, order of the four SetPos calls after the grid loop.
-static const int s_nExtraSlotPos[4][2] =
-{
-	{  82, 118 },
-	{  82,  81 },
-	{ 343, 118 },
-	{ 343,  81 },
-};
+// Inventory.vtf 1024x512 pocket grid (measured from the DXT5).
+// 8 columns x 4 rows. 28 game slots fill row-major (3x8 + 4).
+static const int s_nCellX[8] = { 178, 258, 342, 426, 510, 594, 678, 762 };
+static const int s_nCellY[4] = {  91, 170, 254, 337 };
+static const int s_nCellW[8] = {  80,  84,  84,  84,  84,  84,  84,  84 };
+static const int s_nCellH[4] = {  79,  84,  83,  84 };
+#define UH_SLOT_INSET		2
+#define UH_SLOT_COLS		8
+#define UH_SLOT_ROWS		4
 
 //-----------------------------------------------------------------------------
 // Singleton.
