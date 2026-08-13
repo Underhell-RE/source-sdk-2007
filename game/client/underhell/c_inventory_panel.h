@@ -6,6 +6,8 @@
 // (ImageButton : ImagePanel). Layout from hexrays sub_1012E360.
 // LMB = NewSelection (sub_10130D00, code 107). RMB = ContextMenu Use/Drop
 // (sub_10130D00, code 108 / sub_10130DC0).
+// Background is Frame Texture1 (PaintBackgroundType 1): Inventory.vtf is
+// stretched to the live panel rect. Slots are UV-mapped into that rect.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -74,6 +76,7 @@ public:
 	CInventoryPanel( vgui::VPANEL parent );
 	virtual ~CInventoryPanel( void );
 
+	virtual void ApplySchemeSettings( vgui::IScheme *pScheme );
 	virtual void PerformLayout( void );
 	virtual void PaintBackground( void );
 	virtual void OnThink( void );
@@ -81,6 +84,7 @@ public:
 	virtual void OnKeyCodeTyped( vgui::KeyCode code );
 	virtual void OnClose( void );
 	virtual void OnCommand( const char *command );
+	virtual bool HasUserConfigSettings( void );
 
 	void Toggle( void );
 	void RequestRefresh( void )	{ m_bNeedsRefresh = true; }
@@ -90,12 +94,14 @@ private:
 	void LayoutSlots( void );
 	void ClearSlots( void );
 	void RefreshSlots( void );
+	void LoadBgTexture( void );
+	void ClampToScreen( void );
 
 	MESSAGE_FUNC( OnNewSelection, "NewSelection" );
 	MESSAGE_FUNC( OnNewMouseReleased, "NewMouseReleased" );
 
 	CInventorySlotPanel		*m_pSlots[UH_INVENTORY_SLOTS];
-	vgui::ImagePanel		*m_pBackground;
+	int						m_iBgTexture;
 	bool					m_bNeedsRefresh;
 	int						m_iSelectedSlot;	// original this[139]
 	float					m_flLastToggleTime;

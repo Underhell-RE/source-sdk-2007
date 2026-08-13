@@ -10,12 +10,13 @@
 //                              sub_10130D00 (LMB=107 NewSelection, RMB=108 menu),
 //                              sub_10130DC0 (menu -> useitem/dropitem %i),
 //                              sub_10130ED0 (LMB useitem — treated as double-click)
-//   * layout                 — Inventory.vtf is 1024x512. Opaque rounded
-//                              rect is an 8x4 pocket grid (pitch ~84, origin
-//                              ~178,91). 28 inventory slots fill row-major:
-//                              3 full rows (24) + 4 in the last row. The
-//                              28/37/44/119 hexrays numbers do NOT match this
-//                              texture in pixels — measured from the VTF.
+//   * layout                 — Inventory.vtf is 1024x512. PaintBackgroundType 1
+//                              stretches Texture1 over the Frame (engine path).
+//                              The .res places the Frame at 368,84 — not
+//                              centered. Pocket cells are UV-mapped from the
+//                              1024x512 art into the live panel size so a
+//                              scaled Frame still keeps icons in the pockets.
+//                              28 slots fill row-major: 3x8 + 4.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -86,15 +87,29 @@ static const UHInventorySlotInfo_t s_InventorySlotInfo[UH_INVENTORY_ITEM_TABLE_S
 	{ UH_INV_ITEM( "RadioCrackers" ),	"#UnderHell_Inventory_RadioCracker" },		// 32
 };
 
-// Inventory.vtf 1024x512 pocket grid (measured from the DXT5).
-// 8 columns x 4 rows. 28 game slots fill row-major (3x8 + 4).
-static const int s_nCellX[8] = { 178, 258, 342, 426, 510, 594, 678, 762 };
-static const int s_nCellY[4] = {  91, 170, 254, 337 };
-static const int s_nCellW[8] = {  80,  84,  84,  84,  84,  84,  84,  84 };
-static const int s_nCellH[4] = {  79,  84,  83,  84 };
-#define UH_SLOT_INSET		2
+// Inventory.vtf is 1024x512. The opaque metal plate is centered in that
+// canvas at ~(174,87)-(849,424). Pockets are an 8x4 grid, pitch 84.
+// Panel::PaintBackground type 1 stretches this whole VTF over GetSize(),
+// so slot positions must be mapped through the live panel size — raw VTF
+// pixels only match when the Frame is actually 1024x512.
+#define UH_TEX_W			1024
+#define UH_TEX_H			512
+#define UH_GRID_X0			174
+#define UH_GRID_Y0			87
+#define UH_GRID_PITCH		84
+#define UH_SLOT_INSET		3
 #define UH_SLOT_COLS		8
 #define UH_SLOT_ROWS		4
+
+static int UH_MapTexX( int nTexX, int nPanelW )
+{
+	return ( nTexX * nPanelW ) / UH_TEX_W;
+}
+
+static int UH_MapTexY( int nTexY, int nPanelH )
+{
+	return ( nTexY * nPanelH ) / UH_TEX_H;
+}
 
 //-----------------------------------------------------------------------------
 // Singleton.
@@ -300,6 +315,7 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 	m_iSelectedSlot = -1;
 	m_bNeedsRefresh = true;
 	m_flLastToggleTime = -1.0f;
+	m_iBgTexture = -1;
 
 	SetVisible( false );
 	SetEnabled( true );
@@ -309,21 +325,26 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 	SetCloseButtonVisible( false );
 	SetMinimizeButtonVisible( false );
 	SetMaximizeButtonVisible( false );
-	// NOT proportional — the .res / Inventory.vtf is 1024x512 pixels.
+	// Frame itself is not proportional (.res 1024x512 / 368,84 are raw
+	// pixels). Slots are UV-mapped so they still track Texture1 if the
+	// engine later stretches the Frame.
 	SetProportional( false );
 	SetPaintBorderEnabled( false );
-
-	m_pBackground = new vgui::ImagePanel( this, "InventoryBackground" );
-	m_pBackground->SetImage( UH_INV_BG );
-	m_pBackground->SetShouldScaleImage( true );
-	m_pBackground->SetMouseInputEnabled( false );
-	m_pBackground->SetZPos( -1 );
+	SetPaintBackgroundEnabled( true );
+	SetPaintBackgroundType( 1 );
 
 	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
 	{
 		char szName[32];
 		Q_snprintf( szName, sizeof( szName ), "UHImage%d", i + 1 );
 		m_pSlots[i] = new CInventorySlotPanel( this, szName, i );
+	}
+
+	// Original ctor: LoadSchemeFromFile("resource/SourceScheme.res") + SetScheme.
+	vgui::HScheme hScheme = vgui::scheme()->LoadSchemeFromFile( "resource/SourceScheme.res", "SourceScheme" );
+	if ( hScheme )
+	{
+		SetScheme( hScheme );
 	}
 
 	LoadControlSettings( "resource/UI/InventoryPanel.res" );
@@ -335,18 +356,17 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 	SetMaximizeButtonVisible( false );
 	SetSizeable( false );
 	SetMoveable( false );
+	SetPaintBorderEnabled( false );
+	SetBorder( NULL );
+	SetPaintBackgroundType( 1 );
+	SetZPos( 100 );
 
-	// Force the native art size. .res may have been saved with proportional
-	// values; ignore that and pin 1024x512.
-	SetSize( 1024, 512 );
-
-	// Center so 1024x512 is on-screen at 1280 and up. .res xpos/ypos (368,84)
-	// was for a specific desktop and clips on 1280x720.
-	int iScreenW, iScreenH;
-	vgui::surface()->GetScreenSize( iScreenW, iScreenH );
-	SetPos( max( 0, ( iScreenW - 1024 ) / 2 ), max( 0, ( iScreenH - 512 ) / 2 ) );
-
-	SetBgColor( Color( 255, 255, 255, 128 ) );
+	LoadBgTexture();
+	// Do not invent a centered position. inventorypanel.res is xpos 368
+	// ypos 84 wide 1024 tall 512. Only clamp so a 1280x720 desktop does
+	// not clip the right/bottom edge.
+	ClampToScreen();
+	SetBgColor( Color( 255, 255, 255, 255 ) );
 
 	LayoutSlots();
 
@@ -360,45 +380,125 @@ CInventoryPanel::~CInventoryPanel( void )
 	s_pInventoryPanel = NULL;
 }
 
+void CInventoryPanel::LoadBgTexture( void )
+{
+	if ( m_iBgTexture >= 0 )
+		return;
+
+	// Same path InventoryPanel.res uses for Texture1. DrawSetTextureFile
+	// looks under materials/, so this hits Sprites/Hud/Inventory/Inventory.
+	m_iBgTexture = vgui::surface()->CreateNewTextureID();
+	vgui::surface()->DrawSetTextureFile( m_iBgTexture, "Sprites/Hud/Inventory/Inventory", 1, false );
+}
+
+void CInventoryPanel::ClampToScreen( void )
+{
+	int iScreenW, iScreenH;
+	vgui::surface()->GetScreenSize( iScreenW, iScreenH );
+
+	int x, y, w, h;
+	GetBounds( x, y, w, h );
+	if ( w < 1 )
+		w = UH_TEX_W;
+	if ( h < 1 )
+		h = UH_TEX_H;
+
+	if ( x + w > iScreenW )
+		x = iScreenW - w;
+	if ( y + h > iScreenH )
+		y = iScreenH - h;
+	if ( x < 0 )
+		x = 0;
+	if ( y < 0 )
+		y = 0;
+
+	SetPos( x, y );
+}
+
 void CInventoryPanel::LayoutSlots( void )
 {
-	// 28 slots onto the 8x4 pocket grid, row-major (left-to-right, then down).
+	int nWide = GetWide();
+	int nTall = GetTall();
+	if ( nWide < 1 )
+		nWide = UH_TEX_W;
+	if ( nTall < 1 )
+		nTall = UH_TEX_H;
+
+	// Map each pocket from VTF texels into the rectangle the engine
+	// actually draws Texture1 into (0,0)-(nWide,nTall).
+	const int nInsetX = UH_MapTexX( UH_SLOT_INSET, nWide );
+	const int nInsetY = UH_MapTexY( UH_SLOT_INSET, nTall );
+
 	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
 	{
 		const int iCol = i % UH_SLOT_COLS;
 		const int iRow = i / UH_SLOT_COLS;
-		const int iX = s_nCellX[iCol] + UH_SLOT_INSET;
-		const int iY = s_nCellY[iRow] + UH_SLOT_INSET;
-		const int iW = s_nCellW[iCol] - UH_SLOT_INSET * 2;
-		const int iH = s_nCellH[iRow] - UH_SLOT_INSET * 2;
+		const int nTexX = UH_GRID_X0 + iCol * UH_GRID_PITCH;
+		const int nTexY = UH_GRID_Y0 + iRow * UH_GRID_PITCH;
+		const int iX = UH_MapTexX( nTexX, nWide ) + nInsetX;
+		const int iY = UH_MapTexY( nTexY, nTall ) + nInsetY;
+		const int iW = max( 1, UH_MapTexX( UH_GRID_PITCH, nWide ) - nInsetX * 2 );
+		const int iH = max( 1, UH_MapTexY( UH_GRID_PITCH, nTall ) - nInsetY * 2 );
 		m_pSlots[i]->SetShouldScaleImage( true );
 		m_pSlots[i]->SetSize( iW, iH );
 		m_pSlots[i]->SetPos( iX, iY );
 		m_pSlots[i]->SetVisible( true );
 	}
+}
 
-	if ( m_pBackground )
-	{
-		m_pBackground->SetBounds( 0, 0, GetWide(), GetTall() );
-	}
+void CInventoryPanel::ApplySchemeSettings( vgui::IScheme *pScheme )
+{
+	BaseClass::ApplySchemeSettings( pScheme );
+
+	// Frame::ApplySchemeSettings installs FrameBorder + scheme BgColor and
+	// can flip proportional from the parent. That would tint/inset Texture1
+	// and desync slot pixels from the stretched art.
+	SetProportional( false );
+	SetTitleBarVisible( false );
+	SetMenuButtonVisible( false );
+	SetCloseButtonVisible( false );
+	SetMinimizeButtonVisible( false );
+	SetMaximizeButtonVisible( false );
+	SetPaintBorderEnabled( false );
+	SetBorder( NULL );
+	SetPaintBackgroundEnabled( true );
+	SetPaintBackgroundType( 1 );
+	SetBgColor( Color( 255, 255, 255, 255 ) );
+	LoadBgTexture();
+}
+
+bool CInventoryPanel::HasUserConfigSettings( void )
+{
+	// Frame defaults to true and will rewrite xpos/ypos from user config
+	// or MoveToCenterOfScreen. The original panel stays on the .res coords.
+	return false;
 }
 
 void CInventoryPanel::PerformLayout( void )
 {
 	BaseClass::PerformLayout();
 
-	// Keep the art at native 1024x512 even if Frame tries to resize us.
-	if ( GetWide() != 1024 || GetTall() != 512 )
-	{
-		SetSize( 1024, 512 );
-	}
-
+	// Do not pin 1024x512 here — if the engine scaled the Frame, slots
+	// must follow the live size via UV mapping.
+	ClampToScreen();
 	LayoutSlots();
 }
 
 void CInventoryPanel::PaintBackground( void )
 {
-	// Texture is the ImagePanel child (original Texture1).
+	// Engine path (Panel::PaintBackground type 1 / DrawTexturedBox):
+	// stretch Inventory.vtf over the live panel. Do not go through
+	// Frame::PaintBackground — that also paints the title-bar strip.
+	int wide, tall;
+	GetSize( wide, tall );
+
+	LoadBgTexture();
+	if ( m_iBgTexture >= 0 )
+	{
+		vgui::surface()->DrawSetColor( 255, 255, 255, 255 );
+		vgui::surface()->DrawSetTexture( m_iBgTexture );
+		vgui::surface()->DrawTexturedRect( 0, 0, wide, tall );
+	}
 }
 
 void CInventoryPanel::OnKeyCodePressed( vgui::KeyCode code )
@@ -513,10 +613,8 @@ void CInventoryPanel::Toggle( void )
 		RefreshSlots();
 		m_bNeedsRefresh = false;
 
-		int iScreenW, iScreenH;
-		vgui::surface()->GetScreenSize( iScreenW, iScreenH );
-		SetSize( 1024, 512 );
-		SetPos( max( 0, ( iScreenW - 1024 ) / 2 ), max( 0, ( iScreenH - 512 ) / 2 ) );
+		ClampToScreen();
+		LayoutSlots();
 
 		SetVisible( true );
 		MoveToFront();
