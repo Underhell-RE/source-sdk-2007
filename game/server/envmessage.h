@@ -33,6 +33,7 @@ public:
 private:
 
 	void InputShowMessage( inputdata_t &inputdata );
+	void InputMessage( inputdata_t &inputdata );
 	void InputSetMessage( inputdata_t &inputdata );
 	void InputSetMessagePriority1( inputdata_t &inputdata );
 	void InputSetMessagePriority2( inputdata_t &inputdata );

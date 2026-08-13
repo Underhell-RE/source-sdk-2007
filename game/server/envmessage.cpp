@@ -28,6 +28,7 @@ BEGIN_DATADESC( CMessage )
 	DEFINE_FIELD( m_Radius, FIELD_FLOAT ),
 
 	DEFINE_INPUTFUNC( FIELD_VOID, "ShowMessage", InputShowMessage ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "InputMessage", InputMessage ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessage", InputSetMessage ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority1", InputSetMessagePriority1 ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority2", InputSetMessagePriority2 ),
@@ -320,6 +321,14 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 // SetMessage and RemoveMessagePriority. We implement them all as setting
 // the main message and corresponding priority slot.
 //-----------------------------------------------------------------------------
+void CMessage::InputMessage( inputdata_t &inputdata )
+{
+	// Underhell house map: OnPressed Message,InputMessage,@titles_House.txt_House_Comment_Chest
+	// Should set and show immediately
+	InputSetMessage( inputdata );
+	InputShowMessage( inputdata );
+}
+
 void CMessage::InputSetMessage( inputdata_t &inputdata )
 {
 	const char *psz = inputdata.value.String();
