@@ -164,8 +164,11 @@ UH_DECLARE_ITEM( CItemSyringe,			UH_ITEM_SYRINGE )		// TODO: original class name
 //-----------------------------------------------------------------------------
 // Items seen in the original RTTI / dll strings — classnames recovered from
 // the original serveror.dll string table, models still TODO.
+//
+// NOTE: item_sodacan / CItemSoda stays VANILLA (effects.cpp, the env_beverage
+// can: CanThink + CanTouch + 1 HP). Original RTTI still has that class next
+// to CEnvBeverage. Inventory sodas are item_uhsoda / CItemUHSoda.
 //-----------------------------------------------------------------------------
-UH_DECLARE_ITEM( CItemSoda,				UH_ITEM_UNKNOWN )	// item_sodacan — TODO: id, model
 UH_DECLARE_ITEM( CItemShield,			UH_ITEM_UNKNOWN )	// item_shield — TODO: id, model
 UH_DECLARE_ITEM( CItemShoulderFlashlight, UH_ITEM_UNKNOWN )	// item_shoulderflashlight — TODO
 UH_DECLARE_ITEM( CItemCapPMC,			UH_ITEM_UNKNOWN )	// item_cap_pmc — TODO

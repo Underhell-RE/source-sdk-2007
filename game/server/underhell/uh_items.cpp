@@ -321,8 +321,8 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 
 //-----------------------------------------------------------------------------
 // Classnames from the original serveror.dll string table; models TODO.
+// item_sodacan stays vanilla (CItemSoda in effects.cpp) — do not re-link it.
 //-----------------------------------------------------------------------------
-UH_DEFINE_ITEM( CItemSoda,				item_sodacan,			"models/props_junk/popcan01a.mdl" )
 UH_DEFINE_ITEM( CItemShield,			item_shield,			"models/error.mdl" )	// TODO: model
 UH_DEFINE_ITEM( CItemShoulderFlashlight, item_shoulderflashlight, "models/error.mdl" )	// TODO: model
 UH_DEFINE_ITEM( CItemCapPMC,			item_cap_pmc,			"models/error.mdl" )	// TODO: model
