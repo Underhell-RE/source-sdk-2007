@@ -321,10 +321,13 @@ public:
 	//-----------------------------------------------------------------------------
 	virtual bool		UH_ItemAction( int iSlot, bool bUse );
 
+	void				UH_SpawnItemInWorld( int iItem );
 	void				UH_InitializeInventory( void );
 	void				UH_AddInventoryItem( int iItem );
 	void				UH_RemoveInventoryItem( int iSlot );
 	int					UH_FindInventoryItem( int iItem ) const;
+	int					UH_FindFreeSlot( void ) const;		// 0-based slot, -1 when full
+	void				UH_GiveItem( int iItem );			// vtable [410]: add, or drop to world when full
 	bool				UH_HandleInventoryCommand( const CCommand &args );	// dispatch: switch/dropitem/useitem
 	void				UH_UpdateInventory( void );			// "UpdateInventory" server handler
 

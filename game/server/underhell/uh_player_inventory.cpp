@@ -105,26 +105,113 @@ void CHL2_Player::UH_InitializeInventory( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Add an item to the first free inventory slot.
-// TODO: reconstruct the original add semantics exactly (stacking behaviour,
-// full-inventory handling) from the decompiled pickup code.
+// Purpose: Spawn the world entity for an inventory item in front of the
+// player (eye position + forward*56 + up*64, angled to (0, eye yaw - 90, 0)),
+// styled per id. Shared by UH_GiveItem (vtable [410], drop-on-full) and
+// UH_ItemAction (vtable [411], dropitem) — the original has the same
+// per-id switch in both.
 //-----------------------------------------------------------------------------
-void CHL2_Player::UH_AddInventoryItem( int iItem )
+void CHL2_Player::UH_SpawnItemInWorld( int iItem )
+{
+	const char *pszClass = UH_GetInventoryItemClass( iItem );
+	CBaseEntity *pItem = CreateEntityByName( pszClass );
+	if ( !pItem )
+	{
+		Warning( "Unable to create entity?!\n" );
+		return;
+	}
+
+	// Original: origin = eye + forward*56 + up*64 (sub_102DE310).
+	Vector vecForward;
+	EyeVectors( &vecForward );
+
+	Vector vecOrigin = EyePosition() + vecForward * 56.0f + Vector( 0, 0, 64.0f );
+	QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
+
+	// Per-id styling (original switch, sub_102E05F0 / sub_102DE310).
+	switch ( iItem )
+	{
+	case UH_ITEM_FLARE_PACK:
+		// Flare packs drop a lit flare prop instead of the pack model.
+		UTIL_Remove( pItem );
+		pItem = CreateEntityByName( "prop_physics" );
+		pItem->SetModel( "models/PG_props/pg_obj/pg_flare.mdl" );
+		break;
+
+	case UH_ITEM_GLOWSTICK_FIRST:
+	case UH_ITEM_GLOWSTICK_YELLOW:
+	case UH_ITEM_GLOWSTICK_GREEN:
+	case UH_ITEM_GLOWSTICK_BLUE:
+	case UH_ITEM_GLOWSTICK_LAST:
+		// Glowsticks drop as coloured lit props.
+		UTIL_Remove( pItem );
+		pItem = CreateEntityByName( "prop_physics" );
+		pItem->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
+		static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
+		break;
+
+	default:
+		{
+			// TODO: original wrote the body group on a raw field (entity
+			// offset +212) — verify the exact member (m_nBody? m_nSkin?).
+			int iBodyGroup = UH_GetDropBodyGroup( iItem );
+			if ( iBodyGroup >= 0 )
+			{
+				static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, iBodyGroup );
+			}
+		}
+		break;
+	}
+
+	pItem->SetAbsOrigin( vecOrigin );
+	pItem->SetAbsAngles( angItem );
+	pItem->Spawn();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Add an item to the inventory (original: CHL2_Player vtable [410],
+// sub_102DE310). When every slot is taken the item is spawned back into the
+// world in front of the player instead of vanishing.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_GiveItem( int iItem )
 {
 	if ( !UH_IsValidInventoryItem( iItem ) )
 		return;
 
+	int iFreeSlot = UH_FindFreeSlot();
+	if ( iFreeSlot < 0 )
+	{
+		// Inventory full — the original drops the item to the world.
+		UH_SpawnItemInWorld( iItem );
+		return;
+	}
+
+	m_iInventory.Set( iFreeSlot, iItem );
+	engine->ClientCommand( edict(), "UpdateInventory" );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: First free inventory slot (0-based), or -1 when full.
+// Original helper sub_10171D30 returned a 1-based index with 28 as the
+// "full" sentinel; the clean equivalent is used internally here.
+//-----------------------------------------------------------------------------
+int CHL2_Player::UH_FindFreeSlot( void ) const
+{
 	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
 	{
 		if ( m_iInventory[i] == UH_ITEM_NONE )
-		{
-			m_iInventory.Set( i, iItem );
-			return;
-		}
+			return i;
 	}
 
-	// Inventory full.
-	// TODO: original behaviour (deny sound? item dropped back to world?).
+	return -1;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Add an item to the first free inventory slot.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_AddInventoryItem( int iItem )
+{
+	UH_GiveItem( iItem );
 }
 
 void CHL2_Player::UH_RemoveInventoryItem( int iSlot )
@@ -168,6 +255,20 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 		return false;
 	}
 
+	if ( !bUse )
+	{
+		// Drop path — spawn the styled world item in front of the player
+		// (shared with UH_GiveItem, like the original's duplicated switch).
+		UH_SpawnItemInWorld( iItem );
+
+		UH_RemoveInventoryItem( iSlot );
+		engine->ClientCommand( edict(), "UpdateInventory" );
+		return true;
+	}
+
+	// Use path (original sub_102E05F0): create the item entity, place it at
+	// eye position + forward*56 + up*64, angled to (0, eye yaw - 90, 0),
+	// then Use() it with the item id as the value.
 	const char *pszClass = UH_GetInventoryItemClass( iItem );
 	CBaseEntity *pItem = CreateEntityByName( pszClass );
 
@@ -190,74 +291,29 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 		return false;
 	}
 
-	// Original reads the eye position and drops/uses the item right there.
-	// TODO: confirm the yaw source field (original: float at player + 708).
-	Vector vecOrigin = EyePosition();
+	Vector vecForward;
+	EyeVectors( &vecForward );
+
+	Vector vecOrigin = EyePosition() + vecForward * 56.0f + Vector( 0, 0, 64.0f );
 	QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
 
 	pItem->SetAbsOrigin( vecOrigin );
 	pItem->SetAbsAngles( angItem );
 	pItem->Spawn();
 
-	if ( bUse )
+	// NOTE: the SDK's CItem::Use() returns void, but the original binary
+	// returned a success bool from vtable index 64 (played
+	// "HL2Player.UseDeny" + removed the item on failure). Assume success
+	// until the per-item use logic is implemented.
+	// TODO: recreate the original success/failure semantics.
+	pItem->Use( this, this, USE_ON, (float)iItem );
+
+	if ( UH_IsGlowstick( iItem ) )
 	{
-		// NOTE: the SDK's CItem::Use() returns void, but the original binary
-		// returned a success bool from vtable index 64 (played
-		// "HL2Player.UseDeny" + removed the item on failure). Assume success
-		// until the per-item use logic is implemented.
-		// TODO: recreate the original success/failure semantics.
-		pItem->Use( this, this, USE_ON, (float)iItem );
-
-		if ( UH_IsGlowstick( iItem ) )
-		{
-			// Using an unlit glowstick lights it in place of dropping it.
-			m_iInventory.Set( iSlot, UH_GetLitGlowstickItem( iItem ) );
-			engine->ClientCommand( edict(), "UpdateInventory" );
-			return true;
-		}
-	}
-	else
-	{
-		// Drop path — style the spawned entity per id.
-		switch ( iItem )
-		{
-		case UH_ITEM_FLARE_PACK:
-			// Flare packs drop a lit flare prop instead of the pack model.
-			UTIL_Remove( pItem );
-			pItem = CreateEntityByName( "prop_physics" );
-			pItem->SetModel( "models/PG_props/pg_obj/pg_flare.mdl" );
-			pItem->SetAbsOrigin( vecOrigin );
-			pItem->SetAbsAngles( angItem );
-			pItem->Spawn();
-			break;
-
-		case UH_ITEM_GLOWSTICK_FIRST:
-		case UH_ITEM_GLOWSTICK_YELLOW:
-		case UH_ITEM_GLOWSTICK_GREEN:
-		case UH_ITEM_GLOWSTICK_BLUE:
-		case UH_ITEM_GLOWSTICK_LAST:
-			// Glowsticks drop as coloured lit props.
-			UTIL_Remove( pItem );
-			pItem = CreateEntityByName( "prop_physics" );
-			pItem->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
-			static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
-			pItem->SetAbsOrigin( vecOrigin );
-			pItem->SetAbsAngles( angItem );
-			pItem->Spawn();
-			break;
-
-		default:
-			{
-				// TODO: original wrote the body group on a raw field (entity
-				// offset +212) — verify the exact member (m_nBody? m_nSkin?).
-				int iBodyGroup = UH_GetDropBodyGroup( iItem );
-				if ( iBodyGroup >= 0 )
-				{
-					static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, iBodyGroup );
-				}
-			}
-			break;
-		}
+		// Using an unlit glowstick lights it in place of dropping it.
+		m_iInventory.Set( iSlot, UH_GetLitGlowstickItem( iItem ) );
+		engine->ClientCommand( edict(), "UpdateInventory" );
+		return true;
 	}
 
 	UH_RemoveInventoryItem( iSlot );

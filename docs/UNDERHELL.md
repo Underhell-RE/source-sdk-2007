@@ -109,6 +109,35 @@ Stage 1–6 done (first batch):
 
 Next stage: item pickup flow (`CUHItem::MyTouch` → `UH_AddInventoryItem`), per-item use effects, held-item handle, equip counter at player+848.
 
+## Pickup / item_random decode (from RTTI + datamap blob + vtables)
+
+- **Class hierarchy**: `CItemRandom : CWorldItem : CItem : CBaseAnimating`.
+  `CWorldItem` adds `m_iType` + a `"type"` keyvalue; its Spawn only handles
+  types 44 (item_battery) and 45 (item_suit), warning `"unable to create
+  world_item %d"` otherwise — a legacy wrapper.
+- **CItemRandom::Spawn** (sub_101757D0): roll 0..99; spawn when
+  `roll + 1 > m_inothing * sk_itemrandom{1,2,3}[skill]`. Pool = 77 entries
+  (0-based ids from the original switch): 0..25 food/gear, 26..43 ammo,
+  44..74 weapons, 75/76 radios. Spawned item inherits spawnflags; the
+  `disableshadows` key carries `EF_NOSHADOW` (0x10, matching const.h).
+  Empty pool → `Msg("item_random item possibilites count is 0\n")`.
+  `m_hOldItem` tracks the spawned item; `InputRespawn` re-rolls.
+- **CItemRandom datamap extracted from the original .data blob** (82 fields,
+  52-byte typedescription_t): every keyvalue name + offset recovered
+  (m_bitem_* / m_bweapon_* at 804..880, m_inothing=884, m_bRespawn=888,
+  m_hOldItem=892). Keyvalue names = the pool classnames.
+- **Pickup flow** (CItemBanana::MyTouch, sub_101720D0): RTTI-cast to
+  CHL2_Player → free-slot gate (sub_10171D30 != 28) → sound
+  `HL2Player.PickupItems` (per-item extras like PickupBandages/PickupArmor)
+  → SetOwnerEntity → `CHL2_Player` vtable [410] = **UH_GiveItem** →
+  UTIL_Remove.
+- **[410] UH_GiveItem** (sub_102726310): first free slot, else the item is
+  spawned back into the world at eye + forward*56 + up*64 (drop-on-full).
+- Item Spawn details: apple skin random 0/1 (red/green) picks the inventory
+  id on pickup; soda skin picks flavour; armour gates on armour < 100 and
+  grants 10 (TODO-verify); bandages gate on hurt/bleeding.
+- Vanilla items stay vanilla (CItemBattery/CHealthKit/... untouched).
+
 ## RTTI + vtable validation (from original binaries)
 
 RTTI dumps (clientRTTI.txt / serverRTTI.txt) + PE parsing of Cliento.dll /
