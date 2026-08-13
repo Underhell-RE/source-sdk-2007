@@ -347,7 +347,7 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 	// was for a specific desktop and clips on 1280x720.
 	int iScreenW, iScreenH;
 	vgui::surface()->GetScreenSize( iScreenW, iScreenH );
-	SetPos( MAX( 0, ( iScreenW - 1024 ) / 2 ), MAX( 0, ( iScreenH - 512 ) / 2 ) );
+	SetPos( max( 0, ( iScreenW - 1024 ) / 2 ), max( 0, ( iScreenH - 512 ) / 2 ) );
 
 	SetBgColor( Color( 255, 255, 255, 128 ) );
 
@@ -520,7 +520,7 @@ void CInventoryPanel::Toggle( void )
 		int iScreenW, iScreenH;
 		vgui::surface()->GetScreenSize( iScreenW, iScreenH );
 		SetSize( 1024, 512 );
-		SetPos( MAX( 0, ( iScreenW - 1024 ) / 2 ), MAX( 0, ( iScreenH - 512 ) / 2 ) );
+		SetPos( max( 0, ( iScreenW - 1024 ) / 2 ), max( 0, ( iScreenH - 512 ) / 2 ) );
 
 		SetVisible( true );
 		MoveToFront();
