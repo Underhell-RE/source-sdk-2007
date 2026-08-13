@@ -55,10 +55,11 @@ static const UHInventoryItemInfo_t s_InventoryItemTable[] =
 	{ "item_radiocracker","Radio Cracker"		},	// UH_ITEM_RADIO_CRACKER
 };
 
-COMPILE_TIME_ASSERT( ARRAYSIZE( s_InventoryItemTable ) == UH_INVENTORY_ITEM_TABLE_SIZE );
-
 const UHInventoryItemInfo_t *UH_GetInventoryItemInfo( int iItem )
 {
+	// SDK's COMPILE_TIME_ASSERT expands to switch(0) — function scope only.
+	COMPILE_TIME_ASSERT( ARRAYSIZE( s_InventoryItemTable ) == UH_INVENTORY_ITEM_TABLE_SIZE );
+
 	if ( iItem < 0 || iItem >= UH_INVENTORY_ITEM_TABLE_SIZE )
 		return &s_InventoryItemTable[UH_ITEM_NONE];
 

@@ -185,25 +185,19 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 
 	if ( bUse )
 	{
-		bool bUsed = ( pItem->Use( this, this, USE_ON, (float)iItem ) != 0 );
-		if ( !bUsed )
-		{
-			EmitSound( "HL2Player.UseDeny" );
-			UTIL_Remove( pItem );
-		}
+		// NOTE: the SDK's CItem::Use() returns void, but the original binary
+		// returned a success bool from vtable index 64 (played
+		// "HL2Player.UseDeny" + removed the item on failure). Assume success
+		// until the per-item use logic is implemented.
+		// TODO: recreate the original success/failure semantics.
+		pItem->Use( this, this, USE_ON, (float)iItem );
 
 		if ( UH_IsGlowstick( iItem ) )
 		{
 			// Using an unlit glowstick lights it in place of dropping it.
 			m_iInventory.Set( iSlot, UH_GetLitGlowstickItem( iItem ) );
 			engine->ClientCommand( edict(), "UpdateInventory" );
-			return bUsed;
-		}
-
-		if ( !bUsed )
-		{
-			engine->ClientCommand( edict(), "UpdateInventory" );
-			return false;
+			return true;
 		}
 	}
 	else
@@ -230,7 +224,7 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 			UTIL_Remove( pItem );
 			pItem = CreateEntityByName( "prop_physics" );
 			pItem->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
-			pItem->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
+			static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
 			pItem->SetAbsOrigin( vecOrigin );
 			pItem->SetAbsAngles( angItem );
 			pItem->Spawn();
@@ -243,7 +237,7 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 				int iBodyGroup = UH_GetDropBodyGroup( iItem );
 				if ( iBodyGroup >= 0 )
 				{
-					pItem->SetBodygroup( 0, iBodyGroup );
+					static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, iBodyGroup );
 				}
 			}
 			break;
