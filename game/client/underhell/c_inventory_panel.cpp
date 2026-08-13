@@ -312,7 +312,7 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 
 	m_iSelectedSlot = -1;
 	m_bNeedsRefresh = true;
-	m_flLastToggleTime = -1.0f;
+	m_iLastToggleFrame = -1;
 	m_iBgTexture = -1;
 
 	SetVisible( false );
@@ -573,7 +573,10 @@ void CInventoryPanel::OnThink( void )
 		return;
 	}
 
-	if ( !pPlayer->IsSuitEquipped() || pPlayer->GetHealth() <= 0 )
+	// The inventory is NOT gated on the suit — the original OnThink only
+	// checks the player is alive and the inventory is enabled (a suit-gated
+	// panel would never open before the suit is picked up).
+	if ( pPlayer->GetHealth() <= 0 )
 	{
 		SetVisible( false );
 		return;
@@ -595,15 +598,16 @@ void CInventoryPanel::OnThink( void )
 
 void CInventoryPanel::Toggle( void )
 {
-	// Debounce: popup focus means I can hit both this Frame and the
-	// cl_inventoryToggle binding in one press (open+close = stuck open).
-	const float flNow = gpGlobals->curtime;
-	if ( flNow >= 0.0f && m_flLastToggleTime >= 0.0f &&
-		 ( flNow - m_flLastToggleTime ) < 0.20f )
+	// A single key press can be delivered twice in the same frame — once to
+	// the focused Frame (OnKeyCodeTyped) and once to the engine key binding
+	// (cl_inventoryToggle). Debounce per frame so one press = one toggle, but
+	// do not block legitimate rapid re-toggles (a long time-based window made
+	// quick open/close/open presses unreliable).
+	if ( m_iLastToggleFrame == gpGlobals->framecount )
 	{
 		return;
 	}
-	m_flLastToggleTime = flNow;
+	m_iLastToggleFrame = gpGlobals->framecount;
 
 	if ( IsVisible() )
 	{

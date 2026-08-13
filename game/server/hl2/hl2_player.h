@@ -351,6 +351,12 @@ public:
 	void				UH_SetBleedCounter( int iBleedCounter ) { m_iBleedCounter = iBleedCounter; }
 	void				UH_SetLastBleedTime( float flTime ) { m_flLastBleedTime = flTime; }
 
+	// Bleeding: starts when the player takes damage (uh_bleeding_chance % per
+	// hit), drains health over time, and decays hunger (endurance). Decoded
+	// from the original PostThink (sub_101EF960).
+	void				UH_StartBleeding( float flDamage );
+	void				UH_UpdateBleeding( void );
+
 	//-----------------------------------------------------------------------------
 	// Underhell flashlight battery state. The flashlight runs on discrete
 	// batteries (m_iUHBatteryCount) rather than suit power.
@@ -402,13 +408,16 @@ private:
 	// original save format).
 	//-----------------------------------------------------------------------------
 	CNetworkVar( int, m_iEndurance );	// "hunger" meter, 0..100. Restored by eating.
-	CNetworkVar( int, m_iBleedCounter );	// bleeding state (0 = clean). TODO: full bleed system.
+	CNetworkVar( int, m_iBleedCounter );	// bleeding state (0 = clean, >0 = bleeding).
 
 	// Server-only runtime accumulators (mirror the original binary's members;
 	// not networked, saved for parity).
-	float				m_flPseudoEndurance;	// health<->endurance bridge accumulator (TODO)
+	float				m_flPseudoEndurance;	// accumulated endurance drain (0.2 - hp*0.000875)/sec
+	float				m_flPseudoHealth;		// accumulated bleed damage before applying 1 hp
 	float				m_fEStaminaCount;		// stamina charge accumulator: -1 endurance per 50
-	float				m_flLastBleedTime;		// last time bleeding was applied (TODO)
+	float				m_flLastBleedTime;		// curtime of the last bleed think
+	float				m_flLastBleedTickBase;	// curtime of the previous think (dt accumulator base)
+	int					m_iEHealthCount;		// consecutive bleed-deaths (zeroes endurance at 10)
 
 	// This player's HL2 specific data that should only be replicated to 
 	//  the player and not to other players.

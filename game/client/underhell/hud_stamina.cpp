@@ -35,8 +35,9 @@ CHudStamina::CHudStamina( const char *pElementName ) : CHudElement( pElementName
 	vgui::Panel *pParent = g_pClientMode->GetViewport();
 	SetParent( pParent );
 
-	// Same hide conditions as the original.
-	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD );
+	// Hidden with the health cluster, when the player is dead, or when no suit
+	// is equipped (the original bars only exist once the suit is on).
+	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
 }
 
 //-----------------------------------------------------------------------------

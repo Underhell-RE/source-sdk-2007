@@ -40,7 +40,7 @@ static ConVar uh_player_endurance_stamina_effect( "uh_player_endurance_stamina_e
 static ConVar uh_player_bleed_rate( "uh_player_bleed_rate", "8000", FCVAR_ARCHIVE,
 	"Bleeding damage interval (ms). TODO: full bleeding system." );
 static ConVar uh_bleeding_chance( "uh_bleeding_chance", "5", FCVAR_ARCHIVE,
-	"Chance (percent) per hit that the player starts bleeding. TODO." );
+	"Chance (percent) per hit that the player starts bleeding." );
 
 // How long one flashlight battery lasts (seconds of use).
 ConVar uh_flashlight_battery_time( "uh_flashlight_battery_time", "60", FCVAR_ARCHIVE,
@@ -66,8 +66,11 @@ void CHL2_Player::UH_InitializeEndurance( void )
 	m_iEndurance = uh_player_endurance.GetInt();
 	m_iBleedCounter = 0;
 	m_flPseudoEndurance = 0.0f;
+	m_flPseudoHealth = 0.0f;
 	m_fEStaminaCount = 0.0f;
 	m_flLastBleedTime = 0.0f;
+	m_flLastBleedTickBase = 0.0f;
+	m_iEHealthCount = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -196,4 +199,128 @@ void CHL2_Player::UH_UpdateFlashlightBattery( void )
 	}
 
 	m_flNextFlashlightBatteryTime = gpGlobals->curtime + uh_flashlight_battery_time.GetFloat();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Start bleeding from an incoming hit. The bleed amount scales with
+// the damage taken; each hit has uh_bleeding_chance % to open a wound.
+//
+// Original OnTakeDamage rolls the same convar and bumps m_iBleedCounter
+// (the exact scaling is not recoverable from the hexrays — this reconstruction
+// adds roughly one bleed point per point of damage, clamped to 100).
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_StartBleeding( float flDamage )
+{
+	if ( flDamage <= 0.0f )
+		return;
+
+	if ( random->RandomInt( 1, 100 ) > uh_bleeding_chance.GetInt() )
+		return;
+
+	int iBleed = (int)( flDamage * 1.0f );
+	m_iBleedCounter = clamp( m_iBleedCounter + iBleed, 0, 100 );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Per-think bleeding update (decoded from the original PostThink,
+// sub_101EF960). While bleeding:
+//   * bleed damage per second = m_iBleedCounter * 0.006,
+//     halved when it rounds to zero, doubled while sprinting,
+//     reduced slightly by endurance ( - endurance * 0.00075 ),
+//   * damage accumulates into m_flPseudoHealth and is applied in whole HP,
+//     decrementing m_iBleedCounter per point; below 10 the wound closes.
+// Hunger (endurance) also drains passively: (0.2 - health * 0.000875) per
+// second, applied in whole points.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_UpdateBleeding( void )
+{
+	// First think has no previous timestamp; skip so dt is not huge.
+	if ( m_flLastBleedTickBase == 0.0f )
+	{
+		m_flLastBleedTickBase = gpGlobals->curtime;
+		return;
+	}
+
+	float flDt = gpGlobals->curtime - m_flLastBleedTickBase;
+	m_flLastBleedTickBase = gpGlobals->curtime;
+
+	if ( flDt <= 0.0f )
+		return;
+
+	// Frozen / locked in place: wounds heal instantly (original clears the
+	// counter, sub_101EF960 flags & 0x4000 branch).
+	if ( ( GetFlags() & FL_FROZEN ) || IsPlayerLockedInPlace() )
+	{
+		m_iBleedCounter = 0;
+		return;
+	}
+
+	if ( !IsAlive() )
+		return;
+
+	if ( m_iBleedCounter != 0 )
+	{
+		float flRate = (float)m_iBleedCounter * 0.006f;
+		if ( flRate == 0.0f )
+			flRate *= 0.5f;
+		else if ( IsSprinting() )
+			flRate += flRate;
+
+		// Endurance slightly slows bleeding.
+		flRate += (float)m_iEndurance * -0.00075f;
+
+		m_flPseudoHealth += flRate * flDt;
+
+		int iWhole = (int)m_flPseudoHealth;
+		if ( iWhole >= 1 )
+		{
+			m_flPseudoHealth -= (float)iWhole;
+
+			// Bleeding can only bring the player down to 1 HP; the final
+			// point is finished by a "kill" client command (original does
+			// engine->ClientCommand( "kill" ) at health 0).
+			if ( GetHealth() <= 1 )
+			{
+				// At death's door, the wound stops draining health.
+			}
+			else
+			{
+				TakeHealth( (float)-iWhole, DMG_GENERIC );
+
+				// Blood drip at the player's feet (original spawns a
+				// "blood_drop" effect, sub_1002A5F0).
+				UTIL_BloodDrips( GetAbsOrigin() - Vector( 0, 0, 32 ), Vector( 0, 0, -1 ), BLOOD_COLOR_RED, 2 );
+
+				int iBleed = m_iBleedCounter - iWhole;
+				m_iBleedCounter = ( iBleed <= 10 ) ? 0 : iBleed;
+			}
+
+			if ( GetHealth() <= 0 )
+			{
+				m_iEHealthCount += 1;
+				if ( m_iEHealthCount >= 10 )
+				{
+					m_iEHealthCount = 0;
+					m_iEndurance = 0;
+				}
+			}
+		}
+
+		if ( m_iBleedCounter < 0 )
+			m_iBleedCounter = 0;
+	}
+
+	// Passive hunger decay: faster the lower the player's health.
+	{
+		float flDrain = ( 0.2f - (float)GetHealth() * 0.000875f ) * flDt;
+		m_flPseudoEndurance += flDrain;
+
+		int iWhole = (int)m_flPseudoEndurance;
+		if ( iWhole >= 1 )
+		{
+			m_flPseudoEndurance -= (float)iWhole;
+			int iEndurance = m_iEndurance - iWhole;
+			m_iEndurance = clamp( iEndurance, 0, uh_player_endurance.GetInt() );
+		}
+	}
 }

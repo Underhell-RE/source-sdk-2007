@@ -105,6 +105,9 @@ Full classname list: `FGD/Item List.txt` (food, ammo, equipment, health) + `Weap
 | 12 | fix(server) | +use-only pickup (no auto-pickup / no physcannon grab) |
 | 13 | feat(server) | flashlight on batteries (item_battery / item_batterypack) |
 | 14 | fix(client) | inventory toggle closes on second "I" |
+| 15 | fix(client) | bars hidden without suit; inventory not suit-gated; toggle debounce per-frame |
+| 16 | feat(client) | CHudUHBattery (contour + charge + count) + CHudBleeding |
+| 17 | feat(server) | bleeding system + passive hunger decay |
 
 ## Progress
 
@@ -226,6 +229,42 @@ suit power:
   animation, `FlashlightViewModelThink`, `item_flashlight`/`item_shoulder-
   flashlight` equipment, `m_bShoulderFlashlight`) — still TODO; this ports the
   core battery mechanic on the vanilla EF_DIMLIGHT flashlight.
+
+## Battery + bleeding HUD (stages 16–17)
+
+From scripts/HudLayout.res / decompile:
+
+- **HudUHBattery** (xpos 8 ypos 200 wide 40 tall 64): contour sprite
+  `sprites/hud/hud_battery_contour` (contourx 1 contoury 0 contourwide 24
+  contourtall 42), a vertical chunked bar (BarInsetX 6 BarInsetY 31 BarWidth
+  14 BarHeight 23 BarChunkHeight 2 BarChunkGap 1, HullColor "2 127 252 192"),
+  and the discrete count printed as "x<N>" (sub_100BDC80). The original fades
+  the whole gauge when stable and brings it back on battery-count / flashlight
+  / nightvision changes (sub_100BDF90). The bar fill reads a 0..100 float
+  (client offset 5212 — an Underhell-specific field whose identity is not
+  recoverable); our port fills one chunk per battery (count-capped).
+- **HudBleeding** (xpos 248 ypos 408 wide 24 tall 36): `sprites/hud/
+  hud_blooddrop` tinted red, alpha = m_iBleedCounter * 2.55 (sub_100BE800),
+  shown only while bleeding.
+- Both use HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT (the
+  original sub_100B3790(this, 56) = 0x38).
+
+### Bleeding mechanic (server, decoded from sub_101EF960 PostThink)
+
+- `m_iBleedCounter` (@2188) is the wound severity; `m_iEndurance` (@2184) the
+  hunger meter. Runtime floats: `m_flPseudoHealth` (@2144), `m_flPseudoEndurance`
+  (@2148), `m_flLastBleedTime` (@2152), previous-tick timestamp (@2156),
+  `m_iEHealthCount` (@2160).
+- Start: taking damage rolls `uh_bleeding_chance` (5%) and adds to
+  `m_iBleedCounter` (exact damage→bleed scaling not recoverable — this port
+  adds 1 bleed point per damage point, clamped 100).
+- Per think while bleeding: rate = bleedCounter * 0.006, halved if it rounds to
+  zero, doubled while sprinting, reduced by endurance * 0.00075. Damage
+  accumulates in m_flPseudoHealth and is applied in whole HP (spawning a blood
+  drip); each point decrements bleedCounter, and at <=10 the wound closes.
+  Bleeding cannot take the last HP (original sends "kill" at health 0).
+- Passive hunger decay: endurance drains (0.2 - health * 0.000875) per second,
+  applied in whole points — so hunger falls faster at lower health.
 
 ## Pickup / item_random decode (from RTTI + datamap blob + vtables)
 

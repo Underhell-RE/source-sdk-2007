@@ -318,8 +318,11 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_iEndurance, FIELD_INTEGER ),
 	DEFINE_FIELD( m_iBleedCounter, FIELD_INTEGER ),
 	DEFINE_FIELD( m_flPseudoEndurance, FIELD_FLOAT ),
+	DEFINE_FIELD( m_flPseudoHealth, FIELD_FLOAT ),
 	DEFINE_FIELD( m_fEStaminaCount, FIELD_FLOAT ),
 	DEFINE_FIELD( m_flLastBleedTime, FIELD_TIME ),
+	DEFINE_FIELD( m_flLastBleedTickBase, FIELD_TIME ),
+	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
 
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),
@@ -933,6 +936,9 @@ void CHL2_Player::PostThink( void )
 	{
 		 HandleAdmireGlovesAnimation();
 	}
+
+	// Underhell: bleeding drain + passive hunger decay.
+	UH_UpdateBleeding();
 }
 
 void CHL2_Player::StartAdmireGlovesAnimation( void )
@@ -2404,6 +2410,12 @@ int CHL2_Player::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	if ( info.GetDamageType() & DMG_BURN )
 	{
 		EmitSound( "HL2Player.BurnPain" );
+	}
+
+	// Underhell: taking damage can open a bleeding wound.
+	if ( info.GetDamage() > 0.0f )
+	{
+		UH_StartBleeding( info.GetDamage() );
 	}
 
 

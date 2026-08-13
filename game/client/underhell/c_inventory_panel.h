@@ -104,7 +104,7 @@ private:
 	int						m_iBgTexture;
 	bool					m_bNeedsRefresh;
 	int						m_iSelectedSlot;	// original this[139]
-	float					m_flLastToggleTime;
+	int						m_iLastToggleFrame;
 };
 
 CInventoryPanel *GetInventoryPanel( void );

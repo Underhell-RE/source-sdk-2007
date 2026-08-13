@@ -1,6 +1,10 @@
-//========= Copyright � 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright (c) 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Handling for the suit batteries.
+//
+// Underhell: batteries power the flashlight (CHL2_Player::m_iUHBatteryCount)
+// instead of charging suit armour, and are picked up with +use (no touch
+// auto-pickup), matching every other Underhell item.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -21,35 +25,44 @@ public:
 	DECLARE_CLASS( CItemBattery, CItem );
 
 	void Spawn( void )
-	{ 
-		Precache( );
+	{
+		Precache();
 		SetModel( "models/items/battery.mdl" );
-		BaseClass::Spawn( );
+		BaseClass::Spawn();
+
+		// Underhell: no touch auto-pickup; taken with +use.
+		SetTouch( NULL );
 	}
 	void Precache( void )
 	{
-		PrecacheModel ("models/items/battery.mdl");
+		PrecacheModel( "models/items/battery.mdl" );
 
 		PrecacheScriptSound( "ItemBattery.Touch" );
-
 	}
-		bool MyTouch( CBasePlayer *pPlayer )
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+	{
+		CBasePlayer *pPlayer = ToBasePlayer( pActivator );
+		if ( pPlayer )
 		{
-			// Underhell: batteries power the flashlight (m_iUHBatteryCount)
-			// instead of charging suit armour like vanilla HL2.
-			CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
-			if ( !pHL2Player )
-				return false;
-
-			pHL2Player->UH_AddBattery( 1 );
-
-			CPASAttenuationFilter filter( pPlayer, "ItemBattery.Touch" );
-			EmitSound( filter, pPlayer->entindex(), "ItemBattery.Touch" );
-
-			return true;
+			MyTouch( pPlayer );
 		}
+	}
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		// Underhell: batteries power the flashlight (m_iUHBatteryCount)
+		// instead of charging suit armour like vanilla HL2.
+		CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+		if ( !pHL2Player )
+			return false;
+
+		pHL2Player->UH_AddBattery( 1 );
+
+		CPASAttenuationFilter filter( pPlayer, "ItemBattery.Touch" );
+		EmitSound( filter, pPlayer->entindex(), "ItemBattery.Touch" );
+
+		return true;
+	}
 };
 
 LINK_ENTITY_TO_CLASS(item_battery, CItemBattery);
 PRECACHE_REGISTER(item_battery);
-

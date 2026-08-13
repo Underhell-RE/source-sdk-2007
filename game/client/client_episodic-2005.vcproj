@@ -281,6 +281,14 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\hud_uhbattery.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_bleeding.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\shared\underhell\uh_inventory.cpp"
 					>
 				</File>
@@ -294,6 +302,14 @@
 				</File>
 				<File
 					RelativePath=".\underhell\hud_stamina.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_uhbattery.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_bleeding.h"
 					>
 				</File>
 				<File
