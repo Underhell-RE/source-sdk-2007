@@ -10,11 +10,12 @@
 //                              sub_10130D00 (LMB=107 NewSelection, RMB=108 menu),
 //                              sub_10130DC0 (menu -> useitem/dropitem %i),
 //                              sub_10130ED0 (LMB useitem — treated as double-click)
-//   * layout                 — 1024x512 Inventory.vtf at native pixels.
-//                              Grid is 6 columns x 4 rows (outer v34=0..5 is X,
-//                              inner i=0..3 is Y, v1+=6 walks down a column).
-//                              Slot index = row*6 + col, so items 0..5 fill
-//                              left-to-right. Origin (44,119), pitch 37, 28x28.
+//   * layout                 — Inventory.vtf is 1024x512. Opaque rounded
+//                              rect is an 8x4 pocket grid (pitch ~84, origin
+//                              ~178,91). 28 inventory slots fill row-major:
+//                              3 full rows (24) + 4 in the last row. The
+//                              28/37/44/119 hexrays numbers do NOT match this
+//                              texture in pixels — measured from the VTF.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -368,28 +369,19 @@ CInventoryPanel::~CInventoryPanel( void )
 
 void CInventoryPanel::LayoutSlots( void )
 {
-	// sub_1012E360: outer v34 = column 0..5, inner i = row 0..3, v1 += 6.
-	// Row-major index (row*6 + col) so pickup order fills left-to-right
-	// across the wide Inventory.vtf, not down a column.
-	for ( int iRow = 0; iRow < UH_SLOT_ROWS; ++iRow )
+	// 28 slots onto the 8x4 pocket grid, row-major (left-to-right, then down).
+	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
 	{
-		for ( int iCol = 0; iCol < UH_SLOT_COLS; ++iCol )
-		{
-			const int iSlot = iRow * UH_SLOT_COLS + iCol;
-			m_pSlots[iSlot]->SetShouldScaleImage( true );
-			m_pSlots[iSlot]->SetSize( UH_SLOT_SIZE, UH_SLOT_SIZE );
-			m_pSlots[iSlot]->SetPos( UH_SLOT_ORIGIN_X + iCol * UH_SLOT_PITCH,
-									 UH_SLOT_ORIGIN_Y + iRow * UH_SLOT_PITCH );
-			m_pSlots[iSlot]->SetVisible( true );
-		}
-	}
-
-	for ( int i = 0; i < 4; ++i )
-	{
-		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetShouldScaleImage( true );
-		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetSize( UH_SLOT_SIZE, UH_SLOT_SIZE );
-		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetPos( s_nExtraSlotPos[i][0], s_nExtraSlotPos[i][1] );
-		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetVisible( true );
+		const int iCol = i % UH_SLOT_COLS;
+		const int iRow = i / UH_SLOT_COLS;
+		const int iX = s_nCellX[iCol] + UH_SLOT_INSET;
+		const int iY = s_nCellY[iRow] + UH_SLOT_INSET;
+		const int iW = s_nCellW[iCol] - UH_SLOT_INSET * 2;
+		const int iH = s_nCellH[iRow] - UH_SLOT_INSET * 2;
+		m_pSlots[i]->SetShouldScaleImage( true );
+		m_pSlots[i]->SetSize( iW, iH );
+		m_pSlots[i]->SetPos( iX, iY );
+		m_pSlots[i]->SetVisible( true );
 	}
 
 	if ( m_pBackground )
