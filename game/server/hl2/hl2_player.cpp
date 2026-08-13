@@ -2789,6 +2789,10 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 		return true;
 	}
 
+	// Underhell inventory commands (switch / dropitem / useitem).
+	if ( UH_HandleInventoryCommand( args ) )
+		return true;
+
 	return BaseClass::ClientCommand( args );
 }
 

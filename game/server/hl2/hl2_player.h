@@ -325,7 +325,7 @@ public:
 	void				UH_AddInventoryItem( int iItem );
 	void				UH_RemoveInventoryItem( int iSlot );
 	int					UH_FindInventoryItem( int iItem ) const;
-	void				UH_HandleInventoryCommand( const CCommand &args );	// dispatch: emit/switch/dropitem/useitem
+	bool				UH_HandleInventoryCommand( const CCommand &args );	// dispatch: switch/dropitem/useitem
 	void				UH_UpdateInventory( void );			// "UpdateInventory" server handler
 
 private:

@@ -85,7 +85,8 @@ CInventoryPanel *GetInventoryPanel( void )
 //-----------------------------------------------------------------------------
 // Console commands.
 //-----------------------------------------------------------------------------
-CON_COMMAND( cl_inventoryToggle, "#Inventory" )
+// TODO: verify the original help string; "#Inventory" is the kb_act.lst key name.
+CON_COMMAND( cl_inventoryToggle, "Toggles the inventory." )
 {
 	// Original (hexrays sub_1012E690): ask the server for a resync, then flip
 	// the panel's visibility.

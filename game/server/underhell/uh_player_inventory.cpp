@@ -3,33 +3,30 @@
 // Purpose: Underhell inventory — server-side CHL2_Player implementation.
 //
 // Reconstructed 1:1 from the original server.dll:
-//   * UH_ItemAction            — hexrays sub_102E05F0 (vtable index 411)
-//   * UH_UpdateInventory       — hexrays sub_102DDDE0
-//   * UH_HandleInventoryCommand— hexrays sub_102DDBF0 (emit/switch/dropitem/useitem)
+//   * UH_ItemAction             — hexrays sub_102E05F0 (vtable index 411)
+//   * UH_UpdateInventory        — hexrays sub_102DDDE0
+//   * UH_HandleInventoryCommand — hexrays sub_102DDBF0 (switch/dropitem/useitem)
 //
 // $NoKeywords: $
 //=============================================================================//
 
 #include "cbase.h"
 #include "hl2_player.h"
-#include "recipientfilter.h"
 
 #include "underhell/uh_inventory.h"
 
 //-----------------------------------------------------------------------------
-// Console commands. "emit", "switch", "dropitem" and "useitem" share one
-// dispatcher exactly like the original (single handler branching on args[0]).
+// Console commands.
+//
+// NOTE: "switch", "dropitem" and "useitem" are intentionally NOT registered
+// as ConCommands — like the original they arrive through the engine's
+// client-command route (unknown commands are forwarded to the server and
+// dispatched by CHL2_Player::ClientCommand). "emit" stays in the vanilla
+// base handler. Only "UpdateInventory" is a real ConCommand.
 //-----------------------------------------------------------------------------
 static CHL2_Player *UH_GetCommandPlayer( void )
 {
 	return dynamic_cast<CHL2_Player *>( UTIL_GetCommandClient() );
-}
-
-static void UH_CC_InventoryCommand( const CCommand &args )
-{
-	CHL2_Player *pPlayer = UH_GetCommandPlayer();
-	if ( pPlayer )
-		pPlayer->UH_HandleInventoryCommand( args );
 }
 
 static void UH_CC_UpdateInventory( const CCommand &args )
@@ -39,11 +36,8 @@ static void UH_CC_UpdateInventory( const CCommand &args )
 		pPlayer->UH_UpdateInventory();
 }
 
-// TODO: verify original help strings and FCVAR flags.
-static ConCommand uh_cc_emit( "emit", UH_CC_InventoryCommand, "Emits a test sound.", FCVAR_CHEAT );
-static ConCommand uh_cc_switch( "switch", UH_CC_InventoryCommand, "Swaps two inventory slots.", FCVAR_NONE );
-static ConCommand uh_cc_dropitem( "dropitem", UH_CC_InventoryCommand, "Drops an inventory item.", FCVAR_NONE );
-static ConCommand uh_cc_useitem( "useitem", UH_CC_InventoryCommand, "Uses an inventory item.", FCVAR_NONE );
+// TODO: verify the original registration flags (sub_102DDDE0's ConCommand
+// initializer was not recovered from the binary).
 static ConCommand uh_cc_update_inventory( "UpdateInventory", UH_CC_UpdateInventory, "Updates the inventory", FCVAR_CLIENTCMD_CAN_EXECUTE );
 
 //-----------------------------------------------------------------------------
@@ -262,20 +256,13 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Console command dispatcher (original: single handler for the four
-// inventory commands, branching on the command name).
+// Purpose: Inventory command dispatcher. Runs from ClientCommand — the engine
+// forwards unknown client commands here, exactly like the original (hexrays
+// sub_102DDBF0). Returns true when the command was consumed.
 //-----------------------------------------------------------------------------
-void CHL2_Player::UH_HandleInventoryCommand( const CCommand &args )
+bool CHL2_Player::UH_HandleInventoryCommand( const CCommand &args )
 {
 	const char *pszCommand = args[0];
-
-	if ( !Q_stricmp( pszCommand, "emit" ) )
-	{
-		// Original dev command — plays a test sound to this player.
-		CSingleUserRecipientFilter filter( this );
-		EmitSound( filter, entindex(), "Test.Sound" );
-		return;
-	}
 
 	if ( !Q_stricmp( pszCommand, "switch" ) )
 	{
@@ -294,7 +281,7 @@ void CHL2_Player::UH_HandleInventoryCommand( const CCommand &args )
 				engine->ClientCommand( edict(), "UpdateInventory" );
 			}
 		}
-		return;
+		return true;
 	}
 
 	if ( !Q_stricmp( pszCommand, "dropitem" ) )
@@ -303,7 +290,7 @@ void CHL2_Player::UH_HandleInventoryCommand( const CCommand &args )
 		{
 			UH_ItemAction( atoi( args[1] ), false );
 		}
-		return;
+		return true;
 	}
 
 	if ( !Q_stricmp( pszCommand, "useitem" ) )
@@ -312,8 +299,10 @@ void CHL2_Player::UH_HandleInventoryCommand( const CCommand &args )
 		{
 			UH_ItemAction( atoi( args[1] ), true );
 		}
-		return;
+		return true;
 	}
+
+	return false;
 }
 
 //-----------------------------------------------------------------------------
