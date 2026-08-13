@@ -406,7 +406,14 @@ CHL2_Player::CHL2_Player()
 #if defined( HL2_EPISODIC )
 
 // Underhell ironsight (see docs/underhell-weapons-aiming.md, server/sub_101ECF40).
-#define UH_IRONSIGHT_FOV_SCALE			0.6f	// fraction of default FOV while aiming
+// ConVar names/defaults recovered from the decompiled binary:
+//   uh_ironsight_zoom        - FOV multiplier while aiming (default 0.9)
+//   uh_ironsight_zoom_focus  - value subtracted from the default FOV while the
+//                              zoom transition is in progress (default 40)
+ConVar uh_ironsight_zoom( "uh_ironsight_zoom", "0.9" );
+ConVar uh_ironsight_zoom_focus( "uh_ironsight_zoom_focus", "40", FCVAR_ARCHIVE,
+	"Not actually the zoom value. This value is subracted from the defaultFOV" );
+
 #define UH_IRONSIGHT_FOV_TIME			0.15f	// zoom transition time
 #define UH_IRONSIGHT_TOGGLE_COOLDOWN	0.1f	// min time between toggles
 
@@ -427,7 +434,7 @@ void CHL2_Player::ToggleIronsight( void )
 	{
 		EmitSound( "HL2Player.Ironsighton" );
 
-		int sightFOV = (int)( (float)GetDefaultFOV() * UH_IRONSIGHT_FOV_SCALE );
+		int sightFOV = (int)( (float)GetDefaultFOV() * uh_ironsight_zoom.GetFloat() );
 		SetFOV( this, sightFOV, UH_IRONSIGHT_FOV_TIME );
 	}
 	else
@@ -466,7 +473,14 @@ CON_COMMAND_F( ironsight_toggle, "Toggles ironsight mode for the current weapon.
 // Registered with the kb_act.lst command names so the client console/keybinds
 // forward them to the server in single-player.
 //-----------------------------------------------------------------------------
-ConVar sk_plr_dmg_kick( "sk_plr_dmg_kick", "20" );
+// Underhell unarmed kick (see docs/underhell-weapons-aiming.md, server/sub_101F11D0
+// + sub_101F0050 / sub_101F2990). ConVar names/defaults recovered from the binary:
+//   uh_kick_damage   - damage dealt by the kick (default 21)
+//   uh_kick_forcemult - knockback force multiplier (default 2)
+//   uh_kick_enabled  - master switch (default 1, FCVAR_REPLICATED)
+ConVar uh_kick_damage( "uh_kick_damage", "21" );
+ConVar uh_kick_forcemult( "uh_kick_forcemult", "2" );
+ConVar uh_kick_enabled( "uh_kick_enabled", "1", FCVAR_REPLICATED );
 
 #define UH_KICK_RANGE			72.0f
 #define UH_KICK_COOLDOWN		0.5f
@@ -555,6 +569,10 @@ void CHL2_Player::ThrowGrenadeQuick( void )
 //-----------------------------------------------------------------------------
 void CHL2_Player::PerformKick( void )
 {
+	// Master switch (uh_kick_enabled, FCVAR_REPLICATED).
+	if ( !uh_kick_enabled.GetBool() )
+		return;
+
 	if ( !IsAlive() )
 		return;
 
@@ -596,8 +614,10 @@ void CHL2_Player::PerformKick( void )
 		EmitSound( "HL2Player.kick_fire_fly" );
 	}
 
+	// 72-unit melee trace (matches the decompiled kick: eye -> eye + forward*72),
+	// DMG_CLUB, knockback scaled by uh_kick_forcemult.
 	CheckTraceHullAttack( UH_KICK_RANGE, Vector( -16, -16, -16 ), Vector( 16, 16, 16 ),
-		(int)sk_plr_dmg_kick.GetFloat(), DMG_CLUB );
+		(int)uh_kick_damage.GetFloat(), DMG_CLUB, uh_kick_forcemult.GetFloat() );
 }
 
 static CHL2_Player *UnderhellCommandPlayer( void )

@@ -21,22 +21,23 @@
 #include "tier0/memdbgon.h"
 
 
-// Damage ConVars (names recovered from the decompiled binary; defaults are
-// tunable game-config values, exact Underhell defaults were not recoverable).
-ConVar sk_plr_dmg_baton( "sk_plr_dmg_baton", "22" );
-ConVar sk_npc_dmg_baton( "sk_npc_dmg_baton", "8" );
+// Damage ConVars (names recovered from the decompiled binary). Defaults match
+// the original DLL registrations ("0"); the real values come from the mod's
+// skill.cfg at runtime (sk_npc_dmg_cleaver defaults to 15 in the binary).
+ConVar sk_plr_dmg_baton( "sk_plr_dmg_baton", "0" );
+ConVar sk_npc_dmg_baton( "sk_npc_dmg_baton", "0" );
 
-ConVar sk_plr_dmg_pipe( "sk_plr_dmg_pipe", "28" );
-ConVar sk_npc_dmg_pipe( "sk_npc_dmg_pipe", "10" );
+ConVar sk_plr_dmg_pipe( "sk_plr_dmg_pipe", "0" );
+ConVar sk_npc_dmg_pipe( "sk_npc_dmg_pipe", "0" );
 
-ConVar sk_plr_dmg_axe( "sk_plr_dmg_axe", "40" );
-ConVar sk_npc_dmg_axe( "sk_npc_dmg_axe", "14" );
+ConVar sk_plr_dmg_axe( "sk_plr_dmg_axe", "0" );
+ConVar sk_npc_dmg_axe( "sk_npc_dmg_axe", "0" );
 
-ConVar sk_plr_dmg_wrench( "sk_plr_dmg_wrench", "30" );
-ConVar sk_npc_dmg_wrench( "sk_npc_dmg_wrench", "12" );
+ConVar sk_plr_dmg_wrench( "sk_plr_dmg_wrench", "0" );
+ConVar sk_npc_dmg_wrench( "sk_npc_dmg_wrench", "0" );
 
-ConVar sk_plr_dmg_cleaver( "sk_plr_dmg_cleaver", "45" );
-ConVar sk_npc_dmg_cleaver( "sk_npc_dmg_cleaver", "16" );
+ConVar sk_plr_dmg_cleaver( "sk_plr_dmg_cleaver", "0" );
+ConVar sk_npc_dmg_cleaver( "sk_npc_dmg_cleaver", "15" );
 
 
 //-----------------------------------------------------------------------------

@@ -17,9 +17,10 @@
 #include "tier0/memdbgon.h"
 
 
-// Player damage ConVars (names recovered from the decompiled binary).
-ConVar sk_plr_dmg_bfg_mgl( "sk_plr_dmg_bfg_mgl", "100" );
-ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "12" );
+// Player damage ConVars (names recovered from the decompiled binary; defaults
+// match the original DLL registrations - "0" falls back to the ammo definition).
+ConVar sk_plr_dmg_bfg_mgl( "sk_plr_dmg_bfg_mgl", "0" );
+ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "0" );
 
 
 // Full vanilla machinegun activity table (readiness states included).

@@ -16,12 +16,13 @@
 
 
 // Player damage ConVars (names recovered from the decompiled binary; defaults
-// are tunable game-config values). NPC damage falls back to the ammo definition.
-ConVar sk_plr_dmg_pistol_glock( "sk_plr_dmg_pistol_glock", "8" );
-ConVar sk_plr_dmg_pistol_beretta( "sk_plr_dmg_pistol_beretta", "9" );
-ConVar sk_plr_dmg_pistol_socom( "sk_plr_dmg_pistol_socom", "12" );
-ConVar sk_plr_dmg_pistol_python( "sk_plr_dmg_pistol_python", "40" );
-ConVar sk_plr_dmg_pistol_dualberetta( "sk_plr_dmg_pistol_dualberetta", "9" );
+// match the original DLL registrations - "0" falls back to the ammo definition
+// until skill.cfg overrides them). NPC damage falls back to the ammo definition.
+ConVar sk_plr_dmg_pistol_glock( "sk_plr_dmg_pistol_glock", "0" );
+ConVar sk_plr_dmg_pistol_beretta( "sk_plr_dmg_pistol_beretta", "0" );
+ConVar sk_plr_dmg_pistol_socom( "sk_plr_dmg_pistol_socom", "0" );
+ConVar sk_plr_dmg_pistol_python( "sk_plr_dmg_pistol_python", "0" );
+ConVar sk_plr_dmg_pistol_dualberetta( "sk_plr_dmg_pistol_dualberetta", "0" );
 
 
 // Pistol NPC activity table (identical for all Underhell pistols).

@@ -14,9 +14,10 @@
 #include "tier0/memdbgon.h"
 
 
-// Player damage ConVars (names recovered from the decompiled binary).
-ConVar sk_plr_dmg_rifle_g36k( "sk_plr_dmg_rifle_g36k", "10" );
-ConVar sk_plr_dmg_rifle_sniper( "sk_plr_dmg_rifle_sniper", "100" );
+// Player damage ConVars (names recovered from the decompiled binary; defaults
+// match the original DLL registrations - "0" falls back to the ammo definition).
+ConVar sk_plr_dmg_rifle_g36k( "sk_plr_dmg_rifle_g36k", "0" );
+ConVar sk_plr_dmg_rifle_sniper( "sk_plr_dmg_rifle_sniper", "0" );
 
 
 // Full vanilla AR2 activity table (readiness states included, otherwise NPCs

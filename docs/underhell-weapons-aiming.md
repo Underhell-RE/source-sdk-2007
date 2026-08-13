@@ -16,6 +16,19 @@
 
 ---
 
+## 0. Исправления реверс-инжиниринга (PR #2)
+
+Сверка с декомпиляцией (`server/sub_1045C9C0…10466080` — регистрация ConVar'ов,
+`server/sub_101F11D0` + `sub_101F0050`/`sub_101F2990` — кик, `server/sub_101ECF40` — прицел):
+
+| Что было неверно (PR #1) | Как на самом деле (декомпиляция) |
+|---|---|
+| Урон кика через `sk_plr_dmg_kick` (20) | Такого ConVar'а нет. Реальные: `uh_kick_damage` = **21**, `uh_kick_forcemult` = **2**, `uh_kick_enabled` = **1** (`FCVAR_REPLICATED`); кик — 72-юнитовый melee-трейс (`weapon_kick` как inflictor, `DMG_CLUB`), knockback масштабируется `uh_kick_forcemult` |
+| FOV прицела захардкожен `* 0.6` | `* uh_ironsight_zoom` = **0.9** (плюс `uh_ironsight_zoom_focus` = **40**, «subtracted from defaultFOV») |
+| Дефолты `sk_plr_dmg_*` / `sk_npc_dmg_*` выдуманы (8/9/12/22/45…) | В бинаре все регистрируются с **"0"** (реальные значения кладёт `skill.cfg`; "0" → fallback на урон аммо), кроме `sk_npc_dmg_cleaver` = **"15"** |
+
+---
+
 ## 1. Источники данных
 
 | Источник | Что даёт |
@@ -133,7 +146,7 @@ this+1832 MeleeWeapon, this+1833 BuiltRightHanded, this+1834 AllowFlipping, this
 |---|---|---|
 | `throw_nade` | `Throw_Nade` | `CHL2_Player::ThrowGrenadeQuick()` — быстрый бросок `grenade_frag` (1200 юн/с), если есть аммо «grenade» |
 | `dropweapon` | `DropWeapon` | `CHL2_Player::DropActiveWeapon()` — выброс активного оружия вперёд (300 юн/с); **melee-оружие выбросить нельзя** (проверка флага `MeleeWeapon`, offset 1832 в оригинале) |
-| `uh_jake_kick` | `uh_jake_kick` | `CHL2_Player::PerformKick()` — удар ногой: viewpunch −2°, звуки `HL2Player.kick_fire(_fly)`, melee-урон (`sk_plr_dmg_kick`, по умолч. 20); в оригинале также тратит 20 выносливости (система выносливости — follow-up) |
+| `uh_jake_kick` | `uh_jake_kick` | `CHL2_Player::PerformKick()` — удар ногой: viewpunch −2°, звуки `HL2Player.kick_fire(_fly)`, melee-урон через ConVar'ы `uh_kick_damage` (21), `uh_kick_forcemult` (2), гейт `uh_kick_enabled` (1, FCVAR_REPLICATED); в оригинале также тратит 20 выносливости (система выносливости — follow-up) |
 
 Плюс `additionalequipment` (NPC-снаряжение) поддерживает **список через запятую** — NPC берёт
 случайное оружие из списка (FGD: `weapon_melee_pipe,weapon_melee_baton,weapon_melee_wrench`). Это
@@ -349,9 +362,9 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
   `client/sub_10043D70` / `server/sub_101E6C70`).
 - Серверная команда `ironsight_toggle` повторяет `server/sub_101ECF40`: кулдаун 0.1 c, звук,
   FOV-зум, запись состояния + репликация `m_bExpSighted` на вьюмодель.
-- FOV при прицеливании = `GetDefaultFOV() * UH_IRONSIGHT_FOV_SCALE` (0.6), время 0.15 c —
-  точные числа Underhell из декомпа не восстанавливаются, константы вынесены в `hl2_player.cpp`
-  и легко настраиваются.
+- FOV при прицеливании = `GetDefaultFOV() * uh_ironsight_zoom` (дефолт **0.9**, восстановлен из
+  декомпа: ConVar `uh_ironsight_zoom` = "0.9"; парный ConVar `uh_ironsight_zoom_focus` = "40" —
+  «This value is subracted from the defaultFOV»), время перехода 0.15 c вынесено в `hl2_player.cpp`.
 - `ironsight_toggle` регистрируется только на сервере (`FCVAR_GAMEDLL`): в SP команда из консоли
   пробрасывается на сервер автоматически. Позже пропишем бинд в `kb_act.lst`.
 

@@ -14,10 +14,11 @@
 #include "tier0/memdbgon.h"
 
 
-// Player damage ConVars (names recovered from the decompiled binary).
-ConVar sk_plr_dmg_smg_mp5( "sk_plr_dmg_smg_mp5", "8" );
-ConVar sk_plr_dmg_smg_mp5_eod( "sk_plr_dmg_smg_mp5_eod", "9" );
-ConVar sk_plr_dmg_smg_mp7( "sk_plr_dmg_smg_mp7", "7" );
+// Player damage ConVars (names recovered from the decompiled binary; defaults
+// match the original DLL registrations - "0" falls back to the ammo definition).
+ConVar sk_plr_dmg_smg_mp5( "sk_plr_dmg_smg_mp5", "0" );
+ConVar sk_plr_dmg_smg_mp5_eod( "sk_plr_dmg_smg_mp5_eod", "0" );
+ConVar sk_plr_dmg_smg_mp7( "sk_plr_dmg_smg_mp7", "0" );
 
 
 // Full vanilla SMG1 activity table (readiness states included, otherwise NPCs

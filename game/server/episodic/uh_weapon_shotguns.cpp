@@ -18,11 +18,12 @@
 extern ConVar sk_plr_num_shotgun_pellets;
 
 // Player damage ConVars (names recovered from the decompiled binary; per-pellet
-// damage). NPC damage falls back to the ammo definition.
-ConVar sk_plr_dmg_shotgun_m3( "sk_plr_dmg_shotgun_m3", "8" );
-ConVar sk_plr_dmg_shotgun_m5( "sk_plr_dmg_shotgun_m5", "9" );
-ConVar sk_plr_dmg_shotgun_spas12( "sk_plr_dmg_shotgun_spas12", "7" );
-ConVar sk_plr_dmg_shotgun_xm1014( "sk_plr_dmg_shotgun_xm1014", "7" );
+// damage, defaults "0" fall back to the ammo definition). NPC damage falls
+// back to the ammo definition.
+ConVar sk_plr_dmg_shotgun_m3( "sk_plr_dmg_shotgun_m3", "0" );
+ConVar sk_plr_dmg_shotgun_m5( "sk_plr_dmg_shotgun_m5", "0" );
+ConVar sk_plr_dmg_shotgun_spas12( "sk_plr_dmg_shotgun_spas12", "0" );
+ConVar sk_plr_dmg_shotgun_xm1014( "sk_plr_dmg_shotgun_xm1014", "0" );
 
 
 //-----------------------------------------------------------------------------
