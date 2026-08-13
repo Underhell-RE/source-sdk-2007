@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		Player for HL2.
 //
@@ -14,6 +14,9 @@
 #include "hl2_playerlocaldata.h"
 #include "simtimer.h"
 #include "soundenvelope.h"
+#include "underhell/uh_inventory.h"
+
+class CCommand;
 
 // In HL2MP we need to inherit from  BaseMultiplayerPlayer!
 #if defined ( HL2MP )
@@ -309,12 +312,44 @@ protected:
 	virtual void		ItemPostFrame();
 	virtual void		PlayUseDenySound();
 
+public:
+	//-----------------------------------------------------------------------------
+	// Underhell inventory (implementation in game/server/underhell/uh_player_inventory.cpp).
+	// NOTE: UH_ItemAction is the first virtual Underhell added to the stock
+	// CHL2_Player vtable (index 411 in the original binary) â€” keep it the last
+	// virtual in this class for vtable parity.
+	//-----------------------------------------------------------------------------
+	virtual bool		UH_ItemAction( int iSlot, bool bUse );
+
+	void				UH_InitializeInventory( void );
+	void				UH_AddInventoryItem( int iItem );
+	void				UH_RemoveInventoryItem( int iSlot );
+	int					UH_FindInventoryItem( int iItem ) const;
+	void				UH_HandleInventoryCommand( const CCommand &args );	// dispatch: emit/switch/dropitem/useitem
+	void				UH_UpdateInventory( void );			// "UpdateInventory" server handler
+
 private:
 	bool				CommanderExecuteOne( CAI_BaseNPC *pNpc, const commandgoal_t &goal, CAI_BaseNPC **Allies, int numAllies );
 
 	void				OnSquadMemberKilled( inputdata_t &data );
 
 	Class_T				m_nControlClass;			// Class when player is controlling another entity
+
+	//-----------------------------------------------------------------------------
+	// Underhell inventory state. Declaration order mirrors the original binary
+	// layout (m_iInventory @4928, m_bShoulderFlashlight @5040, four ints, then
+	// the three bools). Do not reorder.
+	//-----------------------------------------------------------------------------
+	CNetworkArray( int, m_iInventory, UH_INVENTORY_SLOTS );	// item ids, 0 = empty slot
+	CNetworkVar( bool, m_bShoulderFlashlight );					// shoulder-mounted flashlight fitted
+	CNetworkVar( int, m_iUHBatteryCount );						// battery items held
+	CNetworkVar( int, m_iUHHermitCardsCount );					// TODO: hermit card system
+	CNetworkVar( int, m_iUHHermitCurrentQuestCount );			// TODO: hermit card system
+	CNetworkVar( int, m_iUHHermitTotalQuestCount );				// TODO: hermit card system
+	CNetworkVar( bool, m_bDisplayHermitCard );					// TODO: hermit card system
+	CNetworkVar( bool, m_bFlashlightOn );						// inventory flashlight state
+	CNetworkVar( bool, m_bInventoryEnabled );					// inventory system enabled
+
 	// This player's HL2 specific data that should only be replicated to 
 	//  the player and not to other players.
 	CNetworkVarEmbedded( CHL2PlayerLocalData, m_HL2Local );
