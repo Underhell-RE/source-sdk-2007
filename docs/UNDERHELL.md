@@ -75,11 +75,13 @@ TODO: verify exact soda/health print names from hexrays string dump.
 
 ### Mechanics (decoded)
 
-- **Use** (`UseItem`, vtable idx 411 — first Underhell virtual): read id from slot. Create world entity from classname table. Fail + id 19–23 → consume slot, remove lit glowstick child (warn if none). Success → place at eye position, spawn, call `Use( player, player, USE_ON, id )`. Glowstick 14–18 → slot becomes `id+5` (lit). Then clear slot, `engine->ClientCommand( edict, "UpdateInventory" )`.
-- **Drop** (`dropitem`): spawn entity at eye pos + forward*56 + up*64 from classname by slot. TODO: name array access confirmed, full geometry TBD.
+- **Use** (`UH_ItemAction`, vtable idx 411 — first Underhell virtual): read id from slot. Create world entity from classname table. Fail + id 19–23 → consume slot, remove lit glowstick child (warn if none). Success → place at eye position, spawn, call `Use( player, player, USE_ON, id )`. Glowstick 14–18 → slot becomes `id+5` (lit). Then clear slot, `engine->ClientCommand( edict, "UpdateInventory" )`.
+- **Drop** (`dropitem`, same virtual with bUse=false): style + drop world item at eye position (body groups per id; flare → flare prop; glowstick → coloured glowstick prop). TODO: second drop path (sub_102DE310, eye + forward*56 + up*64, classname indexed by slot) still to reconcile.
 - **Specials 19–23**: equip logic (sub_10416380) — decrement counter at player+848, remove held entity, consume slot, resync. TODO: port.
 - **`UpdateInventory`** (server handler sub_102DDDE0): per non-empty slot `StateChanged( 4928+4*i )` (or dirty flag), remove held item, clear handle, `engine->ClientCommand( "UpdateInventory" )`.
-- **Client**: `CInventoryPanel` = `vgui::Frame` named `InventoryPanel` (factory class `CInventoryPanel`), 28 slot children, vgui messages `NewSelection` / `NewMouseReleased`. Debug msg on construct: `"InventoryPanel has been constructed"`. `cl_inventoryToggle` → `engine->ClientCmd("UpdateInventory")` + toggle panel. Client `UpdateInventory` cmd sets refresh flag.
+- **Console commands use the client-command route**: `emit`/`switch`/`dropitem`/`useitem` are NOT registered ConCommands — the engine forwards them as client commands into `CHL2_Player::ClientCommand` (the Underhell override = hexrays sub_102DDBF0, falls through to the vanilla handler which owns `emit`). Client panel sends them via `engine->ClientCmd`. TODO: verify 2007 engine forwards `UpdateInventory` when the client dll also registers it (resync is belt-and-braces in our port since CNetworkArray marks changes itself).
+- **Client**: `CInventoryPanel` = `vgui::Frame` named `InventoryPanel` (factory class `CInventoryPanel`), 28 slot children, vgui messages `NewSelection` / `NewMouseReleased`. Debug msg on construct: `"InventoryPanel has been constructed"`. `cl_inventoryToggle` → `engine->ClientCmd("UpdateInventory")` + toggle panel. Client `UpdateInventory` cmd sets refresh flag. OnThink gates on player alive + `m_bInventoryEnabled` (+ an unidentified bool at client player offset 3681 — TODO).
+- **Slot visuals** (client, sub_1012E6C0): per-id sprite + localization token, replicated 1:1 — ids 24/25 (painkillers/syringe) have text only; id 12 = SodaPowerPunch / `#UnderHell_Inventory_MegaSoda`; **glowstick icon colours do not match the print names** (id 14 "Red" uses GlowstickGreen icon) — quirk preserved.
 
 ### Item entities
 
@@ -95,6 +97,17 @@ Full classname list: `FGD/Item List.txt` (food, ammo, equipment, health) + `Weap
 | 4 | feat(server) | CHL2_Player inventory state + use/drop + commands |
 | 5 | feat(client) | CInventoryPanel + network props + client commands |
 | 6 | build | vcproj registration |
+
+## Progress
+
+Stage 1–6 done (first batch):
+
+- Shared: item id enum + id→classname/print-name table (exact original strings).
+- Server: 40 item entity classes registered under original classnames (Spawn/Precache stubbed, models from FGD), `item_random` stub, `CHL2_Player` inventory state (sendtable in original order, datamap per original save format), `UH_ItemAction` use/drop logic ported 1:1, `switch`/`dropitem`/`useitem` via `ClientCommand`, `UpdateInventory` resync command.
+- Client: `C_BaseHLPlayer` inventory props (recv table matches server order), `CInventoryPanel` + 28 slots + original sprite/token table, `cl_inventoryToggle` + `UpdateInventory` commands.
+- Build: sources registered in both episodic vcproj files.
+
+Next stage: item pickup flow (`CUHItem::MyTouch` → `UH_AddInventoryItem`), per-item use effects, held-item handle, equip counter at player+848.
 
 ## TODOs (tracked)
 
