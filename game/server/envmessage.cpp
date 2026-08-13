@@ -107,22 +107,66 @@ void CMessage::Precache( void )
 
 //-----------------------------------------------------------------------------
 // Underhell: helper to set message from string param.
-// The original had 16 priority slots, but VMF only uses SetMessagePriority1
-// with "@titles_*.txt_*" syntax. For compatibility we set main message and
-// the priority slot. The "@" prefix is handled by engine's TextMessage system,
-// but we strip file prefix for safety and keep the entry name as fallback.
+// The original had 16 priority slots, VMF uses SetMessagePriority1 with
+// "@titles_*.txt_*" syntax like "@titles_Prologue.txt_Prologue_2_Objective_A"
+// which means: load titles_Prologue.txt and show entry Prologue_2_Objective_A.
+// That entry's Message is "#UnderHell_Prologue_2_Objective_A" which is
+// localized via Underhell_english.txt. We parse the @ reference to get the
+// actual titles entry name so UTIL_ShowMessage can find it.
 //-----------------------------------------------------------------------------
+const char *CMessage::ParseTitlesReference( const char *pszInput, char *outBuf, int outBufSize )
+{
+	if ( !pszInput || !*pszInput )
+		return pszInput;
+
+	// Strip leading @ or #? Keep # for localization, but handle @titles case.
+	if ( pszInput[0] == '@' )
+	{
+		// Look for ".txt_" or ".txt " separator
+		const char *pszAfterTxt = Q_stristr( pszInput, ".txt_" );
+		if ( pszAfterTxt )
+		{
+			pszAfterTxt += 5; // skip ".txt_"
+			Q_strncpy( outBuf, pszAfterTxt, outBufSize );
+			return outBuf;
+		}
+		pszAfterTxt = Q_stristr( pszInput, ".txt " );
+		if ( pszAfterTxt )
+		{
+			pszAfterTxt += 5;
+			Q_strncpy( outBuf, pszAfterTxt, outBufSize );
+			return outBuf;
+		}
+		// Fallback: after last '_' maybe? For "@titles_Prologue.txt_Prologue_2_Objective_A"
+		// we already handled .txt_ case. If format is different, take after last '/':
+		const char *pszLastSlash = strrchr( pszInput, '/' );
+		const char *pszStart = pszLastSlash ? pszLastSlash + 1 : pszInput + 1; // skip @
+		// If still contains path, try to extract entry name
+		Q_strncpy( outBuf, pszStart, outBufSize );
+		// If outBuf contains ".txt_", extract after
+		char *p = (char*)Q_stristr( outBuf, ".txt_" );
+		if ( p )
+		{
+			Q_strncpy( outBuf, p + 5, outBufSize );
+			return outBuf;
+		}
+		return outBuf;
+	}
+	// If starts with #, keep as is for localization, but also allow.
+	return pszInput;
+}
+
 void CMessage::SetMessageFromString( const char *pszMessage )
 {
 	if ( !pszMessage || !*pszMessage )
 		return;
 
-	// Store as pooled string. If it starts with "@titles_", try to extract
-	// the actual entry name after last '_' or after ".txt_". Original used
-	// "@titles_Prologue.txt_Prologue_2_Objective_A" which should resolve to
-	// "Prologue_2_Objective_A" or keep as is for engine's @ handling.
-	// We store verbatim and also store cleaned version as main message.
-	m_iszMessage = AllocPooledString( pszMessage );
+	char szClean[512];
+	const char *pszParsed = ParseTitlesReference( pszMessage, szClean, sizeof(szClean) );
+	if ( !pszParsed )
+		pszParsed = pszMessage;
+
+	m_iszMessage = AllocPooledString( pszParsed );
 }
 
 //-----------------------------------------------------------------------------
@@ -225,28 +269,29 @@ void CMessage::InputSetMessage( inputdata_t &inputdata )
 	const char *psz = inputdata.value.String();
 	if ( psz && *psz )
 	{
-		m_iszMessage = AllocPooledString( psz );
-		// Also set priority 0 as fallback
+		char szClean[512];
+		const char *pszParsed = ParseTitlesReference( psz, szClean, sizeof(szClean) );
+		m_iszMessage = AllocPooledString( pszParsed ? pszParsed : psz );
 		m_iszMessagesPriority[0] = m_iszMessage;
 	}
 }
 
-void CMessage::InputSetMessagePriority1( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[0] = AllocPooledString( psz ); m_iszMessage = m_iszMessagesPriority[0]; } }
-void CMessage::InputSetMessagePriority2( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[1] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority3( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[2] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority4( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[3] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority5( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[4] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority6( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[5] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority7( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[6] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority8( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[7] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority9( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[8] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority10( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[9] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority11( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[10] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority12( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[11] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority13( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[12] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority14( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[13] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority15( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[14] = AllocPooledString( psz ); } }
-void CMessage::InputSetMessagePriority16( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[15] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority1( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[0] = AllocPooledString( p ? p : psz ); m_iszMessage = m_iszMessagesPriority[0]; } }
+void CMessage::InputSetMessagePriority2( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[1] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority3( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[2] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority4( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[3] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority5( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[4] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority6( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[5] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority7( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[6] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority8( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[7] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority9( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[8] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority10( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[9] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority11( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[10] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority12( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[11] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority13( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[12] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority14( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[13] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority15( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[14] = AllocPooledString( p ? p : psz ); } }
+void CMessage::InputSetMessagePriority16( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { char szClean[512]; const char *p = ParseTitlesReference( psz, szClean, sizeof(szClean) ); m_iszMessagesPriority[15] = AllocPooledString( p ? p : psz ); } }
 
 void CMessage::InputRemoveMessagePriority( inputdata_t &inputdata )
 {

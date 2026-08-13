@@ -53,6 +53,7 @@ private:
 	void InputRemoveMessagePriority( inputdata_t &inputdata );
 
 	void SetMessageFromString( const char *pszMessage );
+	const char *ParseTitlesReference( const char *pszInput, char *outBuf, int outBufSize );
 
 	string_t m_iszMessage;		// Message to display.
 	float m_MessageVolume;
