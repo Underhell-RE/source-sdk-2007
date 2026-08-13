@@ -26,6 +26,8 @@
 | Урон кика через `sk_plr_dmg_kick` (20) | Такого ConVar'а нет. Реальные: `uh_kick_damage` = **21**, `uh_kick_forcemult` = **2**, `uh_kick_enabled` = **1** (`FCVAR_REPLICATED`); кик — 72-юнитовый melee-трейс (`weapon_kick` как inflictor, `DMG_CLUB`), knockback масштабируется `uh_kick_forcemult` |
 | FOV прицела захардкожен `* 0.6` | `* uh_ironsight_zoom` = **0.9** (плюс `uh_ironsight_zoom_focus` = **40**, «subtracted from defaultFOV») |
 | Дефолты `sk_plr_dmg_*` / `sk_npc_dmg_*` выдуманы (8/9/12/22/45…) | В бинаре все регистрируются с **"0"** (реальные значения кладёт `skill.cfg`; "0" → fallback на урон аммо), кроме `sk_npc_dmg_cleaver` = **"15"** |
+| Проникание: затухание урона 0.5 за каждую поверхность | В декомпе (`sub_100EAFB0`) каждый сегмент наносит **полный** `m_iDamage` без затухания; `UH_PENETRATION_DAMAGE_FALLOFF` = 1.0. Плюс раскладка `FireBulletsInfo_t`: поле проникания **вставлено** на `+52`, штатные поля сдвинуты (`m_iDamage`→`+56` и т.д.), а не «переиспользован `m_iDamage`» |
+| Кик: плоский урон `uh_kick_damage`, только `kick_fire`/`kick_fire_fly` | Урон **масштабируется скоростью**: `max(uh_kick_damage, \|velocity\|·0.01·uh_kick_damage)`, при движении назад — базовый (`sub_101E5A60`). При попадании играется `HL2Player.kick_body` (NPC/игрок) или `HL2Player.kick_wall` (мир) |
 
 ---
 
@@ -146,7 +148,7 @@ this+1832 MeleeWeapon, this+1833 BuiltRightHanded, this+1834 AllowFlipping, this
 |---|---|---|
 | `throw_nade` | `Throw_Nade` | `CHL2_Player::ThrowGrenadeQuick()` — быстрый бросок `grenade_frag` (1200 юн/с), если есть аммо «grenade» |
 | `dropweapon` | `DropWeapon` | `CHL2_Player::DropActiveWeapon()` — выброс активного оружия вперёд (300 юн/с); **melee-оружие выбросить нельзя** (проверка флага `MeleeWeapon`, offset 1832 в оригинале) |
-| `uh_jake_kick` | `uh_jake_kick` | `CHL2_Player::PerformKick()` — удар ногой: viewpunch −2°, звуки `HL2Player.kick_fire(_fly)`, melee-урон через ConVar'ы `uh_kick_damage` (21), `uh_kick_forcemult` (2), гейт `uh_kick_enabled` (1, FCVAR_REPLICATED); в оригинале также тратит 20 выносливости (система выносливости — follow-up) |
+| `uh_jake_kick` | `uh_jake_kick` | `CHL2_Player::PerformKick()` — удар ногой: viewpunch −2°, звуки `HL2Player.kick_fire(_fly)` + `kick_body`/`kick_wall` по факту попадания, melee-урон `max(uh_kick_damage, |vel|·0.01·uh_kick_damage)` (21), knockback `uh_kick_forcemult` (2), гейт `uh_kick_enabled` (1, FCVAR_REPLICATED); в оригинале также тратит 20 выносливости (система выносливости — follow-up) |
 
 Плюс `additionalequipment` (NPC-снаряжение) поддерживает **список через запятую** — NPC берёт
 случайное оружие из списка (FGD: `weapon_melee_pipe,weapon_melee_baton,weapon_melee_wrench`). Это
@@ -213,9 +215,11 @@ first-person):
 |---|---|
 | `server/sub_100EAFB0` | `CBaseEntity::FireBullets` — цикл выстрела с поддержкой проникания (88-байтовая копия `FireBulletsInfo_t`, флаг-байт `+81`, продолжение трассировки после попадания) |
 
-Ключевая находка из декомпиляции: в Underhell `FireBulletsInfo_t` расширен, а поле на
-смещении `+52` (в ванили `m_iDamage`) используется как **бюджет проникания** — цикл сегмента
-(`while (BYTE2(flag) && v132 <= *(info+52))`) продолжает трассировку сквозь поверхность, пока
+Ключевая находка из декомпиляции: в Underhell `FireBulletsInfo_t` **расширен** — поле
+**проникания вставлено на смещение `+52`**, а штатные поля сдвинуты вниз:
+`m_iDamage`→`+56`, `m_iPlayerDamage`→`+60`, `m_nFlags`→`+64`, `m_flDamageForceScale`→`+68`,
+`m_pAttacker`→`+72` (+ байтовые флаги `+81` «это уже продолжение проникания» и `+83` «проникание
+включено»). Цикл сегмента (`v132 > *(info+52)`) продолжает трассировку сквозь поверхность, пока
 счётчик не превысит значение из конфига. Значения из оригинальных `weapon_*.txt`:
 
 | Оружие | `Penetration` |
@@ -226,9 +230,10 @@ first-person):
 | `weapon_pistol_python` / `weapon_rifle_sniper` | 10 |
 
 Семантика: **число поверхностей, которые пуля может пройти насквозь** (0 = выключено). Пуля
-останавливается на NPC/игроке; на каждой пробитой поверхности урон падает
-(`UH_PENETRATION_DAMAGE_FALLOFF`, 0.5 — точную константу Underhell из Hex-Rays не достать,
-вынесена в `uh_basefirearm.cpp`). Реализация: `CUhFirearmWeapon::FireBulletsPenetrating()` —
+останавливается на NPC/игроке; **урон на каждой пробитой поверхности наносится полный** — в
+декомпиляции каждый сегмент применяет один и тот же `m_iDamage` без затухания
+(`UH_PENETRATION_DAMAGE_FALLOFF` вынесен в `uh_basefirearm.cpp` и равен 1.0, чтобы совпадать
+с оригиналом; раньше по ошибке стоял 0.5). Реализация: `CUhFirearmWeapon::FireBulletsPenetrating()` —
 посегментная трассировка, каждый сегмент уходит в `CBasePlayer::FireBullets` с
 `VECTOR_CONE_PRECALCULATED`, поэтому декали/эффекты/урон по аммо-типу полностью штатные.
 Парсинг значения — из оригинальных конфигов через `CUHWeaponInfo::m_iPenetration`.
@@ -353,8 +358,9 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
      дуговая граната — follow-up).
    - ✅ Проникание `UH_Weapon_Special.Penetration` — `CUhFirearmWeapon::FireBulletsPenetrating`
      (§2.6), значение из оригинальных `weapon_*.txt`.
-   - ✅ Быстрые действия: `dropweapon` / `throw_nade` / `uh_jake_kick` (§2.7) — серверные
-     `CON_COMMAND` + обработка в `CHL2_Player::ClientCommand`; `additionalequipment` понимает
+   - ✅ Быстрые действия: `dropweapon` / `throw_nade` / `uh_jake_kick` / `ironsight_toggle` /
+     `update_freeaim` (§2.7) — обрабатываются **только** в `CHL2_Player::ClientCommand`
+     (как в оригинальном `sub_101F11D0`), без дублирующих `CON_COMMAND`; `additionalequipment` понимает
      список через запятую (случайный выбор, §2.7); кик/граната проигрывают анимации
      (`ACT_VM_HITCENTER` / `ACT_VM_THROW` + `PLAYER_ATTACK1`).
    - ✅ OTS free-aim (§2.8) — клиентские `cam_ots_freeaim_*` + курсор в `CInput` +
@@ -382,8 +388,9 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
 - FOV при прицеливании = `GetDefaultFOV() * uh_ironsight_zoom` (дефолт **0.9**, восстановлен из
   декомпа: ConVar `uh_ironsight_zoom` = "0.9"; парный ConVar `uh_ironsight_zoom_focus` = "40" —
   «This value is subracted from the defaultFOV»), время перехода 0.15 c вынесено в `hl2_player.cpp`.
-- `ironsight_toggle` регистрируется только на сервере (`FCVAR_GAMEDLL`): в SP команда из консоли
-  пробрасывается на сервер автоматически. Позже пропишем бинд в `kb_act.lst`.
+- `ironsight_toggle` (как и `dropweapon`/`throw_nade`/`uh_jake_kick`/`update_freeaim`) обрабатывается
+  в `CHL2_Player::ClientCommand` — как в оригинальном `sub_101F11D0`, без дублирующего
+  `CON_COMMAND`. Бинды уже есть в `kb_act.lst` (перенос контента — отдельным шагом).
 
 > Примечание по «1:1»: раскладка полей в декомпиляции показывает, что Underhell добавлял поля
 > прямо в начало структуры данных оружия (offsets 8–103 до `szClassName`). Для чистоты мы не

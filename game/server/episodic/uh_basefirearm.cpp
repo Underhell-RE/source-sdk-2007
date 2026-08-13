@@ -24,11 +24,15 @@
 
 //-----------------------------------------------------------------------------
 // Penetration tuning. Underhell drives the *budget* (how many surfaces a bullet
-// may pass through) from the weapon script (UH_Weapon_Special.Penetration);
-// these constants describe the physical behavior of a single pass.
+// may pass through) from the weapon script (UH_Weapon_Special.Penetration).
+//
+// The decompiled FireBullets (server/sub_100EAFB0) applies the FULL damage to
+// every segment — there is no per-surface damage falloff. UH_PENETRATION_DAMAGE_FALLOFF
+// is kept as a documented tunable, defaulting to 1.0 (no falloff) to match the
+// original behavior.
 //-----------------------------------------------------------------------------
-#define UH_PENETRATION_DAMAGE_FALLOFF		0.5f	// damage retained after passing one surface
-#define UH_PENETRATION_STEP_OUT				1.0f	// units to step past a penetrated surface
+#define UH_PENETRATION_DAMAGE_FALLOFF		1.0f	// damage retained after passing one surface (decomp: full damage)
+#define UH_PENETRATION_STEP_OUT			1.0f	// units to step past a penetrated surface
 #define UH_PENETRATION_STEP_OUT_ATTEMPTS	16		// max steps to clear a thick solid
 
 

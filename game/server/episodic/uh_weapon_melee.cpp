@@ -60,12 +60,14 @@ public:
 //-----------------------------------------------------------------------------
 void CUHMeleeWeapon::Spawn( void )
 {
+	// Call the base first: CBaseHLBludgeonWeapon::Spawn() hard-codes m_fMaxRange1/2
+	// to 64, so the script-driven reach must be applied AFTER it.
+	BaseClass::Spawn();
+
 	m_fMinRange1 = 0;
 	m_fMinRange2 = 0;
 	m_fMaxRange1 = GetRange();
 	m_fMaxRange2 = GetRange();
-
-	BaseClass::Spawn();
 }
 
 

@@ -451,27 +451,13 @@ void CHL2_Player::ToggleIronsight( void )
 	}
 }
 
-CON_COMMAND_F( ironsight_toggle, "Toggles ironsight mode for the current weapon.", FCVAR_GAMEDLL )
-{
-	CBasePlayer *pPlayer = UTIL_GetCommandClient();
-	if ( !pPlayer )
-	{
-		// Executed directly (server console / listen server): use the first active player.
-		pPlayer = UTIL_PlayerByIndex( 1 );
-	}
-
-	CHL2_Player *pHL2Player = dynamic_cast< CHL2_Player * >( pPlayer );
-	if ( pHL2Player )
-	{
-		pHL2Player->ToggleIronsight();
-	}
-}
-
 //-----------------------------------------------------------------------------
 // Underhell quick actions. Mirrors the decompiled server ClientCommand
 // dispatcher (server/sub_101F11D0: DropWeapon / Throw_Nade / uh_jake_kick).
-// Registered with the kb_act.lst command names so the client console/keybinds
-// forward them to the server in single-player.
+// Handled in CHL2_Player::ClientCommand with the decompiled (case-insensitive)
+// names, exactly like the original — NOT registered as ConCommands, so the
+// kb_act.lst binds (dropweapon / throw_nade / uh_jake_kick / ironsight_toggle)
+// reach a single dispatch path.
 //-----------------------------------------------------------------------------
 // Underhell unarmed kick (see docs/underhell-weapons-aiming.md, server/sub_101F11D0
 // + sub_101F0050 / sub_101F2990). ConVar names/defaults recovered from the binary:
@@ -614,63 +600,27 @@ void CHL2_Player::PerformKick( void )
 		EmitSound( "HL2Player.kick_fire_fly" );
 	}
 
+	// Kick damage is velocity-scaled in the original (server/sub_101E5A60):
+	//   damage = max( uh_kick_damage, |velocity| * 0.01 * uh_kick_damage ),
+	// and the base value is used when moving away from the kick direction.
+	float flKickDamage = uh_kick_damage.GetFloat();
+	Vector vecKickDir;
+	EyeVectors( &vecKickDir, NULL, NULL );
+	float flSpeed = GetAbsVelocity().Length();
+	float flScaled = flSpeed * 0.01f * flKickDamage;
+	if ( GetAbsVelocity().Dot( vecKickDir ) < 0.0f || flScaled < flKickDamage )
+		flScaled = flKickDamage;
+
 	// 72-unit melee trace (matches the decompiled kick: eye -> eye + forward*72),
-	// DMG_CLUB, knockback scaled by uh_kick_forcemult.
-	CheckTraceHullAttack( UH_KICK_RANGE, Vector( -16, -16, -16 ), Vector( 16, 16, 16 ),
-		(int)uh_kick_damage.GetFloat(), DMG_CLUB, uh_kick_forcemult.GetFloat() );
-}
+	// DMG_CLUB, knockback scaled by uh_kick_forcemult. The hit entity selects the
+	// impact sound: kick_body on an NPC/player, kick_wall on the world.
+	CBaseEntity *pHit = CheckTraceHullAttack( UH_KICK_RANGE, Vector( -16, -16, -16 ), Vector( 16, 16, 16 ),
+		(int)flScaled, DMG_CLUB, uh_kick_forcemult.GetFloat() );
 
-static CHL2_Player *UnderhellCommandPlayer( void )
-{
-	CBasePlayer *pPlayer = UTIL_GetCommandClient();
-	if ( !pPlayer )
-	{
-		// Executed directly (server console / listen server): use the first active player.
-		pPlayer = UTIL_PlayerByIndex( 1 );
-	}
-	return dynamic_cast< CHL2_Player * >( pPlayer );
-}
-
-CON_COMMAND_F( dropweapon, "Drops the currently active weapon.", FCVAR_GAMEDLL )
-{
-	CHL2_Player *pPlayer = UnderhellCommandPlayer();
-	if ( pPlayer )
-		pPlayer->DropActiveWeapon();
-}
-
-CON_COMMAND_F( throw_nade, "Quick-throws a grenade.", FCVAR_GAMEDLL )
-{
-	CHL2_Player *pPlayer = UnderhellCommandPlayer();
-	if ( pPlayer )
-		pPlayer->ThrowGrenadeQuick();
-}
-
-CON_COMMAND_F( uh_jake_kick, "Performs an unarmed kick.", FCVAR_GAMEDLL )
-{
-	CHL2_Player *pPlayer = UnderhellCommandPlayer();
-	if ( pPlayer )
-		pPlayer->PerformKick();
-}
-
-//-----------------------------------------------------------------------------
-// Underhell OTS free-aim sync. The client sends the current free-aim offset;
-// the server stores it and rotates the shot direction to match (docs §2.8).
-//-----------------------------------------------------------------------------
-CON_COMMAND_F( update_freeaim, "Underhell free-aim sync (client internal).", FCVAR_GAMEDLL )
-{
-	CHL2_Player *pPlayer = UnderhellCommandPlayer();
-	if ( !pPlayer )
-		return;
-
-	QAngle angOffset( 0, 0, 0 );
-	if ( args.ArgC() > 1 )
-		angOffset.x = atof( args[1] );
-	if ( args.ArgC() > 2 )
-		angOffset.y = atof( args[2] );
-	if ( args.ArgC() > 3 )
-		angOffset.z = atof( args[3] );
-
-	pPlayer->SetFreeAimOffset( angOffset );
+	if ( pHit && ( pHit->IsNPC() || pHit->IsPlayer() ) )
+		EmitSound( "HL2Player.kick_body" );
+	else
+		EmitSound( "HL2Player.kick_wall" );
 }
 
 #endif // HL2_EPISODIC
@@ -722,6 +672,8 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.Ironsightoff" );
 	PrecacheScriptSound( "HL2Player.kick_fire" );
 	PrecacheScriptSound( "HL2Player.kick_fire_fly" );
+	PrecacheScriptSound( "HL2Player.kick_body" );
+	PrecacheScriptSound( "HL2Player.kick_wall" );
 	PrecacheScriptSound( "Player.Voice.Kick" );
 	PrecacheScriptSound( "Player.Voice.Kick.Exhausted" );
 	PrecacheModel( "models/weapons/v_grenade.mdl" );
@@ -3093,6 +3045,21 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	if ( !Q_stricmp( args[0], "ironsight_toggle" ) )
 	{
 		ToggleIronsight();
+		return true;
+	}
+
+	if ( !Q_stricmp( args[0], "update_freeaim" ) )
+	{
+		// Underhell OTS free-aim sync: the client sends the current aim offset.
+		QAngle angOffset( 0, 0, 0 );
+		if ( args.ArgC() > 1 )
+			angOffset.x = atof( args[1] );
+		if ( args.ArgC() > 2 )
+			angOffset.y = atof( args[2] );
+		if ( args.ArgC() > 3 )
+			angOffset.z = atof( args[3] );
+
+		SetFreeAimOffset( angOffset );
 		return true;
 	}
 #endif
