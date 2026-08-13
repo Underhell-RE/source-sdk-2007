@@ -112,3 +112,21 @@ bool CHL2_Player::UH_HandleObjectiveCommand( const CCommand &args )
 
 	return false;
 }
+
+//-----------------------------------------------------------------------------
+// Dev/testing helper — not part of the original. Drives the hermit-cards
+// counters so the CHudUHHermitCards HUD can be exercised without the (still
+// unported) game-stats system. Usage: uh_give_hermit_card [cards] [questcur] [questtotal]
+//-----------------------------------------------------------------------------
+CON_COMMAND_F( uh_give_hermit_card, "Sets hermit card / quest counters (dev/testing).", FCVAR_CHEAT )
+{
+	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player *>( UTIL_GetCommandClient() );
+	if ( !pPlayer )
+		return;
+
+	int iCards = ( args.ArgC() > 1 ) ? atoi( args[1] ) : ( pPlayer->UH_GetHermitCardsCount() + 1 );
+	int iQuestCur = ( args.ArgC() > 2 ) ? atoi( args[2] ) : 0;
+	int iQuestTotal = ( args.ArgC() > 3 ) ? atoi( args[3] ) : 0;
+
+	pPlayer->UH_SetHermitCards( iCards, iQuestCur, iQuestTotal );
+}

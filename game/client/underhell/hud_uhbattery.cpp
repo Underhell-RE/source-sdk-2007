@@ -73,7 +73,7 @@ void CHudUHBattery::OnThink( void )
 	if ( !pPlayer )
 		return;
 
-	if ( pPlayer->m_bFlashlightOn || pPlayer->m_iBatteryCount != m_iBatteryCount )
+	if ( pPlayer->m_bFlashlightOn || pPlayer->m_iUHBatteryCount != m_iBatteryCount )
 	{
 		m_iAlpha = 255;
 	}
@@ -82,7 +82,7 @@ void CHudUHBattery::OnThink( void )
 		m_iAlpha = max( 0, m_iAlpha - 5 );
 	}
 
-	m_iBatteryCount = pPlayer->m_iBatteryCount;
+	m_iBatteryCount = pPlayer->m_iUHBatteryCount;
 }
 
 //-----------------------------------------------------------------------------

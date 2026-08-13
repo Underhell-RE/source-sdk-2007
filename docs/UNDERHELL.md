@@ -108,6 +108,7 @@ Full classname list: `FGD/Item List.txt` (food, ammo, equipment, health) + `Weap
 | 15 | fix(client) | bars hidden without suit; inventory not suit-gated; toggle debounce per-frame |
 | 16 | feat(client) | CHudUHBattery (contour + charge + count) + CHudBleeding |
 | 17 | feat(server) | bleeding system + passive hunger decay |
+| 18 | feat(client) | CHudUHHermitCards (deck icon + count + quest progress) |
 
 ## Progress
 
@@ -265,6 +266,24 @@ From scripts/HudLayout.res / decompile:
   Bleeding cannot take the last HP (original sends "kill" at health 0).
 - Passive hunger decay: endurance drains (0.2 - health * 0.000875) per second,
   applied in whole points — so hunger falls faster at lower health.
+
+## Hermit cards HUD (stage 18)
+
+From scripts/HudLayout.res + decompile:
+
+- **HudUHHermitCards** (xpos r124 ypos 16 wide 128 tall 100): contour sprite
+  `sprites/hud/hud_hermitcards` (contourx 34 contoury 10 contourwide 78
+  contourtall 54), the collected count printed as "<N>/52" (text1x 78 text1y
+  30, HudNumbers font), and — while a quest is active — quest progress
+  "   <cur>/<total>" (text2x 10 text2y 30). Paint sub_100BD080.
+- Visibility (think sub_100BCFA0): appears when `m_iUHHermitCardsCount` or
+  `m_bDisplayHermitCard` changes, fades out ~3 s after the last change. The
+  deck icon therefore only appears once the first card is collected.
+- Server (sub_102E1B60): the counters are copied from game stats
+  `GC_HermitCards` / `GC_HermitQuest_Total` / `GC_HermitQuest_Current` into
+  the networked fields; `m_bDisplayHermitCard` flips true once cards exist.
+  The Underhell game-stats system is not ported, so the port exposes
+  `CHL2_Player::UH_SetHermitCards()` + a `uh_give_hermit_card` cheat instead.
 
 ## Pickup / item_random decode (from RTTI + datamap blob + vtables)
 

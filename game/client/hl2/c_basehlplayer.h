@@ -68,12 +68,12 @@ public:
 	// Underhell flags/counters (networked, see DT_HL2_Player recv table).
 	bool						m_bShoulderFlashlight;				// shoulder-mounted flashlight fitted
 	bool						m_bFlashlightOn;					// inventory flashlight state
-	bool						m_bDisplayHermitCard;				// TODO: hermit card system
-	bool						m_bInventoryEnabled;				// inventory system enabled
+	bool							m_bDisplayHermitCard;				// hermit card deck shown
+	bool							m_bInventoryEnabled;				// inventory system enabled
 	int								m_iUHBatteryCount;					// battery items held
-	int								m_iUHHermitCardsCount;				// TODO: hermit card system
-	int								m_iUHHermitCurrentQuestCount;		// TODO: hermit card system
-	int								m_iUHHermitTotalQuestCount;			// TODO: hermit card system
+	int								m_iUHHermitCardsCount;				// collected hermit cards
+	int								m_iUHHermitCurrentQuestCount;		// current hermit quest progress
+	int								m_iUHHermitTotalQuestCount;			// total hermit quest progress
 
 	// Underhell endurance / hunger state (networked; drawn by CHudEndurance).
 	int								m_iEndurance;						// "hunger" meter, 0..100

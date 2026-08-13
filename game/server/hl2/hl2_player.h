@@ -358,6 +358,28 @@ public:
 	void				UH_UpdateBleeding( void );
 
 	//-----------------------------------------------------------------------------
+	// Underhell hermit-cards quest state. The counters are networked and drawn
+	// by CHudUHHermitCards. The original reads them from the game stats
+	// (GC_HermitCards / GC_HermitQuest_Total / GC_HermitQuest_Current,
+	// sub_102E1B60) — that stat system is not yet ported, so map logic drives
+	// these directly via UH_SetHermitCards.
+	//-----------------------------------------------------------------------------
+	void				UH_SetHermitCards( int iCards, int iQuestCurrent, int iQuestTotal )
+	{
+		m_iUHHermitCardsCount = iCards;
+		m_iUHHermitCurrentQuestCount = iQuestCurrent;
+		m_iUHHermitTotalQuestCount = iQuestTotal;
+
+		// First card collected -> show the deck icon.
+		if ( iCards > 0 )
+		{
+			m_bDisplayHermitCard = true;
+		}
+	}
+
+	int					UH_GetHermitCardsCount( void ) const { return m_iUHHermitCardsCount; }
+
+	//-----------------------------------------------------------------------------
 	// Underhell flashlight battery state. The flashlight runs on discrete
 	// batteries (m_iUHBatteryCount) rather than suit power.
 	//-----------------------------------------------------------------------------

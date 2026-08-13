@@ -289,6 +289,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\hud_hermitcards.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\shared\underhell\uh_inventory.cpp"
 					>
 				</File>
@@ -310,6 +314,10 @@
 				</File>
 				<File
 					RelativePath=".\underhell\hud_bleeding.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_hermitcards.h"
 					>
 				</File>
 				<File
