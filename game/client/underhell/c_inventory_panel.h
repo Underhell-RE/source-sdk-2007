@@ -98,6 +98,7 @@ private:
 	vgui::ImagePanel		*m_pBackground;
 	bool					m_bNeedsRefresh;
 	int						m_iSelectedSlot;	// original this[139]
+	float					m_flLastToggleTime;
 };
 
 CInventoryPanel *GetInventoryPanel( void );

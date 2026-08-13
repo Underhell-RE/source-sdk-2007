@@ -10,10 +10,11 @@
 //                              sub_10130D00 (LMB=107 NewSelection, RMB=108 menu),
 //                              sub_10130DC0 (menu -> useitem/dropitem %i),
 //                              sub_10130ED0 (LMB useitem — treated as double-click)
-//   * layout                 — 1024x512 Inventory.vtf at native pixels (the .res
-//                              size). Slots 28x28, origin (44,119), pitch 37,
-//                              column-major. Do NOT SetProportional — that blows
-//                              the 1024x512 art past the screen (height/480).
+//   * layout                 — 1024x512 Inventory.vtf at native pixels.
+//                              Grid is 6 columns x 4 rows (outer v34=0..5 is X,
+//                              inner i=0..3 is Y, v1+=6 walks down a column).
+//                              Slot index = row*6 + col, so items 0..5 fill
+//                              left-to-right. Origin (44,119), pitch 37, 28x28.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -89,8 +90,8 @@ static const UHInventorySlotInfo_t s_InventorySlotInfo[UH_INVENTORY_ITEM_TABLE_S
 #define UH_SLOT_PITCH		37
 #define UH_SLOT_ORIGIN_X	44
 #define UH_SLOT_ORIGIN_Y	119
-#define UH_SLOT_COLS		4
-#define UH_SLOT_ROWS		6
+#define UH_SLOT_COLS		6		// outer loop v34 < 6 — X
+#define UH_SLOT_ROWS		4		// inner loop i < 4  — Y
 
 // Extra slots 24..27, order of the four SetPos calls after the grid loop.
 static const int s_nExtraSlotPos[4][2] =
@@ -304,6 +305,7 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 
 	m_iSelectedSlot = -1;
 	m_bNeedsRefresh = true;
+	m_flLastToggleTime = -1.0f;
 
 	SetVisible( false );
 	SetEnabled( true );
@@ -315,6 +317,7 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 	SetMaximizeButtonVisible( false );
 	// NOT proportional — the .res / Inventory.vtf is 1024x512 pixels.
 	SetProportional( false );
+	SetPaintBorderEnabled( false );
 
 	m_pBackground = new vgui::ImagePanel( this, "InventoryBackground" );
 	m_pBackground->SetImage( UH_INV_BG );
@@ -365,12 +368,14 @@ CInventoryPanel::~CInventoryPanel( void )
 
 void CInventoryPanel::LayoutSlots( void )
 {
-	// Pixel layout matching the 1024x512 Inventory.vtf.
+	// sub_1012E360: outer v34 = column 0..5, inner i = row 0..3, v1 += 6.
+	// Row-major index (row*6 + col) so pickup order fills left-to-right
+	// across the wide Inventory.vtf, not down a column.
 	for ( int iRow = 0; iRow < UH_SLOT_ROWS; ++iRow )
 	{
 		for ( int iCol = 0; iCol < UH_SLOT_COLS; ++iCol )
 		{
-			const int iSlot = iRow + iCol * UH_SLOT_ROWS;
+			const int iSlot = iRow * UH_SLOT_COLS + iCol;
 			m_pSlots[iSlot]->SetShouldScaleImage( true );
 			m_pSlots[iSlot]->SetSize( UH_SLOT_SIZE, UH_SLOT_SIZE );
 			m_pSlots[iSlot]->SetPos( UH_SLOT_ORIGIN_X + iCol * UH_SLOT_PITCH,
@@ -413,21 +418,17 @@ void CInventoryPanel::PaintBackground( void )
 
 void CInventoryPanel::OnKeyCodePressed( vgui::KeyCode code )
 {
-	if ( code == (vgui::KeyCode)KEY_ESCAPE ||
-		 code == (vgui::KeyCode)KEY_I )
-	{
-		Toggle();
-		return;
-	}
-
+	// Do not Toggle here — OnKeyCodeTyped also fires for the same key,
+	// and cl_inventoryToggle may fire too. One I would flip twice.
 	BaseClass::OnKeyCodePressed( code );
 }
 
 void CInventoryPanel::OnKeyCodeTyped( vgui::KeyCode code )
 {
-	if ( code == KEY_ESCAPE || code == KEY_I )
+	if ( code == KEY_ESCAPE )
 	{
-		Toggle();
+		if ( IsVisible() )
+			Toggle();
 		return;
 	}
 
@@ -507,6 +508,16 @@ void CInventoryPanel::OnThink( void )
 
 void CInventoryPanel::Toggle( void )
 {
+	// Debounce: popup focus means I can hit both this Frame and the
+	// cl_inventoryToggle binding in one press (open+close = stuck open).
+	const float flNow = gpGlobals->curtime;
+	if ( flNow >= 0.0f && m_flLastToggleTime >= 0.0f &&
+		 ( flNow - m_flLastToggleTime ) < 0.20f )
+	{
+		return;
+	}
+	m_flLastToggleTime = flNow;
+
 	if ( IsVisible() )
 	{
 		SetVisible( false );
