@@ -7,19 +7,20 @@
 //   * GiveSign   — same func: find "GiveSignal" and trigger
 //   * SkipScene  — same func: find "Relay_SkipScene" and trigger
 //
+// VMF evidence (uh_prologue_2_d.vmf, added by user):
+//   Display_Objective (logic_relay)
+//     OnTrigger -> MainObjective,ShowMessage
+//   MainObjective (env_message)
+//     messagesound "Underhell.NewObjective"
+//     message set at runtime via logic_auto:
+//       OnMapSpawn MainObjective,SetMessagePriority1,@titles_Prologue.txt_Prologue_2_Objective_A
+//   So the text was not drawn because vanilla CMessage lacks SetMessagePriority1
+//   input — only sound played. Fixed in envmessage.cpp by adding those inputs.
+//
 // Original CLogicRelay trigger path (sub_10180EC0):
 //   if (!m_bDisabled@848 && !m_bWaitForRefire@849)
 //     m_OnTrigger@800.FireOutput(activator, this);
-//     if (spawnflags & SF_REMOVE_ON_FIRE) UTIL_Remove(this);
-//     else if (!(flags & SF_ALLOW_FAST_RETRIGGER))
-//       m_bWaitForRefire=true; AddEvent("EnableRefire", maxDelay+0.001)
-//
-// The Display_Objective relay is placed in every chapter map and its
-// OnTrigger outputs drive the current objective HUD (game_text / env_message
-// titles like #UnderHell_Chapter1_X_Objective_Y). The actual objective
-// strings are stored in CBasePlayer::m_UHObjectives @2676 (0x200 bytes =
-// 8 players * 16 slots * 4 bytes, zeroed in sub_101F77C0, synced in
-// sub_101386C0/sub_10138B60/sub_10139380 via HudText/HudMsg).
+//     ...
 //
 // This file is intentionally separate from uh_player_inventory.cpp for
 // code quality / portability. Inventory stays pure inventory.
@@ -39,6 +40,8 @@
 //   sub_1012BF20(&gEntList, 0, name, 0,0,0,0)  -> FindEntityByName
 //   sub_10180EC0(entity, player)               -> InputTrigger
 // AcceptInput("Trigger") performs the same disabled / wait checks.
+// For robustness we also try Display (game_text) and ShowMessage (env_message)
+// because Display_Objective could be overridden in custom maps.
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_TriggerMapEntity( const char *pszTargetName )
 {
@@ -49,21 +52,35 @@ void CHL2_Player::UH_TriggerMapEntity( const char *pszTargetName )
 	if ( pEnt )
 	{
 		variant_t emptyVariant;
-		// Original passed player in v53[0] as activator. Reproduce by using
-		// this as both activator and caller.
+		// Original passed player in v53[0] as activator.
 		pEnt->AcceptInput( "Trigger", this, this, emptyVariant, 0 );
+		// Fallbacks for direct game_text / env_message usage:
+		pEnt->AcceptInput( "Display", this, this, emptyVariant, 0 );
+		pEnt->AcceptInput( "ShowMessage", this, this, emptyVariant, 0 );
 	}
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: DispObj — display current objective (chapter task).
-// 1:1 from sub_101F11D0:
+// 1:1 from sub_101F11D0 + VMF fix:
 //   v10 = gEntList.FindEntityByName(0, "Display_Objective")
-//   if (v10) InputTrigger(v10, player)
+//   if (v10) InputTrigger(v10, player) -> MainObjective,ShowMessage
+// If Display_Objective relay is missing (custom map), also try MainObjective
+// directly, then fallback to direct HudMessage via UTIL_ShowMessage.
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_DisplayObjective( void )
 {
+	// Primary path: original relay
 	UH_TriggerMapEntity( "Display_Objective" );
+
+	// Secondary: direct MainObjective env_message (as in uh_prologue_2_d.vmf)
+	// This ensures text draws even if relay output was broken.
+	CBaseEntity *pMain = gEntList.FindEntityByName( NULL, "MainObjective" );
+	if ( pMain )
+	{
+		variant_t emptyVariant;
+		pMain->AcceptInput( "ShowMessage", this, this, emptyVariant, 0 );
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -77,22 +94,18 @@ bool CHL2_Player::UH_HandleObjectiveCommand( const CCommand &args )
 
 	if ( !Q_stricmp( pszCommand, "DispObj" ) )
 	{
-		// Reconstructed 1:1 — see header comment above. This is the command
-		// that caused "Unknown command: DispObj" before.
 		UH_DisplayObjective();
 		return true;
 	}
 
 	if ( !Q_stricmp( pszCommand, "GiveSign" ) )
 	{
-		// Original: GiveSign -> GiveSignal
 		UH_TriggerMapEntity( "GiveSignal" );
 		return true;
 	}
 
 	if ( !Q_stricmp( pszCommand, "SkipScene" ) )
 	{
-		// Original: SkipScene -> Relay_SkipScene
 		UH_TriggerMapEntity( "Relay_SkipScene" );
 		return true;
 	}

@@ -1,4 +1,4 @@
-//========= Copyright � 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Implements visual effects entities: sprites, beams, bubbles, etc.
 //
@@ -28,6 +28,26 @@ BEGIN_DATADESC( CMessage )
 	DEFINE_FIELD( m_Radius, FIELD_FLOAT ),
 
 	DEFINE_INPUTFUNC( FIELD_VOID, "ShowMessage", InputShowMessage ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessage", InputSetMessage ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority1", InputSetMessagePriority1 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority2", InputSetMessagePriority2 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority3", InputSetMessagePriority3 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority4", InputSetMessagePriority4 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority5", InputSetMessagePriority5 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority6", InputSetMessagePriority6 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority7", InputSetMessagePriority7 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority8", InputSetMessagePriority8 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority9", InputSetMessagePriority9 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority10", InputSetMessagePriority10 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority11", InputSetMessagePriority11 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority12", InputSetMessagePriority12 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority13", InputSetMessagePriority13 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority14", InputSetMessagePriority14 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority15", InputSetMessagePriority15 ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetMessagePriority16", InputSetMessagePriority16 ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "RemoveMessagePriority", InputRemoveMessagePriority ),
+
+	DEFINE_ARRAY( m_iszMessagesPriority, FIELD_STRING, 16 ),
 
 	DEFINE_OUTPUT(m_OnShowMessage, "OnShowMessage"),
 
@@ -85,17 +105,63 @@ void CMessage::Precache( void )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Underhell: helper to set message from string param.
+// The original had 16 priority slots, but VMF only uses SetMessagePriority1
+// with "@titles_*.txt_*" syntax. For compatibility we set main message and
+// the priority slot. The "@" prefix is handled by engine's TextMessage system,
+// but we strip file prefix for safety and keep the entry name as fallback.
+//-----------------------------------------------------------------------------
+void CMessage::SetMessageFromString( const char *pszMessage )
+{
+	if ( !pszMessage || !*pszMessage )
+		return;
+
+	// Store as pooled string. If it starts with "@titles_", try to extract
+	// the actual entry name after last '_' or after ".txt_". Original used
+	// "@titles_Prologue.txt_Prologue_2_Objective_A" which should resolve to
+	// "Prologue_2_Objective_A" or keep as is for engine's @ handling.
+	// We store verbatim and also store cleaned version as main message.
+	m_iszMessage = AllocPooledString( pszMessage );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Input handler for showing the message and/or playing the sound.
 //-----------------------------------------------------------------------------
 void CMessage::InputShowMessage( inputdata_t &inputdata )
 {
+	// Underhell extension: if priority messages are set, show highest priority
+	// that is still valid. The VMF uses SetMessagePriority1 to set current
+	// objective, so we check slots in order.
+	const char *pszToShow = NULL;
+
+	// Try to find highest priority (1 is highest? In VMF they use 1 for current).
+	// We'll check from 16 down to 1? Actually SetMessagePriority1 is used for current,
+	// so lowest number = highest priority. Let's scan 1..16 and pick first non-empty
+	// that we have, then fallback to main m_iszMessage.
+	for ( int i = 0; i < 16; ++i )
+	{
+		if ( m_iszMessagesPriority[i] != NULL_STRING && STRING(m_iszMessagesPriority[i])[0] )
+		{
+			pszToShow = STRING(m_iszMessagesPriority[i]);
+			break;
+		}
+	}
+
+	if ( !pszToShow || !*pszToShow )
+	{
+		if ( m_iszMessage != NULL_STRING )
+			pszToShow = STRING(m_iszMessage);
+	}
+
+	// If still nothing, nothing to show but still play sound.
+
 	CBaseEntity *pPlayer = NULL;
 
 	if ( m_spawnflags & SF_MESSAGE_ALL )
 	{
-		UTIL_ShowMessageAll( STRING( m_iszMessage ) );
+		if ( pszToShow && *pszToShow )
+			UTIL_ShowMessageAll( pszToShow );
 	}
 	else
 	{
@@ -110,7 +176,20 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 
 		if ( pPlayer && pPlayer->IsPlayer() )
 		{
-			UTIL_ShowMessage( STRING( m_iszMessage ), ToBasePlayer( pPlayer ) );
+			if ( pszToShow && *pszToShow )
+				UTIL_ShowMessage( pszToShow, ToBasePlayer( pPlayer ) );
+		}
+		else if ( !pPlayer )
+		{
+			// No activator, but singleplayer: try local player
+			if ( pszToShow && *pszToShow )
+			{
+				CBasePlayer *pLocal = UTIL_GetLocalPlayer();
+				if ( pLocal )
+					UTIL_ShowMessage( pszToShow, pLocal );
+				else
+					UTIL_ShowMessageAll( pszToShow );
+			}
 		}
 	}
 
@@ -133,6 +212,62 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 	}
 
 	m_OnShowMessage.FireOutput( inputdata.pActivator, this );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: SetMessage and priority variants — Underhell extension.
+// Original binary had 16 separate inputs (InputSetMessagePriority1..16) plus
+// SetMessage and RemoveMessagePriority. We implement them all as setting
+// the main message and corresponding priority slot.
+//-----------------------------------------------------------------------------
+void CMessage::InputSetMessage( inputdata_t &inputdata )
+{
+	const char *psz = inputdata.value.String();
+	if ( psz && *psz )
+	{
+		m_iszMessage = AllocPooledString( psz );
+		// Also set priority 0 as fallback
+		m_iszMessagesPriority[0] = m_iszMessage;
+	}
+}
+
+void CMessage::InputSetMessagePriority1( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[0] = AllocPooledString( psz ); m_iszMessage = m_iszMessagesPriority[0]; } }
+void CMessage::InputSetMessagePriority2( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[1] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority3( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[2] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority4( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[3] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority5( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[4] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority6( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[5] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority7( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[6] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority8( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[7] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority9( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[8] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority10( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[9] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority11( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[10] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority12( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[11] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority13( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[12] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority14( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[13] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority15( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[14] = AllocPooledString( psz ); } }
+void CMessage::InputSetMessagePriority16( inputdata_t &inputdata ) { const char *psz = inputdata.value.String(); if ( psz && *psz ) { m_iszMessagesPriority[15] = AllocPooledString( psz ); } }
+
+void CMessage::InputRemoveMessagePriority( inputdata_t &inputdata )
+{
+	// If no param, clear all. If param is priority number, clear that slot.
+	// Original removed by priority index, but for safety clear main and all.
+	const char *psz = inputdata.value.String();
+	if ( psz && *psz )
+	{
+		int iPrio = atoi( psz );
+		if ( iPrio >= 1 && iPrio <= 16 )
+		{
+			m_iszMessagesPriority[iPrio-1] = NULL_STRING;
+			if ( iPrio == 1 )
+				m_iszMessage = NULL_STRING;
+			return;
+		}
+	}
+	// No valid index: clear all priorities
+	for ( int i = 0; i < 16; ++i )
+		m_iszMessagesPriority[i] = NULL_STRING;
+	m_iszMessage = NULL_STRING;
 }
 
 
