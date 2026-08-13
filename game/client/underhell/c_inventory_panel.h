@@ -2,10 +2,8 @@
 //
 // Purpose: Underhell inventory UI panel.
 //
-// Original: CInventoryPanel, a vgui::Frame loaded from
-// "resource/UI/InventoryPanel.res" (1024x512 at 368,84), holding 28 slot
-// panels — a 4x6 grid plus a row of 4 — refreshed from the local player's
-// replicated m_iInventory.
+// Original: CInventoryPanel : vgui::Frame, 28 vgui::DragnDropSlot children
+// (ImageButton : ImagePanel). Layout from hexrays sub_1012E360.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -17,7 +15,7 @@
 #endif
 
 #include "vgui_controls/Frame.h"
-#include "vgui_controls/Label.h"
+#include "vgui_controls/ImagePanel.h"
 
 #include "underhell/uh_inventory.h"
 
@@ -31,30 +29,19 @@ public:
 };
 
 //-----------------------------------------------------------------------------
-// One inventory slot: 28x28 icon painted straight from the mod's HUD sprite
-// material + a localized label. Drawing bypasses the scheme image lookup —
-// the sprites live under "Sprites/Hud/Items/", not in vgui/.
+// One inventory slot. Original: vgui::DragnDropSlot : ImageButton : ImagePanel.
+// We stand in with ImagePanel (OB SDK has no ImageButton / DragnDropSlot) —
+// same 28x28 scaled sprite, same tooltip text. Drag-drop still TODO.
 //-----------------------------------------------------------------------------
-class CInventorySlotPanel : public vgui::Panel
+class CInventorySlotPanel : public vgui::ImagePanel
 {
-	DECLARE_CLASS_SIMPLE( CInventorySlotPanel, vgui::Panel );
+	DECLARE_CLASS_SIMPLE( CInventorySlotPanel, vgui::ImagePanel );
 
 public:
 	CInventorySlotPanel( vgui::Panel *pParent, const char *pszName );
-	virtual ~CInventorySlotPanel();
-
-	virtual void PerformLayout( void );
-	virtual void PaintBackground( void );
 
 	void SetSlotContents( const char *pszSprite, const char *pszTextToken );
 	void Clear( void );
-	void SetSelected( bool bSelected ) { m_bSelected = bSelected; }
-
-private:
-	const char		*m_pszSprite;	// static table pointer, NULL = nothing to draw
-	vgui::Label		*m_pLabel;
-	int				m_iTextureId;
-	bool			m_bSelected;
 };
 
 //-----------------------------------------------------------------------------
@@ -72,6 +59,8 @@ public:
 	virtual void PaintBackground( void );
 	virtual void OnThink( void );
 	virtual void OnKeyCodePressed( vgui::KeyCode code );
+	virtual void OnKeyCodeTyped( vgui::KeyCode code );
+	virtual void OnClose( void );
 
 	// cl_inventoryToggle — flips visibility and asks the server to resync.
 	void Toggle( void );
@@ -80,16 +69,16 @@ public:
 	void RequestRefresh( void )	{ m_bNeedsRefresh = true; }
 
 private:
+	void LayoutSlots( void );
 	void ClearSlots( void );
 	void RefreshSlots( void );
-	void SetSlot( int iSlot, const char *pszSprite, const char *pszTextToken );
 
 	// Messages the original panel registered (hexrays sub_1012EC80/sub_1012ED20).
 	MESSAGE_FUNC( OnNewSelection, "NewSelection" );
 	MESSAGE_FUNC( OnNewMouseReleased, "NewMouseReleased" );
 
 	CInventorySlotPanel		*m_pSlots[UH_INVENTORY_SLOTS];
-	int						m_iBackgroundTextureId;
+	vgui::ImagePanel		*m_pBackground;
 	bool					m_bNeedsRefresh;
 };
 
