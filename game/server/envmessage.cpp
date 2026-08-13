@@ -306,19 +306,17 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 	}
 
 	// Try to resolve titles file entry for correct color/position (middle bottom etc.)
-	// This is the original Underhell behavior: env_message message is a titles entry
-	// like "House_Comment_Chest" which lives in scripts/titles_House.txt with
-	// positionx/y, color r1/g1/b1, effect, etc., and Message "#UnderHell_House_Comment_Chest"
-	// We load that entry and use its parms for HUD display, to avoid duplicate middle text
-	// and to get the correct color (chest comments are different from objectives).
+	// Original Underhell: env_message message is a titles entry like "House_Comment_Chest"
+	// which lives in scripts/titles_House.txt with positionx/y, color, and Message
+	// "#UnderHell_House_Comment_Chest". We load that entry and use its parms,
+	// so chest comments render in middle bottom with different color as original,
+	// not duplicate in middle.
 	if ( pszToShow && *pszToShow )
 	{
 		hudtextparms_t hparms;
 		char szMessageFromTitles[512];
 		if ( GetTitlesEntry( pszToShow, hparms, szMessageFromTitles, sizeof(szMessageFromTitles) ) )
 		{
-			// Found in titles_*.txt — use its parms and its Message (localization token)
-			// This matches original: text rendered with different color in middle bottom
 			CBaseEntity *pPlayer = NULL;
 			if ( inputdata.pActivator && inputdata.pActivator->IsPlayer() )
 				pPlayer = inputdata.pActivator;
@@ -330,15 +328,13 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 			else
 				UTIL_HudMessageAll( hparms, szMessageFromTitles );
 
-			// Also play sound and fire output, but don't do extra UTIL_ShowMessage to avoid duplicate
 			goto play_sound;
 		}
 	}
 
-	// Fallback: no titles entry found — try vanilla path and localization token fallback
+	// Fallback: vanilla path — no titles entry found, use UTIL_ShowMessage as is
 	{
 		CBaseEntity *pPlayer = NULL;
-		bool bHasPlayer = false;
 
 		if ( m_spawnflags & SF_MESSAGE_ALL )
 		{
@@ -348,15 +344,9 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 		else
 		{
 			if ( inputdata.pActivator && inputdata.pActivator->IsPlayer() )
-			{
 				pPlayer = inputdata.pActivator;
-				bHasPlayer = true;
-			}
 			else
-			{
 				pPlayer = (gpGlobals->maxClients > 1) ? NULL : UTIL_GetLocalPlayer();
-				bHasPlayer = (pPlayer != NULL);
-			}
 
 			if ( pPlayer && pPlayer->IsPlayer() )
 			{
@@ -374,19 +364,6 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 						UTIL_ShowMessageAll( pszToShow );
 				}
 			}
-		}
-
-		// If UTIL_ShowMessage didn't find anything (titles file not loaded), try localization token directly
-		// This ensures at least something shows, matching original where only sound played before fix
-		if ( pszToShow && *pszToShow && pszToShow[0] != '#' )
-		{
-			char szFallback[512];
-			Q_snprintf( szFallback, sizeof(szFallback), "#UnderHell_%s", pszToShow );
-
-			if ( bHasPlayer && pPlayer )
-				ClientPrint( ToBasePlayer(pPlayer), HUD_PRINTCENTER, szFallback );
-			else
-				UTIL_ClientPrintAll( HUD_PRINTCENTER, szFallback );
 		}
 	}
 
