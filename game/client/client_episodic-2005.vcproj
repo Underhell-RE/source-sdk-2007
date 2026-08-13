@@ -265,6 +265,26 @@
 		<Filter
 			Name="Source Files"
 			>
+			<Filter
+				Name="underhell"
+				>
+				<File
+					RelativePath=".\underhell\c_inventory_panel.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\underhell\uh_inventory.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\c_inventory_panel.h"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\underhell\uh_inventory.h"
+					>
+				</File>
+			</Filter>
 			<File
 				RelativePath=".\achievement_notification_panel.cpp"
 				>
