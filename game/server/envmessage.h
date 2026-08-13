@@ -55,6 +55,7 @@ private:
 
 	void SetMessageFromString( const char *pszMessage );
 	const char *ParseTitlesReference( const char *pszInput, char *outBuf, int outBufSize );
+	bool GetTitlesEntry( const char *pszEntryName, hudtextparms_t &outParms, char *outMessage, int outMessageSize );
 
 	string_t m_iszMessage;		// Message to display.
 	float m_MessageVolume;

@@ -157,6 +157,116 @@ const char *CMessage::ParseTitlesReference( const char *pszInput, char *outBuf, 
 	return pszInput;
 }
 
+// Tries to find a titles entry in scripts/titles_*.txt files.
+// Returns true if found and fills outParms and outMessage (which is the
+// localization token like "#UnderHell_House_Comment_Chest" or the raw message).
+// This replicates original Underhell's handling of @titles_*.txt_* references
+// and ensures correct color/position (middle bottom for chest comments vs
+// middle for objectives). Uses filesystem and KeyValues parser.
+bool CMessage::GetTitlesEntry( const char *pszEntryName, hudtextparms_t &outParms, char *outMessage, int outMessageSize )
+{
+	if ( !pszEntryName || !*pszEntryName )
+		return false;
+
+	// List of known titles files from Underhell (from scripts/ folder)
+	const char *pszFiles[] =
+	{
+		"titles.txt",
+		"titles_Prologue.txt",
+		"titles_House.txt",
+		"titles_Chapter1.txt",
+		"titles_Chapter1.txt", // duplicate for safety, engine also loads mod-specific
+		NULL
+	};
+
+	// Default parms (if not found in file, use objective style)
+	Q_memset( &outParms, 0, sizeof(outParms) );
+	outParms.channel = 1;
+	outParms.x = -1;
+	outParms.y = -1;
+	outParms.effect = 0;
+	outParms.r1 = 255; outParms.g1 = 255; outParms.b1 = 255; outParms.a1 = 255;
+	outParms.r2 = 255; outParms.g2 = 255; outParms.b2 = 255; outParms.a2 = 255;
+	outParms.fadeinTime = 0;
+	outParms.fadeoutTime = 0;
+	outParms.holdTime = 5.0f;
+	outParms.fxTime = 0;
+
+	for ( int i = 0; pszFiles[i]; ++i )
+	{
+		char szPath[256];
+		Q_snprintf( szPath, sizeof(szPath), "scripts/%s", pszFiles[i] );
+
+		// Try to load via filesystem (MOD then GAME)
+		KeyValues *pKV = new KeyValues( pszFiles[i] );
+		bool bLoaded = pKV->LoadFromFile( filesystem, szPath, "MOD" );
+		if ( !bLoaded )
+			bLoaded = pKV->LoadFromFile( filesystem, szPath, "GAME" );
+
+		if ( !bLoaded )
+		{
+			pKV->deleteThis();
+			continue;
+		}
+
+		// Titles files have entries as subkeys at root level
+		// Each entry like "House_Comment_Chest" { "positionx" "0.1" ... "Message" "#UnderHell_..." }
+		KeyValues *pEntry = pKV->FindKey( pszEntryName );
+		if ( !pEntry )
+		{
+			// Some files have an extra top-level wrapper (file name as root)?
+			// Try to find case-insensitive?
+			for ( KeyValues *pSub = pKV->GetFirstSubKey(); pSub; pSub = pSub->GetNextKey() )
+			{
+				if ( !Q_stricmp( pSub->GetName(), pszEntryName ) )
+				{
+					pEntry = pSub;
+					break;
+				}
+			}
+		}
+
+		if ( pEntry )
+		{
+			// Fill parms from entry
+			outParms.x = pEntry->GetFloat( "positionx", -1.0f );
+			outParms.y = pEntry->GetFloat( "positiony", -1.0f );
+			outParms.effect = pEntry->GetInt( "effect", 0 );
+			outParms.fadeinTime = pEntry->GetFloat( "fadein", 0.0f );
+			outParms.fadeoutTime = pEntry->GetFloat( "fadeout", 0.0f );
+			outParms.holdTime = pEntry->GetFloat( "holdtime", 3.0f );
+			outParms.fxTime = pEntry->GetFloat( "fxtime", 0.25f );
+			outParms.r1 = pEntry->GetInt( "r1", 255 );
+			outParms.g1 = pEntry->GetInt( "g1", 255 );
+			outParms.b1 = pEntry->GetInt( "b1", 255 );
+			outParms.a1 = pEntry->GetInt( "a1", 255 );
+			outParms.r2 = pEntry->GetInt( "r2", 255 );
+			outParms.g2 = pEntry->GetInt( "g2", 255 );
+			outParms.b2 = pEntry->GetInt( "b2", 255 );
+			outParms.a2 = pEntry->GetInt( "a2", 255 );
+			outParms.channel = pEntry->GetInt( "channel", 1 );
+
+			const char *pszMsg = pEntry->GetString( "Message", "" );
+			if ( pszMsg && *pszMsg )
+			{
+				Q_strncpy( outMessage, pszMsg, outMessageSize );
+			}
+			else
+			{
+				// No Message field — use entry name as fallback
+				Q_strncpy( outMessage, pszEntryName, outMessageSize );
+			}
+
+			pKV->deleteThis();
+			return true;
+		}
+
+		pKV->deleteThis();
+	}
+
+	return false;
+}
+
 void CMessage::SetMessageFromString( const char *pszMessage )
 {
 	if ( !pszMessage || !*pszMessage )
@@ -195,105 +305,92 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 			pszToShow = STRING(m_iszMessage);
 	}
 
-	CBaseEntity *pPlayer = NULL;
-	bool bHasPlayer = false;
-
-	if ( m_spawnflags & SF_MESSAGE_ALL )
-	{
-		if ( pszToShow && *pszToShow )
-			UTIL_ShowMessageAll( pszToShow );
-	}
-	else
-	{
-		if ( inputdata.pActivator && inputdata.pActivator->IsPlayer() )
-		{
-			pPlayer = inputdata.pActivator;
-			bHasPlayer = true;
-		}
-		else
-		{
-			pPlayer = (gpGlobals->maxClients > 1) ? NULL : UTIL_GetLocalPlayer();
-			bHasPlayer = (pPlayer != NULL);
-		}
-
-		if ( pPlayer && pPlayer->IsPlayer() )
-		{
-			if ( pszToShow && *pszToShow )
-				UTIL_ShowMessage( pszToShow, ToBasePlayer( pPlayer ) );
-		}
-		else if ( !pPlayer )
-		{
-			if ( pszToShow && *pszToShow )
-			{
-				CBasePlayer *pLocal = UTIL_GetLocalPlayer();
-				if ( pLocal )
-					UTIL_ShowMessage( pszToShow, pLocal );
-				else
-					UTIL_ShowMessageAll( pszToShow );
-			}
-		}
-	}
-
-	// Fallback for Underhell: if TextMessageGet fails (titles_*.txt not loaded),
-	// try to show localization token directly via center print. The titles entry
-	// Prologue_2_Objective_A has Message "#UnderHell_Prologue_2_Objective_A" which
-	// is in Underhell_english.txt. We construct "#UnderHell_<entry>" and send as
-	// TextMsg so client localizes it. This ensures text renders even without
-	// titles file loading, matching original behavior where sound played but
-	// text didn't (user report).
+	// Try to resolve titles file entry for correct color/position (middle bottom etc.)
+	// This is the original Underhell behavior: env_message message is a titles entry
+	// like "House_Comment_Chest" which lives in scripts/titles_House.txt with
+	// positionx/y, color r1/g1/b1, effect, etc., and Message "#UnderHell_House_Comment_Chest"
+	// We load that entry and use its parms for HUD display, to avoid duplicate middle text
+	// and to get the correct color (chest comments are different from objectives).
 	if ( pszToShow && *pszToShow )
 	{
-		// If pszToShow is already a localization token starting with #, keep it
-		// Otherwise try to build Underhell token
-		char szFallback[512];
-		if ( pszToShow[0] == '#' )
+		hudtextparms_t hparms;
+		char szMessageFromTitles[512];
+		if ( GetTitlesEntry( pszToShow, hparms, szMessageFromTitles, sizeof(szMessageFromTitles) ) )
 		{
-			Q_strncpy( szFallback, pszToShow, sizeof(szFallback) );
-		}
-		else
-		{
-			// Try #UnderHell_<entry> and also #<entry>
-			// First try exact entry as localization? Actually most objectives are
-			// UnderHell_<entry>
-			Q_snprintf( szFallback, sizeof(szFallback), "#UnderHell_%s", pszToShow );
-		}
-
-		// Send as center print and as HudMessage fallback — both will be localized
-		// by client if token exists in Underhell_english.txt
-		if ( bHasPlayer && pPlayer )
-		{
-			ClientPrint( ToBasePlayer(pPlayer), HUD_PRINTCENTER, szFallback );
-		}
-		else
-		{
-			UTIL_ClientPrintAll( HUD_PRINTCENTER, szFallback );
-		}
-
-		// Also try direct HUD message with the fallback token using game_text style
-		// In case TextMsg center print is not enough, also show via HudMessage with default parms
-		// This mirrors original sub_10139380 which used HudText (sub_1025F270) and sound.
-		{
-			hudtextparms_t hparms;
-			hparms.channel = 1;
-			hparms.x = 0.1f;
-			hparms.y = 0.1f;
-			hparms.effect = 2;
-			hparms.r1 = 165; hparms.g1 = 155; hparms.b1 = 30; hparms.a1 = 0;
-			hparms.r2 = 255; hparms.g2 = 245; hparms.b2 = 115; hparms.a2 = 0;
-			hparms.fadeinTime = 0.007f;
-			hparms.fadeoutTime = 0.5f;
-			hparms.holdTime = 3.5f;
-			hparms.fxTime = 0.25f;
-
-			// Try to get localized string directly via TextMessageGet for fallback token?
-			// If not found, UTIL_HudMessage will still show raw token which vgui will localize.
-			if ( pPlayer && pPlayer->IsPlayer() )
-				UTIL_HudMessage( ToBasePlayer(pPlayer), hparms, szFallback );
+			// Found in titles_*.txt — use its parms and its Message (localization token)
+			// This matches original: text rendered with different color in middle bottom
+			CBaseEntity *pPlayer = NULL;
+			if ( inputdata.pActivator && inputdata.pActivator->IsPlayer() )
+				pPlayer = inputdata.pActivator;
 			else
-				UTIL_HudMessageAll( hparms, szFallback );
+				pPlayer = (gpGlobals->maxClients > 1) ? NULL : UTIL_GetLocalPlayer();
+
+			if ( pPlayer && pPlayer->IsPlayer() )
+				UTIL_HudMessage( ToBasePlayer(pPlayer), hparms, szMessageFromTitles );
+			else
+				UTIL_HudMessageAll( hparms, szMessageFromTitles );
+
+			// Also play sound and fire output, but don't do extra UTIL_ShowMessage to avoid duplicate
+			goto play_sound;
 		}
 	}
 
+	// Fallback: no titles entry found — try vanilla path and localization token fallback
+	{
+		CBaseEntity *pPlayer = NULL;
+		bool bHasPlayer = false;
+
+		if ( m_spawnflags & SF_MESSAGE_ALL )
+		{
+			if ( pszToShow && *pszToShow )
+				UTIL_ShowMessageAll( pszToShow );
+		}
+		else
+		{
+			if ( inputdata.pActivator && inputdata.pActivator->IsPlayer() )
+			{
+				pPlayer = inputdata.pActivator;
+				bHasPlayer = true;
+			}
+			else
+			{
+				pPlayer = (gpGlobals->maxClients > 1) ? NULL : UTIL_GetLocalPlayer();
+				bHasPlayer = (pPlayer != NULL);
+			}
+
+			if ( pPlayer && pPlayer->IsPlayer() )
+			{
+				if ( pszToShow && *pszToShow )
+					UTIL_ShowMessage( pszToShow, ToBasePlayer( pPlayer ) );
+			}
+			else if ( !pPlayer )
+			{
+				if ( pszToShow && *pszToShow )
+				{
+					CBasePlayer *pLocal = UTIL_GetLocalPlayer();
+					if ( pLocal )
+						UTIL_ShowMessage( pszToShow, pLocal );
+					else
+						UTIL_ShowMessageAll( pszToShow );
+				}
+			}
+		}
+
+		// If UTIL_ShowMessage didn't find anything (titles file not loaded), try localization token directly
+		// This ensures at least something shows, matching original where only sound played before fix
+		if ( pszToShow && *pszToShow && pszToShow[0] != '#' )
+		{
+			char szFallback[512];
+			Q_snprintf( szFallback, sizeof(szFallback), "#UnderHell_%s", pszToShow );
+
+			if ( bHasPlayer && pPlayer )
+				ClientPrint( ToBasePlayer(pPlayer), HUD_PRINTCENTER, szFallback );
+			else
+				UTIL_ClientPrintAll( HUD_PRINTCENTER, szFallback );
+		}
+	}
+
+play_sound:
 	if ( m_sNoise != NULL_STRING )
 	{
 		CPASAttenuationFilter filter( this );
