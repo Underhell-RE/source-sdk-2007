@@ -136,7 +136,7 @@ Next stage: item pickup flow (`CUHItem::MyTouch` → `UH_AddInventoryItem`), per
 - Item Spawn details: apple skin random 0/1 (red/green) picks the inventory
   id on pickup; soda skin picks flavour; armour gates on armour < 100 and
   grants 10 (TODO-verify); bandages gate on hurt/bleeding.
-- Vanilla items stay vanilla (CItemBattery/CHealthKit/... untouched).
+- Vanilla items stay vanilla (CItemBattery/CHealthKit/CItemSoda/item_sodacan/... untouched). Inventory sodas are item_uhsoda.
 
 ## RTTI + vtable validation (from original binaries)
 
