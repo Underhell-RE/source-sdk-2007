@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Implements health kits and wall mounted health chargers.
 //
@@ -32,7 +32,9 @@ public:
 	bool MyTouch( CBasePlayer *pPlayer );
 };
 
-LINK_ENTITY_TO_CLASS( item_healthkit, CHealthKit );
+// UH: item_healthkit is replaced by the Underhell inventory item
+// (game/server/underhell/uh_items.cpp, CUHItemHealthKit).
+// LINK_ENTITY_TO_CLASS( item_healthkit, CHealthKit );
 PRECACHE_REGISTER(item_healthkit);
 
 
@@ -147,7 +149,9 @@ public:
 	}
 };
 
-LINK_ENTITY_TO_CLASS( item_healthvial, CHealthVial );
+// UH: item_healthvial is replaced by the Underhell inventory item
+// (game/server/underhell/uh_items.cpp, CUHItemHealthVial).
+// LINK_ENTITY_TO_CLASS( item_healthvial, CHealthVial );
 PRECACHE_REGISTER( item_healthvial );
 
 //-----------------------------------------------------------------------------

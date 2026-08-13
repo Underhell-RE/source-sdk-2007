@@ -47,72 +47,72 @@ public:
 //-----------------------------------------------------------------------------
 // Food
 //-----------------------------------------------------------------------------
-UH_DECLARE_ITEM( CItemApple,			UH_ITEM_APPLE_RED )
-UH_DECLARE_ITEM( CItemOrange,			UH_ITEM_ORANGE )
-UH_DECLARE_ITEM( CItemBanana,			UH_ITEM_BANANA )
-UH_DECLARE_ITEM( CItemBananaBunch,		UH_ITEM_BANANA_BUNCH )
-UH_DECLARE_ITEM( CItemSandwich,			UH_ITEM_SANDWICH )
-UH_DECLARE_ITEM( CItemChocobar,			UH_ITEM_CHOCOBAR )
-UH_DECLARE_ITEM( CItemBurrito,			UH_ITEM_BURRITO )
-UH_DECLARE_ITEM( CItemUHSoda,			UH_ITEM_SODA_FIRST )
+UH_DECLARE_ITEM( CUHItemApple,			UH_ITEM_APPLE_RED )
+UH_DECLARE_ITEM( CUHItemOrange,			UH_ITEM_ORANGE )
+UH_DECLARE_ITEM( CUHItemBanana,			UH_ITEM_BANANA )
+UH_DECLARE_ITEM( CUHItemBananaBunch,		UH_ITEM_BANANA_BUNCH )
+UH_DECLARE_ITEM( CUHItemSandwich,			UH_ITEM_SANDWICH )
+UH_DECLARE_ITEM( CUHItemChocobar,			UH_ITEM_CHOCOBAR )
+UH_DECLARE_ITEM( CUHItemBurrito,			UH_ITEM_BURRITO )
+UH_DECLARE_ITEM( CUHItemUHSoda,			UH_ITEM_SODA_FIRST )
 
 //-----------------------------------------------------------------------------
 // Ammo — boxed and loose rounds.
 //-----------------------------------------------------------------------------
-UH_DECLARE_ITEM( CItemAmmoPistol,		UH_ITEM_UNKNOWN )	// TODO: ammo ids — original uses a separate ammo namespace
-UH_DECLARE_ITEM( CItemAmmoPistolLarge,	UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemBoxPistolAmmo,	UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemAmmo357,			UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemAmmo357Large,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemBox357Ammo,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemAmmoSMG1,			UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemAmmoSMG1Large,	UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemAmmoSMG1Grenade,	UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemBoxSMG1Ammo,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemAmmoBuckshot,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemBoxBuckshot,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemAmmoAR2,			UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemAmmoAR2Large,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemAmmoAR2AltFire,	UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemBoxRifleAmmo,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemRPGRound,			UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemAmmoCrossbow,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmoPistol,		UH_ITEM_UNKNOWN )	// TODO: ammo ids — original uses a separate ammo namespace
+UH_DECLARE_ITEM( CUHItemAmmoPistolLarge,	UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemBoxPistolAmmo,	UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmo357,			UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmo357Large,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemBox357Ammo,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmoSMG1,			UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmoSMG1Large,	UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmoSMG1Grenade,	UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemBoxSMG1Ammo,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmoBuckshot,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemBoxBuckshot,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmoAR2,			UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmoAR2Large,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmoAR2AltFire,	UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemBoxRifleAmmo,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemRPGRound,			UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemAmmoCrossbow,		UH_ITEM_UNKNOWN )
 
 //-----------------------------------------------------------------------------
 // Equipment
 //-----------------------------------------------------------------------------
-UH_DECLARE_ITEM( CItemBattery,			UH_ITEM_UNKNOWN )	// TODO: equipment ids
-UH_DECLARE_ITEM( CItemBatteryPack,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemArmor,			UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemHeavyArmor,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemFlashlight,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemNightvision,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemGasmask,			UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemHelmetGuard,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemHelmetPrison,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemHelmetPMC,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemHelmetWorker,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItemFlarePack,		UH_ITEM_FLARE_PACK )
-UH_DECLARE_ITEM( CItemGlowstick,		UH_ITEM_GLOWSTICK_FIRST )
-UH_DECLARE_ITEM( CItemFMRadio,			UH_ITEM_FM_RADIO )
-UH_DECLARE_ITEM( CItemRadioCracker,		UH_ITEM_RADIO_CRACKER )
+UH_DECLARE_ITEM( CUHItemBattery,			UH_ITEM_UNKNOWN )	// TODO: equipment ids
+UH_DECLARE_ITEM( CUHItemBatteryPack,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemArmor,			UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemHeavyArmor,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemFlashlight,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemNightvision,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemGasmask,			UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemHelmetGuard,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemHelmetPrison,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemHelmetPMC,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemHelmetWorker,		UH_ITEM_UNKNOWN )
+UH_DECLARE_ITEM( CUHItemFlarePack,		UH_ITEM_FLARE_PACK )
+UH_DECLARE_ITEM( CUHItemGlowstick,		UH_ITEM_GLOWSTICK_FIRST )
+UH_DECLARE_ITEM( CUHItemFMRadio,			UH_ITEM_FM_RADIO )
+UH_DECLARE_ITEM( CUHItemRadioCracker,		UH_ITEM_RADIO_CRACKER )
 
 //-----------------------------------------------------------------------------
 // Health
 //-----------------------------------------------------------------------------
-UH_DECLARE_ITEM( CItemHealthKit,			UH_ITEM_HEALTHKIT )
-UH_DECLARE_ITEM( CItemHealthVial,			UH_ITEM_HEALTH_VIAL )
-UH_DECLARE_ITEM( CItemBandages,				UH_ITEM_BANDAGES )
-UH_DECLARE_ITEM( CItemPainkillers,			UH_ITEM_PAINKILLERS )
-UH_DECLARE_ITEM( CItemSyringe,				UH_ITEM_SYRINGE )
+UH_DECLARE_ITEM( CUHItemHealthKit,			UH_ITEM_HEALTHKIT )
+UH_DECLARE_ITEM( CUHItemHealthVial,			UH_ITEM_HEALTH_VIAL )
+UH_DECLARE_ITEM( CUHItemBandages,				UH_ITEM_BANDAGES )
+UH_DECLARE_ITEM( CUHItemPainkillers,			UH_ITEM_PAINKILLERS )
+UH_DECLARE_ITEM( CUHItemSyringe,				UH_ITEM_SYRINGE )
 
 //-----------------------------------------------------------------------------
 // item_random — spawns a random item from the fixed pool.
 //-----------------------------------------------------------------------------
-class CItemRandom : public CUHItem
+class CUHItemRandom : public CUHItem
 {
 public:
-	DECLARE_CLASS( CItemRandom, CUHItem );
+	DECLARE_CLASS( CUHItemRandom, CUHItem );
 
 	virtual void Spawn( void );
 	virtual void Precache( void );

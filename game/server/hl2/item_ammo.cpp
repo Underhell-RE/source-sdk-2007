@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: The various ammo types for HL2	
 //
@@ -447,7 +447,9 @@ public:
 	}
 };
 LINK_ENTITY_TO_CLASS( item_ml_grenade, CItem_RPG_Round );
-LINK_ENTITY_TO_CLASS( item_rpg_round, CItem_RPG_Round );
+// UH: item_rpg_round is replaced by the Underhell inventory item
+// (game/server/underhell/uh_items.cpp, CUHItemRPGRound).
+// LINK_ENTITY_TO_CLASS( item_rpg_round, CItem_RPG_Round );
 
 // ========================================================================
 //	>> AR2_Grenade
@@ -587,7 +589,9 @@ public:
 	}
 };
 
-LINK_ENTITY_TO_CLASS( item_ammo_ar2_altfire, CItem_AR2AltFireRound );
+// UH: item_ammo_ar2_altfire is replaced by the Underhell inventory item
+// (game/server/underhell/uh_items.cpp, CUHItemAmmoAR2AltFire).
+// LINK_ENTITY_TO_CLASS( item_ammo_ar2_altfire, CItem_AR2AltFireRound );
 
 // ==================================================================
 // Ammo crate which will supply infinite ammo of the specified type

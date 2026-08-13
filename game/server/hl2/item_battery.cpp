@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Handling for the suit batteries.
 //
@@ -40,6 +40,8 @@ public:
 	}
 };
 
-LINK_ENTITY_TO_CLASS(item_battery, CItemBattery);
+// UH: item_battery is replaced by the Underhell inventory item
+// (game/server/underhell/uh_items.cpp, CUHItemBattery).
+// LINK_ENTITY_TO_CLASS(item_battery, CItemBattery);
 PRECACHE_REGISTER(item_battery);
 
