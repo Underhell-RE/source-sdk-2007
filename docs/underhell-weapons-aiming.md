@@ -166,7 +166,7 @@ this+1832 MeleeWeapon, this+1833 BuiltRightHanded, this+1834 AllowFlipping, this
 | `client/sub_100BC870` | вычисляет free-aim смещение из мыши/вида и шлёт `update_freeaim %f %f %f` на сервер |
 | `client/sub_102B85xx` | ConVar'ы `cam_ots_freeaim_enable` (1), `_interval_enable` (0), `_move_threshold` (0.05), `_move_max` (0.1), `_speed_turn` (1), `_speed_evenYawSpeed` (0), `_autoturn_speed` (250) |
 | `server/sub_101F11D0` | обработчик `update_freeaim` — кладёт 3 float в игрока |
-| `server/sub_101F1D70` | отдаёт free-aim смещение стрельбе, клампы: pitch ±25°, yaw ±12° |
+| `server/sub_101F1D70` | отдаёт направление стрельбе: при включённом free-aim берёт 3 float клиента **как вектор направления** без изменений; в ветке с выключенным free-aim клампит eye-углы (pitch ±25°, yaw ±12°) |
 
 Семантика: **в бедре оружие уходит от центра экрана** (мышь двигает свободный прицел, оружие
 авто-возвращается к центру с `autoturn_speed`), **в прицеле — фиксируется на центр**. Именно это
@@ -177,18 +177,35 @@ Underhell, а не баг.
 first-person):
 - `game/client/in_camera.cpp` — ConVar'ы `cam_ots_freeaim_*` (дефолты из оригинальных DLL),
   состояние курсора в `CInput` (`m_vecFreeAimPos`), `CAM_IsFreeAiming`, `CAM_GetFreeAimCursor`,
-  `CAM_FreeAimDecay`, `TryCursorMove` (накопление + поворот вида за мёртвую зону).
+  `TryCursorMove` (движение курсора + поворот вида за мёртвую зону). **Единственная** регистрация
+  ConVar'ов free-aim — в этом файле.
 - `game/client/in_mouse.cpp` — `MouseMove` использует `TryCursorMove` вместо `ApplyMouse`,
   когда free-aim активен.
-- `game/client/episodic/uh_freeaim_client.cpp` — `UH_FreeAim_GetOffset()` (угол от центра экрана
-  к курсору = `cursor × FOV/2`).
+- `game/client/episodic/uh_freeaim_client.cpp` — `UH_FreeAim_GetOffset()` — угол от центра экрана
+  к курсору (`cursor × FOV/2`, знаки: `pitch = +cursor.y·FOV/2`, `yaw = −cursor.x·FOV/2`); читает
+  курсор через `CAM_GetFreeAimCursor()`, ConVar'ы — по имени (`ConVarRef`).
 - `game/shared/baseviewmodel_shared.cpp` — смещение углов вьюмодели (`!m_bExpSighted`).
-- `game/client/hl2/c_basehlplayer.cpp` — `UH_FreeAim_SyncToServer()`: decay + сброс при прицеле
-  + отправка `update_freeaim %f %f %f`.
-- `game/server/.../uh_basefirearm.cpp` — сервер доворачивает направление пули по `update_freeaim`.
+- `game/client/hl2/c_basehlplayer.cpp` — `UH_FreeAim_SyncToServer()`: сброс курсора при выключении/
+  прицеле + отправка `update_freeaim %f %f %f`.
+- `game/server/.../uh_basefirearm.cpp` — сервер доворачивает направление пули на полученный угол.
 
-Точную кривую отклика мыши из Hex-Rays не восстановить — использован расчёт из туториала
-(плюс подтверждённые клампы ±25°/±12° из `server/sub_101F1D70`).
+### 2.8.1. Отличия от декомпиляции (честный статус)
+
+- В оригинале клиент шлёт **нормированный мировой вектор** направления на прицел
+  (`ScreenToWorld` курсора, `sub_100BC870`), а сервер использует его напрямую. У нас шлётся
+  эквивалентный **малоугловой оффсет** (`cursor × FOV/2`): при диапазоне курсора `move_max=0.1`
+  (≈±4° при FOV 75) отличие от точного экранного вектора пренебрежимо мало.
+- В декомпе вьюмодель доворачивается к прицелу с коэффициентом 0.25
+  (`v44*0.25+0.5` в `sub_10014D80`), у нас вьюмодель использует тот же полный `cursor × FOV/2`.
+- **Авто-возврат к центру (`autoturn_speed`) пока не реализован**: в туториале он живёт в
+  `CInput::CalcPlayerAngle()` (+ `m_vecFreeAimPos_Delta`/`m_angViewAngle_Delta`), у нас курсор
+  сбрасывается только при выключении free-aim и при прицеливании. `CAM_FreeAimDecay()` —
+  заготовка, не вызывается (её прямая формула гасит курсор за кадр, т.к. `autoturn_speed` в °/с
+  применяется к нормированным координатам курсора без пересчёта).
+- HUD-прицел не двигается за курсором (`hud_crosshair.cpp` не тронут — в туториале это отдельный
+  шаг `CHudCrosshair::Paint`).
+- `cam_ots_TurnAuto`/`cam_ots_Turn180` — заглушки (в оригинале `CAM_UpdateAngleByFreeAiming` /
+  `CAM_UpdateAngle180`).
 
 ### 2.6. Проникание пуль (`UH_Weapon_Special.Penetration`)
 
