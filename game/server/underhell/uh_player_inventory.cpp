@@ -41,6 +41,33 @@ static void UH_CC_UpdateInventory( const CCommand &args )
 static ConCommand uh_cc_update_inventory( "UpdateInventory", UH_CC_UpdateInventory, "Updates the inventory", FCVAR_CLIENTCMD_CAN_EXECUTE );
 
 //-----------------------------------------------------------------------------
+// Dev/testing helper — not part of the original. Lets the inventory UI and
+// use/drop flows be exercised without the (still stubbed) pickup logic.
+//-----------------------------------------------------------------------------
+CON_COMMAND( uh_give_item, "Adds an item to your inventory (dev/testing).", FCVAR_CHEAT )
+{
+	CHL2_Player *pPlayer = UH_GetCommandPlayer();
+	if ( !pPlayer )
+		return;
+
+	if ( args.ArgC() < 2 )
+	{
+		Msg( "usage: uh_give_item <item id 1..%d>\n", UH_ITEM_MAX - 1 );
+		return;
+	}
+
+	int iItem = atoi( args[1] );
+	if ( !UH_IsValidInventoryItem( iItem ) )
+	{
+		Msg( "uh_give_item: invalid item id %d\n", iItem );
+		return;
+	}
+
+	pPlayer->UH_AddInventoryItem( iItem );
+	engine->ClientCommand( pPlayer->edict(), "UpdateInventory" );
+}
+
+//-----------------------------------------------------------------------------
 // Item ids that get a body group when dropped into the world as an item model.
 // Original mapping (hexrays sub_102E05F0 switch): apple/soda colours.
 //-----------------------------------------------------------------------------
