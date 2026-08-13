@@ -15,11 +15,45 @@
 #include "vguiscreen.h"
 #endif
 
+#if defined( HL2_EPISODIC )
+#include "episodic/uh_weapon_parse.h"
+#if defined( CLIENT_DLL )
+#include "episodic/uh_freeaim.h"
+#endif
+#endif
+
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 #define VIEWMODEL_ANIMATION_PARITY_BITS 3
 #define SCREEN_OVERLAY_MATERIAL "vgui/screens/vgui_overlay"
+
+#if defined( CLIENT_DLL ) && defined( HL2_EPISODIC )
+#define UH_IRONSIGHT_BLEND_TIME 0.1f	// seconds to slide the viewmodel to/from the ironsight pose
+
+//-----------------------------------------------------------------------------
+// Purpose: Underhell ironsight. Moves the viewmodel origin up to the player's
+//			eyes using the ExpOffset/ExpOriOffset data from the weapon script.
+//			Based on the Cin/jorg40 ironsight system (notes/ironsight.txt).
+//-----------------------------------------------------------------------------
+static void CalcExpWpnOffsets( CBasePlayer *owner, Vector &pos, QAngle &ang )
+{
+	CBaseCombatWeapon *pWeapon = owner ? owner->GetActiveWeapon() : NULL;
+	if ( !pWeapon )
+		return;
+
+	const CUHWeaponInfo &wpnInfo = GetUHWeaponInfo( pWeapon );
+
+	ang += wpnInfo.m_expOriOffset;
+
+	Vector forward, right, up;
+	AngleVectors( ang, &forward, &right, &up );
+
+	pos += forward * wpnInfo.m_expOffset.x;
+	pos += right * wpnInfo.m_expOffset.y;
+	pos += up * wpnInfo.m_expOffset.z;
+}
+#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -30,7 +64,17 @@ CBaseViewModel::CBaseViewModel()
 	// NOTE: We do this here because the color is never transmitted for the view model.
 	m_nOldAnimationParity = 0;
 	m_EntClientFlags |= ENTCLIENTFLAG_ALWAYS_INTERPOLATE;
+
+#if defined( HL2_EPISODIC )
+	m_expFactor = 0.0f;
+	m_bPrevExpSighted = false;
+	m_flIronsightedChangeTime = 0.0f;
 #endif
+#endif
+#if defined( HL2_EPISODIC )
+	m_bExpSighted = false;
+#endif
+
 	SetRenderColor( 255, 255, 255, 255 );
 
 	// View model of this weapon
@@ -72,6 +116,14 @@ void CBaseViewModel::Spawn( void )
 	Precache( );
 	SetSize( Vector( -8, -4, -2), Vector(8, 4, 2) );
 	SetSolid( SOLID_NONE );
+
+#if defined( CLIENT_DLL ) && defined( HL2_EPISODIC )
+	// Underhell ironsight state
+	m_bExpSighted = false;
+	m_expFactor = 0.0f;
+	m_bPrevExpSighted = false;
+	m_flIronsightedChangeTime = 0.0f;
+#endif
 }
 
 
@@ -403,6 +455,31 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 	}
 #endif
 
+#if defined( CLIENT_DLL ) && defined( HL2_EPISODIC )
+	// Underhell ironsight: detect a state change and (re)start the blend timer.
+	if ( m_bExpSighted != m_bPrevExpSighted )
+	{
+		m_bPrevExpSighted = m_bExpSighted;
+		m_flIronsightedChangeTime = gpGlobals->curtime;
+	}
+
+	// Apply the weapon's ExpOffset toward the eye position, blended over time.
+	CalcExpWpnOffsets( owner, vmorigin, vmangles );
+
+	float flDelta = ( gpGlobals->curtime - m_flIronsightedChangeTime ) / UH_IRONSIGHT_BLEND_TIME;
+	m_expFactor = m_bExpSighted ? clamp( flDelta, 0.0f, 1.0f ) : clamp( 1.0f - flDelta, 0.0f, 1.0f );
+
+	Vector vmDiffPos = vmorigin - eyePosition;
+	vmorigin = eyePosition + ( vmDiffPos * m_expFactor );
+
+	// Underhell OTS free-aim: in hip-fire the weapon is offset from the view
+	// center; ironsighting locks it back to center (see docs §2.8).
+	if ( !m_bExpSighted && UH_FreeAim_IsEnabled() )
+	{
+		vmangles += UH_FreeAim_GetOffset();
+	}
+#endif
+
 	SetLocalOrigin( vmorigin );
 	SetLocalAngles( vmangles );
 
@@ -517,6 +594,9 @@ BEGIN_NETWORK_TABLE_NOBASE(CBaseViewModel, DT_BaseViewModel)
 	SendPropInt		(SENDINFO(m_nAnimationParity), 3, SPROP_UNSIGNED ),
 	SendPropEHandle (SENDINFO(m_hWeapon)),
 	SendPropEHandle (SENDINFO(m_hOwner)),
+#if defined( HL2_EPISODIC )
+	SendPropBool	(SENDINFO(m_bExpSighted)),
+#endif
 
 	SendPropInt( SENDINFO( m_nNewSequenceParity ), EF_PARITY_BITS, SPROP_UNSIGNED ),
 	SendPropInt( SENDINFO( m_nResetEventsParity ), EF_PARITY_BITS, SPROP_UNSIGNED ),
@@ -536,6 +616,9 @@ BEGIN_NETWORK_TABLE_NOBASE(CBaseViewModel, DT_BaseViewModel)
 	RecvPropInt		(RECVINFO(m_nAnimationParity)),
 	RecvPropEHandle (RECVINFO(m_hWeapon), RecvProxy_Weapon ),
 	RecvPropEHandle (RECVINFO(m_hOwner)),
+#if defined( HL2_EPISODIC )
+	RecvPropBool	(RECVINFO(m_bExpSighted)),
+#endif
 
 	RecvPropInt( RECVINFO( m_nNewSequenceParity )),
 	RecvPropInt( RECVINFO( m_nResetEventsParity )),
@@ -561,6 +644,9 @@ BEGIN_PREDICTION_DATA( CBaseViewModel )
 	DEFINE_PRED_FIELD( m_fEffects, FIELD_INTEGER, FTYPEDESC_INSENDTABLE | FTYPEDESC_OVERRIDE ),
 	DEFINE_PRED_FIELD( m_nAnimationParity, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_hWeapon, FIELD_EHANDLE, FTYPEDESC_INSENDTABLE ),
+#if defined( HL2_EPISODIC )
+	DEFINE_PRED_FIELD( m_bExpSighted, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
+#endif
 	DEFINE_PRED_FIELD( m_flAnimTime, FIELD_FLOAT, 0 ),
 
 	DEFINE_FIELD( m_hOwner, FIELD_EHANDLE ),

@@ -49,6 +49,9 @@
 
 #ifdef HL2_EPISODIC
 #include "npc_alyx_episodic.h"
+#include "baseviewmodel_shared.h"
+#include "grenade_frag.h"
+#include "ammodef.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -313,6 +316,11 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),
 	DEFINE_FIELD( m_fIsSprinting, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIsWalking, FIELD_BOOLEAN ),
+#if defined( HL2_EPISODIC )
+	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
+	DEFINE_FIELD( m_flNextKickTime, FIELD_TIME ),
+#endif
 
 	/*
 	// These are initialized every time the player calls Activate()
@@ -386,7 +394,286 @@ CHL2_Player::CHL2_Player()
 
 	m_flArmorReductionTime = 0.0f;
 	m_iArmorReductionFrom = 0;
+
+#if defined( HL2_EPISODIC )
+	m_bIronSighted = false;
+	m_fIronsightedTime = 0.0f;
+	m_flNextKickTime = 0.0f;
+	m_angFreeAimOffset.Init();
+#endif
 }
+
+#if defined( HL2_EPISODIC )
+
+// Underhell ironsight (see docs/underhell-weapons-aiming.md, server/sub_101ECF40).
+// ConVar names/defaults recovered from the decompiled binary:
+//   uh_ironsight_zoom        - FOV multiplier while aiming (default 0.9)
+//   uh_ironsight_zoom_focus  - value subtracted from the default FOV while the
+//                              zoom transition is in progress (default 40)
+ConVar uh_ironsight_zoom( "uh_ironsight_zoom", "0.9" );
+ConVar uh_ironsight_zoom_focus( "uh_ironsight_zoom_focus", "40", FCVAR_ARCHIVE,
+	"Not actually the zoom value. This value is subracted from the defaultFOV" );
+
+#define UH_IRONSIGHT_FOV_TIME			0.15f	// zoom transition time
+#define UH_IRONSIGHT_TOGGLE_COOLDOWN	0.1f	// min time between toggles
+
+//-----------------------------------------------------------------------------
+// Purpose: Underhell ironsight toggle. Cooldown, sound, FOV zoom and the
+//			viewmodel raise state, mirroring the decompiled server toggle.
+//-----------------------------------------------------------------------------
+void CHL2_Player::ToggleIronsight( void )
+{
+	// Cooldown so rapid toggling doesn't spam (decomp: >= 0.1s).
+	if ( ( gpGlobals->curtime - m_fIronsightedTime ) < UH_IRONSIGHT_TOGGLE_COOLDOWN )
+		return;
+
+	m_bIronSighted = !m_bIronSighted;
+	m_fIronsightedTime = gpGlobals->curtime;
+
+	if ( m_bIronSighted )
+	{
+		EmitSound( "HL2Player.Ironsighton" );
+
+		int sightFOV = (int)( (float)GetDefaultFOV() * uh_ironsight_zoom.GetFloat() );
+		SetFOV( this, sightFOV, UH_IRONSIGHT_FOV_TIME );
+	}
+	else
+	{
+		EmitSound( "HL2Player.Ironsightoff" );
+		SetFOV( this, 0, UH_IRONSIGHT_FOV_TIME );	// reset to default
+	}
+
+	// Keep the viewmodel's raise state in sync so it replicates to the client.
+	CBaseViewModel *pViewModel = GetViewModel();
+	if ( pViewModel )
+	{
+		pViewModel->m_bExpSighted = (bool)m_bIronSighted;
+	}
+}
+
+CON_COMMAND_F( ironsight_toggle, "Toggles ironsight mode for the current weapon.", FCVAR_GAMEDLL )
+{
+	CBasePlayer *pPlayer = UTIL_GetCommandClient();
+	if ( !pPlayer )
+	{
+		// Executed directly (server console / listen server): use the first active player.
+		pPlayer = UTIL_PlayerByIndex( 1 );
+	}
+
+	CHL2_Player *pHL2Player = dynamic_cast< CHL2_Player * >( pPlayer );
+	if ( pHL2Player )
+	{
+		pHL2Player->ToggleIronsight();
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Underhell quick actions. Mirrors the decompiled server ClientCommand
+// dispatcher (server/sub_101F11D0: DropWeapon / Throw_Nade / uh_jake_kick).
+// Registered with the kb_act.lst command names so the client console/keybinds
+// forward them to the server in single-player.
+//-----------------------------------------------------------------------------
+// Underhell unarmed kick (see docs/underhell-weapons-aiming.md, server/sub_101F11D0
+// + sub_101F0050 / sub_101F2990). ConVar names/defaults recovered from the binary:
+//   uh_kick_damage   - damage dealt by the kick (default 21)
+//   uh_kick_forcemult - knockback force multiplier (default 2)
+//   uh_kick_enabled  - master switch (default 1, FCVAR_REPLICATED)
+ConVar uh_kick_damage( "uh_kick_damage", "21" );
+ConVar uh_kick_forcemult( "uh_kick_forcemult", "2" );
+ConVar uh_kick_enabled( "uh_kick_enabled", "1", FCVAR_REPLICATED );
+
+#define UH_KICK_RANGE			72.0f
+#define UH_KICK_COOLDOWN		0.5f
+
+//-----------------------------------------------------------------------------
+// Purpose: Drop the active weapon (tossed forward). Mirrors "DropWeapon".
+//-----------------------------------------------------------------------------
+void CHL2_Player::DropActiveWeapon( void )
+{
+	if ( !IsAlive() )
+		return;
+
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	if ( !pWeapon )
+		return;
+
+	// Underhell: melee weapons cannot be dropped (decomp checks the MeleeWeapon flag).
+	if ( pWeapon->GetWpnData().m_bMeleeWeapon )
+		return;
+
+	if ( IsIronSighted() )
+		ToggleIronsight();
+
+	Vector vecThrow;
+	EyeVectors( &vecThrow, NULL, NULL );
+	vecThrow *= 300.0f;
+
+	Weapon_Drop( pWeapon, NULL, &vecThrow );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Quick-throw a grenade. Mirrors "Throw_Nade".
+//-----------------------------------------------------------------------------
+void CHL2_Player::ThrowGrenadeQuick( void )
+{
+	if ( !IsAlive() )
+		return;
+
+	int iGrenade = GetAmmoDef()->Index( "grenade" );
+	if ( GetAmmoCount( iGrenade ) <= 0 )
+		return;
+
+	if ( IsIronSighted() )
+		ToggleIronsight();
+
+	RemoveAmmo( 1, iGrenade );
+
+	// Throw animation (body + grenade viewmodel, mirrors Throw_Nade / sub_101ED130).
+	int seq = SelectWeightedSequence( ACT_HANDGRENADE_THROW1 );
+	if ( seq >= 0 )
+	{
+		ResetSequence( seq );
+		SetActivity( ACT_HANDGRENADE_THROW1 );
+	}
+	else
+	{
+		SetAnimation( PLAYER_ATTACK1 );
+	}
+
+	CBaseViewModel *pViewModel = GetViewModel();
+	if ( pViewModel )
+	{
+		pViewModel->SetWeaponModel( "models/weapons/v_grenade.mdl", GetActiveWeapon() );
+	}
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	if ( pWeapon )
+		pWeapon->SendWeaponAnim( ACT_VM_THROW );
+
+	Vector vecEye = EyePosition();
+	Vector vForward, vRight;
+	EyeVectors( &vForward, &vRight, NULL );
+	Vector vecSrc = vecEye + vForward * 18.0f + vRight * 8.0f;
+	vForward[2] += 0.1f;
+
+	Vector vecThrow;
+	GetVelocity( &vecThrow, NULL );
+	vecThrow += vForward * 1200.0f;
+
+	Fraggrenade_Create( vecSrc, vec3_angle, vecThrow,
+		AngularImpulse( 600, random->RandomInt( -1200, 1200 ), 0 ), this, 3.0f, false );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Underhell unarmed kick. Mirrors "uh_jake_kick".
+//          (The original also drains 20 stamina - stamina system is a follow-up.)
+//-----------------------------------------------------------------------------
+void CHL2_Player::PerformKick( void )
+{
+	// Master switch (uh_kick_enabled, FCVAR_REPLICATED).
+	if ( !uh_kick_enabled.GetBool() )
+		return;
+
+	if ( !IsAlive() )
+		return;
+
+	// Cooldown so the kick can't be spammed faster than the animation plays.
+	if ( m_flNextKickTime > gpGlobals->curtime )
+		return;
+	m_flNextKickTime = gpGlobals->curtime + UH_KICK_COOLDOWN;
+
+	if ( IsIronSighted() )
+		ToggleIronsight();
+
+	// Kick animation. The body plays ACT_KICK when the player model provides it
+	// (Underhell models do; fallback is the standard attack pose), and the
+	// viewmodel plays a melee swing. Mirrors uh_jake_kick.
+	int seq = SelectWeightedSequence( ACT_KICK );
+	if ( seq >= 0 )
+	{
+		ResetSequence( seq );
+		SetActivity( ACT_KICK );
+	}
+	else
+	{
+		SetAnimation( PLAYER_ATTACK1 );
+	}
+
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	if ( pWeapon )
+		pWeapon->SendWeaponAnim( ACT_VM_HITCENTER );
+
+	ViewPunch( QAngle( -2.0f, 0.0f, 0.0f ) );
+
+	if ( GetFlags() & FL_ONGROUND )
+	{
+		EmitSound( "HL2Player.kick_fire" );
+		EmitSound( "Player.Voice.Kick" );
+	}
+	else
+	{
+		EmitSound( "HL2Player.kick_fire_fly" );
+	}
+
+	// 72-unit melee trace (matches the decompiled kick: eye -> eye + forward*72),
+	// DMG_CLUB, knockback scaled by uh_kick_forcemult.
+	CheckTraceHullAttack( UH_KICK_RANGE, Vector( -16, -16, -16 ), Vector( 16, 16, 16 ),
+		(int)uh_kick_damage.GetFloat(), DMG_CLUB, uh_kick_forcemult.GetFloat() );
+}
+
+static CHL2_Player *UnderhellCommandPlayer( void )
+{
+	CBasePlayer *pPlayer = UTIL_GetCommandClient();
+	if ( !pPlayer )
+	{
+		// Executed directly (server console / listen server): use the first active player.
+		pPlayer = UTIL_PlayerByIndex( 1 );
+	}
+	return dynamic_cast< CHL2_Player * >( pPlayer );
+}
+
+CON_COMMAND_F( dropweapon, "Drops the currently active weapon.", FCVAR_GAMEDLL )
+{
+	CHL2_Player *pPlayer = UnderhellCommandPlayer();
+	if ( pPlayer )
+		pPlayer->DropActiveWeapon();
+}
+
+CON_COMMAND_F( throw_nade, "Quick-throws a grenade.", FCVAR_GAMEDLL )
+{
+	CHL2_Player *pPlayer = UnderhellCommandPlayer();
+	if ( pPlayer )
+		pPlayer->ThrowGrenadeQuick();
+}
+
+CON_COMMAND_F( uh_jake_kick, "Performs an unarmed kick.", FCVAR_GAMEDLL )
+{
+	CHL2_Player *pPlayer = UnderhellCommandPlayer();
+	if ( pPlayer )
+		pPlayer->PerformKick();
+}
+
+//-----------------------------------------------------------------------------
+// Underhell OTS free-aim sync. The client sends the current free-aim offset;
+// the server stores it and rotates the shot direction to match (docs §2.8).
+//-----------------------------------------------------------------------------
+CON_COMMAND_F( update_freeaim, "Underhell free-aim sync (client internal).", FCVAR_GAMEDLL )
+{
+	CHL2_Player *pPlayer = UnderhellCommandPlayer();
+	if ( !pPlayer )
+		return;
+
+	QAngle angOffset( 0, 0, 0 );
+	if ( args.ArgC() > 1 )
+		angOffset.x = atof( args[1] );
+	if ( args.ArgC() > 2 )
+		angOffset.y = atof( args[2] );
+	if ( args.ArgC() > 3 )
+		angOffset.z = atof( args[3] );
+
+	pPlayer->SetFreeAimOffset( angOffset );
+}
+
+#endif // HL2_EPISODIC
 
 //
 // SUIT POWER DEVICES
@@ -410,6 +697,10 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100 
 IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropDataTable(SENDINFO_DT(m_HL2Local), &REFERENCE_SEND_TABLE(DT_HL2Local), SendProxy_SendLocalDataTable),
 	SendPropBool( SENDINFO(m_fIsSprinting) ),
+#if defined( HL2_EPISODIC )
+	SendPropBool( SENDINFO(m_bIronSighted) ),
+	SendPropFloat( SENDINFO(m_fIronsightedTime) ),
+#endif
 END_SEND_TABLE()
 
 
@@ -426,6 +717,15 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.TrainUse" );
 	PrecacheScriptSound( "HL2Player.Use" );
 	PrecacheScriptSound( "HL2Player.BurnPain" );
+#if defined( HL2_EPISODIC )
+	PrecacheScriptSound( "HL2Player.Ironsighton" );
+	PrecacheScriptSound( "HL2Player.Ironsightoff" );
+	PrecacheScriptSound( "HL2Player.kick_fire" );
+	PrecacheScriptSound( "HL2Player.kick_fire_fly" );
+	PrecacheScriptSound( "Player.Voice.Kick" );
+	PrecacheScriptSound( "Player.Voice.Kick.Exhausted" );
+	PrecacheModel( "models/weapons/v_grenade.mdl" );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -2769,6 +3069,33 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 		}
 		return true;
 	}
+
+#if defined( HL2_EPISODIC )
+	// Underhell client commands (names match the decompiled dispatcher sub_101F11D0).
+	if ( !Q_stricmp( args[0], "DropWeapon" ) )
+	{
+		DropActiveWeapon();
+		return true;
+	}
+
+	if ( !Q_stricmp( args[0], "Throw_Nade" ) )
+	{
+		ThrowGrenadeQuick();
+		return true;
+	}
+
+	if ( !Q_stricmp( args[0], "uh_jake_kick" ) )
+	{
+		PerformKick();
+		return true;
+	}
+
+	if ( !Q_stricmp( args[0], "ironsight_toggle" ) )
+	{
+		ToggleIronsight();
+		return true;
+	}
+#endif
 
 	return BaseClass::ClientCommand( args );
 }

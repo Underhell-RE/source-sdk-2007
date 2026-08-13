@@ -130,6 +130,36 @@ public:
 
 	virtual bool		ClientCommand( const CCommand &args );
 
+#if defined( HL2_EPISODIC )
+	// Underhell: ironsight.
+	bool				IsIronSighted( void ) const { return m_bIronSighted; }
+	void				ToggleIronsight( void );
+
+	// Underhell: quick actions (see docs/underhell-weapons-aiming.md).
+	void				DropActiveWeapon( void );
+	void				ThrowGrenadeQuick( void );
+	void				PerformKick( void );
+
+	// Underhell OTS free-aim (server-side copy, synced via update_freeaim).
+	const QAngle &		GetFreeAimOffset( void ) const { return m_angFreeAimOffset; }
+	void				SetFreeAimOffset( const QAngle &angOffset ) { m_angFreeAimOffset = angOffset; }
+
+	// -------------------------------------------------------------------------
+	// Underhell TODO (still to port — see docs/underhell-weapons-aiming.md §6):
+	//   #  Feature                      Where it lives
+	//   1  Endurance (m_iEndurance)     CHL2_Player + melee/kick (StaminaToDrain)
+	//   2  Bleeding (m_iBleedCounter)   CHL2_Player + damage handling
+	//   3  Inventory (cl_inventoryToggle) client VGUI panel + concommand
+	//   4  NVG / gasmask / silencer     CHL2_Player (+ postprocess / sound)
+	//   5  MGL arcing grenade           uh_weapon_bfg.cpp (projectile)
+	//   6  FireMode (semi/auto)         CUhFirearmWeapon (optional)
+	//   7  Haptics (hap_*)              client forcefeedback
+	//   8  uh_ragdollcollisiontype      CHL2_Player ragdoll params
+	//   9  kb_act.lst / skill.cfg binds content (scripts/)
+	//  10  Polish (kick anim, sk_plr_dmg_* defaults)
+	// -------------------------------------------------------------------------
+#endif
+
 	// from cbasecombatcharacter
 	void				InitVCollision( const Vector &vecAbsOrigin, const Vector &vecAbsVelocity );
 	WeaponProficiency_t CalcWeaponProficiency( CBaseCombatWeapon *pWeapon );
@@ -327,6 +357,15 @@ private:
 
 	CNetworkVar( bool, m_fIsSprinting );
 	CNetworkVarForDerived( bool, m_fIsWalking );
+
+#if defined( HL2_EPISODIC )
+	// Underhell: ironsight state.
+	CNetworkVar( bool, m_bIronSighted );		// true while aiming down the sights
+	CNetworkVar( float, m_fIronsightedTime );	// last time the ironsight state changed
+
+	float				m_flNextKickTime;		// Underhell kick cooldown (transient)
+	QAngle				m_angFreeAimOffset;		// Underhell OTS free-aim (server-only)
+#endif
 
 protected:	// Jeep: Portal_Player needs access to this variable to overload PlayerUse for picking up objects through portals
 	bool				m_bPlayUseDenySound;		// Signaled by PlayerUse, but can be unset by HL2 ladder code...

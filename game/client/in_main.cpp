@@ -1476,6 +1476,11 @@ void CInput::Init_All (void)
 	m_pVerifiedCommands = new CVerifiedUserCmd[ MULTIPLAYER_BACKUP ];
 
 	m_fMouseInitialized	= false;
+#if defined( HL2_EPISODIC )
+	m_vecFreeAimPos.Init();
+	m_vecFreeAimPos_Delta.Init();
+	m_angViewAngle_Delta.Init();
+#endif
 	m_fRestoreSPI		= false;
 	m_fMouseActive		= false;
 	Q_memset( m_rgOrigMouseParms, 0, sizeof( m_rgOrigMouseParms ) );

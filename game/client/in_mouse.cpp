@@ -591,7 +591,12 @@ void CInput::MouseMove( CUserCmd *cmd )
 		g_pClientMode->OverrideMouseInput( &mouse_x, &mouse_y );
 
 		// Add mouse X/Y movement to cmd
-		ApplyMouse( viewangles, cmd, mouse_x, mouse_y );
+#if defined( HL2_EPISODIC )
+		if ( CAM_IsFreeAiming() )
+			TryCursorMove( viewangles, cmd, mouse_x, mouse_y );
+		else
+#endif
+			ApplyMouse( viewangles, cmd, mouse_x, mouse_y );
 
 		// Re-center the mouse.
 		ResetMouse();

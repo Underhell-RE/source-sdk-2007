@@ -926,6 +926,112 @@ void CInput::CAM_GetCameraOffset( Vector& ofs )
 	VectorCopy( m_vecCameraOffset, ofs );
 }
 
+#if defined( HL2_EPISODIC )
+//-----------------------------------------------------------------------------
+// Underhell OTS free-aim (docs/underhell-weapons-aiming.md §2.8). Based on the
+// Valve Dev Community 'Over the Shoulder View' tutorial (free-aim section),
+// adapted to first person: the mouse moves the crosshair, the weapon/bullets
+// aim at it, and the camera re-centers at autoturn_speed.
+//-----------------------------------------------------------------------------
+static ConVar cam_ots_freeaim_enable( "cam_ots_freeaim_enable", "1", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_interval_enable( "cam_ots_freeaim_interval_enable", "0", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_move_threshold( "cam_ots_freeaim_move_threshold", "0.05", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_move_max( "cam_ots_freeaim_move_max", "0.1", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_speed_turn( "cam_ots_freeaim_speed_turn", "1", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_speed_evenYawSpeed( "cam_ots_freeaim_speed_evenYawSpeed", "0", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_autoturn_speed( "cam_ots_freeaim_autoturn_speed", "250", FCVAR_ARCHIVE );
+
+static ConVarRef m_yaw( "m_yaw" );
+static ConVarRef m_pitch( "m_pitch" );
+
+CON_COMMAND( cam_ots_TurnAuto, "Re-centers the OTS free-aim cursor." )
+{
+	::input->CAM_ResetFreeAimCursor();
+}
+CON_COMMAND( cam_ots_Turn180, "Re-centers the OTS free-aim cursor (first-person stub)." )
+{
+	::input->CAM_ResetFreeAimCursor();
+}
+
+bool CInput::CAM_IsFreeAiming( void )
+{
+	return cam_ots_freeaim_enable.GetBool();
+}
+
+Vector2D CInput::CAM_GetFreeAimCursor( void )
+{
+	return m_vecFreeAimPos;
+}
+
+void CInput::CAM_ResetFreeAimCursor( void )
+{
+	m_vecFreeAimPos.Init();
+	m_vecFreeAimPos_Delta.Init();
+	m_angViewAngle_Delta.Init();
+}
+
+void CInput::CAM_FreeAimDecay( float frametime )
+{
+	// Camera recenter toward the aim point at autoturn_speed (degrees/s),
+	// expressed in normalized crosshair units.
+	float flFOV = 75.0f;
+	C_BasePlayer *pl = C_BasePlayer::GetLocalPlayer();
+	if ( pl )
+		flFOV = pl->GetFOV();
+
+	float flDecay = cam_ots_freeaim_autoturn_speed.GetFloat() * frametime / ( flFOV * 0.5f );
+	for ( int i = 0; i < 2; i++ )
+	{
+		float *p = ( i == 0 ) ? &m_vecFreeAimPos.x : &m_vecFreeAimPos.y;
+		if ( *p > flDecay )			*p -= flDecay;
+		else if ( *p < -flDecay )	*p += flDecay;
+		else						*p = 0.0f;
+	}
+}
+
+// Crosshair movement + view turning beyond the dead zone.
+void CInput::TryCursorMove( QAngle& viewangles, CUserCmd *cmd, float x, float y )
+{
+	C_BasePlayer *pl = C_BasePlayer::GetLocalPlayer();
+	float flFOV = ( pl ? pl->GetFOV() : 75.0f );
+	float flScaleNormalizedRange_Yaw = m_yaw.GetFloat() / flFOV;
+	float flScaleNormalizedRange_Pitch = m_pitch.GetFloat() / flFOV;
+	float flScale_Pitch = 1;
+	if ( cam_ots_freeaim_speed_evenYawSpeed.GetInt() )
+		flScale_Pitch = engine->GetScreenAspectRatio();
+
+	m_vecFreeAimPos += Vector2D( x * flScaleNormalizedRange_Yaw, y * flScale_Pitch * flScaleNormalizedRange_Pitch );
+	float flLength = m_vecFreeAimPos.NormalizeInPlace();
+	float flMoveVars[ 2 ] = { cam_ots_freeaim_move_threshold.GetFloat(), cam_ots_freeaim_move_max.GetFloat() };
+	float flTurnSpeed;
+
+	Vector2D moveDir = m_vecFreeAimPos;
+	moveDir.NormalizeInPlace();
+
+	if ( cam_ots_freeaim_interval_enable.GetInt() )
+	{
+		flTurnSpeed = cam_ots_freeaim_speed_turn.GetFloat() * max( 0, ( flLength - flMoveVars[0] ) / ( flMoveVars[1] - flMoveVars[0] ) );
+		viewangles += QAngle( moveDir.y * flTurnSpeed, moveDir.x * -flTurnSpeed, 0 );
+	}
+	else
+	{
+		flTurnSpeed = max( 0, flLength - flMoveVars[ 1 ] );
+		viewangles += QAngle( moveDir.y * flTurnSpeed * flFOV, moveDir.x * -flTurnSpeed * flFOV, 0 );
+	}
+
+	if ( viewangles.x > 89.0f )			viewangles.x = 89.0f;
+	else if ( viewangles.x < -89.0f )	viewangles.x = -89.0f;
+	if ( viewangles.y > 180.0f )			viewangles.y -= 360.0f;
+	else if ( viewangles.y < -180.0f )	viewangles.y += 360.0f;
+
+	flLength = min( flMoveVars[1], flLength );
+	m_vecFreeAimPos *= flLength;
+
+	cmd->mousedx = (int)x;
+	cmd->mousedy = (int)y;
+}
+#endif // HL2_EPISODIC
+
 /*
 ==============================
 CAM_InterceptingMouse

@@ -11,6 +11,10 @@
 #include "c_ai_basenpc.h"
 #include "in_buttons.h"
 #include "collisionutils.h"
+#if defined( HL2_EPISODIC )
+#include "episodic/uh_freeaim.h"
+#include "usercmd.h"
+#endif
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -28,14 +32,47 @@ extern ConVar sensitivity;
 ConVar cl_npc_speedmod_intime( "cl_npc_speedmod_intime", "0.25", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
 ConVar cl_npc_speedmod_outtime( "cl_npc_speedmod_outtime", "1.5", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
 
+#if defined( HL2_EPISODIC )
+
+//-----------------------------------------------------------------------------
+// Underhell OTS free-aim sync: accumulate/decay the aim offset and send it to
+// the server so bullets follow the free-aim point (docs §2.8).
+//-----------------------------------------------------------------------------
+#define UH_FREEAIM_SEND_INTERVAL	0.1f	// update_freeaim throttle
+
+static float s_flLastFreeAimSend = 0.0f;
+
+void UH_FreeAim_SyncToServer( CUserCmd *pCmd, float flFrameTime )
+{
+	UH_FreeAim_Update( pCmd, flFrameTime );
+
+	if ( ( gpGlobals->curtime - s_flLastFreeAimSend ) >= UH_FREEAIM_SEND_INTERVAL )
+	{
+		s_flLastFreeAimSend = gpGlobals->curtime;
+		QAngle ang = UH_FreeAim_GetOffset();
+		engine->ServerCmd( VarArgs( "update_freeaim %f %f %f", ang.x, ang.y, ang.z ) );
+	}
+}
+
+#endif // HL2_EPISODIC
+
+
 IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropDataTable( RECVINFO_DT(m_HL2Local),0, &REFERENCE_RECV_TABLE(DT_HL2Local) ),
 	RecvPropBool( RECVINFO( m_fIsSprinting ) ),
+#if defined( HL2_EPISODIC )
+	RecvPropBool( RECVINFO( m_bIronSighted ) ),
+	RecvPropFloat( RECVINFO( m_fIronsightedTime ) ),
+#endif
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )
 	DEFINE_PRED_TYPEDESCRIPTION( m_HL2Local, C_HL2PlayerLocalData ),
 	DEFINE_PRED_FIELD( m_fIsSprinting, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
+#if defined( HL2_EPISODIC )
+	DEFINE_PRED_FIELD( m_bIronSighted, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
+	DEFINE_PRED_FIELD( m_fIronsightedTime, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
+#endif
 END_PREDICTION_DATA()
 
 //-----------------------------------------------------------------------------
@@ -84,6 +121,17 @@ void C_BaseHLPlayer::OnDataChanged( DataUpdateType_t updateType )
 	{
 		SetNextClientThink( CLIENT_THINK_ALWAYS );
 	}
+
+#if defined( HL2_EPISODIC )
+	// Underhell: hide the crosshair while aiming down the sights.
+	if ( IsLocalPlayer() )
+	{
+		if ( m_bIronSighted )
+			m_Local.m_iHideHUD |= HIDEHUD_CROSSHAIR;
+		else
+			m_Local.m_iHideHUD &= ~HIDEHUD_CROSSHAIR;
+	}
+#endif
 
 	BaseClass::OnDataChanged( updateType );
 }
@@ -632,6 +680,13 @@ void C_BaseHLPlayer::PerformClientSideNPCSpeedModifiers( float flFrameTime, CUse
 bool C_BaseHLPlayer::CreateMove( float flInputSampleTime, CUserCmd *pCmd )
 {
 	bool bResult = BaseClass::CreateMove( flInputSampleTime, pCmd );
+
+#if defined( HL2_EPISODIC )
+	if ( IsLocalPlayer() )
+	{
+		UH_FreeAim_SyncToServer( pCmd, flInputSampleTime );
+	}
+#endif
 
 	if ( !IsInAVehicle() )
 	{

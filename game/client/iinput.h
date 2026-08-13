@@ -81,6 +81,14 @@ public:
 	virtual void		CAM_Think( void ) = 0;
 	virtual int			CAM_IsThirdPerson( void ) = 0;
 	virtual void		CAM_GetCameraOffset( Vector& ofs ) = 0;
+
+#if defined( HL2_CLIENT_DLL ) && defined( HL2_EPISODIC )
+	// Underhell OTS free-aim (docs/underhell-weapons-aiming.md §2.8)
+	virtual bool		CAM_IsFreeAiming( void ) = 0;
+	virtual Vector2D	CAM_GetFreeAimCursor( void ) = 0;
+	virtual void		CAM_ResetFreeAimCursor( void ) = 0;
+	virtual void		CAM_FreeAimDecay( float frametime ) = 0;
+#endif
 	virtual void		CAM_ToThirdPerson(void) = 0;
 	virtual void		CAM_ToFirstPerson(void) = 0;
 	virtual void		CAM_StartMouseMove(void) = 0;
