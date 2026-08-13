@@ -26,6 +26,8 @@
 | `underhell-hexrays/FGD/Item List.txt` | список предметов/боеприпасов |
 | `underhell-hexrays/Underhell/scripts/weapon_*.txt` | скрипты данных оружия (WeaponData) |
 | `underhell-hexrays/notes/ironsight.txt` | исходный туториал прицеливания (база системы) |
+| `underhell-hexrays/notes/Over the Shoulder View*.html` | туториал VDC «Over the Shoulder View» — основа OTS free-aim (§2.8) |
+| `underhell-hexrays/Underhell/bin/Cliento.dll` / `serveror.dll` | **оригинальные DLL** — источник строк: имена ConVar/ConCommand, активностей (`ACT_KICK`=1441), звуков (`HL2Player.kick_body` и т.д.) |
 | `underhell-hexrays/FGD/Underhell.fgd` | список игровых энтити |
 
 ---
@@ -156,12 +158,24 @@ this+1832 MeleeWeapon, this+1833 BuiltRightHanded, this+1834 AllowFlipping, this
 Семантика: **в бедре оружие уходит от центра экрана** (мышь двигает свободный прицел, оружие
 авто-возвращается к центру с `autoturn_speed`), **в прицеле — фиксируется на центр**. Именно это
 поведение пользователь видел как «вне прицеливания оружие не привязано к центру» — это фича
-Underhell, а не баг. Реализация: клиентские ConVar'ы + накопление мыши в
-`C_BaseHLPlayer::CreateMove` (`UH_FreeAim_Update`), смещение углов вьюмодели в
-`CalcViewModelView` (`!m_bExpSighted`), синхронизация `update_freeaim` → сервер хранит смещение и
-доворачивает направление пули в `CUhFirearmWeapon::FireBullets`. Точную кривую отклика мыши из
-Hex-Rays не восстановить (те же искажения, что у проникания) — константы вынесены в
-`c_basehlplayer.cpp` (`UH_FREEAIM_*`).
+Underhell, а не баг.
+
+Реализация (по туториалу VDC «Over the Shoulder View», секция free-aim, адаптировано под
+first-person):
+- `game/client/in_camera.cpp` — ConVar'ы `cam_ots_freeaim_*` (дефолты из оригинальных DLL),
+  состояние курсора в `CInput` (`m_vecFreeAimPos`), `CAM_IsFreeAiming`, `CAM_GetFreeAimCursor`,
+  `CAM_FreeAimDecay`, `TryCursorMove` (накопление + поворот вида за мёртвую зону).
+- `game/client/in_mouse.cpp` — `MouseMove` использует `TryCursorMove` вместо `ApplyMouse`,
+  когда free-aim активен.
+- `game/client/episodic/uh_freeaim_client.cpp` — `UH_FreeAim_GetOffset()` (угол от центра экрана
+  к курсору = `cursor × FOV/2`).
+- `game/shared/baseviewmodel_shared.cpp` — смещение углов вьюмодели (`!m_bExpSighted`).
+- `game/client/hl2/c_basehlplayer.cpp` — `UH_FreeAim_SyncToServer()`: decay + сброс при прицеле
+  + отправка `update_freeaim %f %f %f`.
+- `game/server/.../uh_basefirearm.cpp` — сервер доворачивает направление пули по `update_freeaim`.
+
+Точную кривую отклика мыши из Hex-Rays не восстановить — использован расчёт из туториала
+(плюс подтверждённые клампы ±25°/±12° из `server/sub_101F1D70`).
 
 ### 2.6. Проникание пуль (`UH_Weapon_Special.Penetration`)
 
@@ -313,10 +327,16 @@ weapon_*.txt ──(KeyValues)──▶ CUHWeaponInfo::Parse()   [game/shared/ep
      `CON_COMMAND` + обработка в `CHL2_Player::ClientCommand`; `additionalequipment` понимает
      список через запятую (случайный выбор, §2.7); кик/граната проигрывают анимации
      (`ACT_VM_HITCENTER` / `ACT_VM_THROW` + `PLAYER_ATTACK1`).
-   - ✅ OTS free-aim (§2.8) — клиентские `cam_ots_freeaim_*` + смещение вьюмодели в бедре +
-     `update_freeaim` → доворот направления пули на сервере.
+   - ✅ OTS free-aim (§2.8) — клиентские `cam_ots_freeaim_*` + курсор в `CInput` +
+     смещение вьюмодели в бедре + `update_freeaim` → доворот направления пули на сервере.
    - ✅ T-pose NPC — полные ванильные acttable (readiness-состояния) для ПП/винтовок/дробовиков/BFG.
+   - ✅ NPC-стрельба — `CUhFirearmWeapon::Operator_ForceNPCFire` (базовый пустой, без него NPC
+     с этими оружиями не стреляли) + `FireBullets` теперь стреляет через любого владельца.
+   - ✅ `ACT_KICK`/`ACT_KICK_CROUCHED` (1441/1442 из DLL) добавлены в activity-лист; граната
+     кидает через viewmodel `models/weapons/v_grenade.mdl` + `ACT_VM_THROW`.
    - ⬜ Система выносливости (kick/mеле расходуют `m_iEndurance`).
+   - ⬜ Отдельная kick-viewmodel (`v_kick.mdl` / `SetPlayerKickModel` / `KickContext`) —
+     сейчас кик играет body-аним + `ACT_VM_HITCENTER` на текущем оружии.
 5. **Скрипты** `weapon_*.txt` — перенос из `Underhell/scripts/` в `scripts/` мода
    (контент, вне SDK-кода; классы уже читают их данные через `CUHWeaponInfo`).
 

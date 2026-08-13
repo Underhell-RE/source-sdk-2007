@@ -2633,6 +2633,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\episodic\uh_freeaim_client.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\c_weapon_physcannon.cpp"
 					>
 				</File>

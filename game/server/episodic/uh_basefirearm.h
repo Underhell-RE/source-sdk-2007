@@ -40,6 +40,10 @@ public:
 	virtual float	GetPlayerDamage( void ) { return 0.0f; }
 	virtual float	GetNPCDamage( void ) { return 0.0f; }
 
+	// NPC fire path: the base Operator_ForceNPCFire does nothing, so without
+	// this override NPCs wielding these weapons never shoot.
+	virtual void	Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary );
+
 protected:
 	const CUHWeaponInfo &GetUHWpnData( void ) const { return GetUHWeaponInfo( this ); }
 

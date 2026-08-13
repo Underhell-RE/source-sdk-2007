@@ -173,9 +173,11 @@ void CUhFirearmWeapon::FireBullets( const FireBulletsInfo_t &info )
 		return;
 	}
 
-	if ( pPlayer )
+	// Fire through the owner so both players and NPCs work.
+	CBaseCombatCharacter *pOwner = GetOwner();
+	if ( pOwner )
 	{
-		pPlayer->FireBullets( uhInfo );
+		pOwner->FireBullets( uhInfo );
 	}
 }
 
@@ -188,8 +190,8 @@ void CUhFirearmWeapon::FireBullets( const FireBulletsInfo_t &info )
 //-----------------------------------------------------------------------------
 void CUhFirearmWeapon::FireBulletsPenetrating( const FireBulletsInfo_t &info, int iPenetration )
 {
-	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-	if ( !pPlayer )
+	CBaseCombatCharacter *pOwner = GetOwner();
+	if ( !pOwner )
 	{
 		return;
 	}
@@ -200,7 +202,7 @@ void CUhFirearmWeapon::FireBulletsPenetrating( const FireBulletsInfo_t &info, in
 	// Fire each shot separately so pellets penetrate independently.
 	for ( int iShot = 0; iShot < info.m_iShots; iShot++ )
 	{
-		if ( pPlayer->IsPlayer() )
+		if ( pOwner->IsPlayer() )
 		{
 			RandomSeed( CBaseEntity::GetPredictionRandomSeed() & 255 );
 		}
@@ -217,7 +219,7 @@ void CUhFirearmWeapon::FireBulletsPenetrating( const FireBulletsInfo_t &info, in
 			Vector vecEnd = vecSrc + vecDir * info.m_flDistance;
 
 			trace_t tr;
-			UTIL_TraceLine( vecSrc, vecEnd, MASK_SHOT, pPlayer, COLLISION_GROUP_NONE, &tr );
+			UTIL_TraceLine( vecSrc, vecEnd, MASK_SHOT, pOwner, COLLISION_GROUP_NONE, &tr );
 
 			// Clear shot to the end: fire the remaining segment and stop.
 			if ( tr.fraction == 1.0f )
@@ -264,8 +266,8 @@ void CUhFirearmWeapon::FireBulletsPenetrating( const FireBulletsInfo_t &info, in
 void CUhFirearmWeapon::FireSegment( const FireBulletsInfo_t &info, const Vector &vecSrc,
 									const Vector &vecDir, const Vector &vecEnd, float flDamageScale )
 {
-	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-	if ( !pPlayer )
+	CBaseCombatCharacter *pOwner = GetOwner();
+	if ( !pOwner )
 		return;
 
 	FireBulletsInfo_t seg = info;
@@ -277,7 +279,47 @@ void CUhFirearmWeapon::FireSegment( const FireBulletsInfo_t &info, const Vector 
 	seg.m_iPlayerDamage = (int)( GetPlayerDamage() * flDamageScale );
 	seg.m_iDamage = (int)( GetNPCDamage() * flDamageScale );
 
-	pPlayer->FireBullets( seg );
+	pOwner->FireBullets( seg );
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: NPC fire path (mirrors the vanilla SMG1/AR2 implementations).
+//-----------------------------------------------------------------------------
+void CUhFirearmWeapon::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary )
+{
+	if ( !pOperator )
+		return;
+
+	// Ensure we have a round to fire.
+	m_iClip1++;
+
+	Vector vecShootOrigin, vecShootDir;
+	QAngle angShootDir;
+	if ( !GetAttachment( LookupAttachment( "muzzle" ), vecShootOrigin, angShootDir ) )
+	{
+		vecShootOrigin = pOperator->Weapon_ShootPosition();
+		pOperator->EyeVectors( &vecShootDir, NULL, NULL );
+	}
+	else
+	{
+		AngleVectors( angShootDir, &vecShootDir );
+	}
+
+	FireBulletsInfo_t info;
+	info.m_iShots = 1;
+	info.m_vecSrc = vecShootOrigin;
+	info.m_vecDirShooting = vecShootDir;
+	info.m_vecSpread = VECTOR_CONE_PRECALCULATED;
+	info.m_flDistance = MAX_TRACE_LENGTH;
+	info.m_iAmmoType = m_iPrimaryAmmoType;
+	info.m_iTracerFreq = 2;
+
+	FireBullets( info );
+
+	WeaponSound( SINGLE_NPC );
+	pOperator->DoMuzzleFlash();
+	m_iClip1--;
 }
 
 

@@ -1920,6 +1920,10 @@ void ActivityList_RegisterSharedActivities( void )
 	REGISTER_SHARED_ACTIVITY( ACT_ITEM2_VM_IDLE_LOWERED );
 	REGISTER_SHARED_ACTIVITY( ACT_ITEM2_VM_LOWERED_TO_IDLE );
 
+	// Underhell: unarmed kick
+	REGISTER_SHARED_ACTIVITY( ACT_KICK );
+	REGISTER_SHARED_ACTIVITY( ACT_KICK_CROUCHED );
+
 	AssertMsg( g_HighestActivity == LAST_SHARED_ACTIVITY - 1, "Not all activities from ai_activity.h registered in activitylist.cpp" ); 
 } 
 

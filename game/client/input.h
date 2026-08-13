@@ -83,6 +83,14 @@ public:
 	virtual		void		CAM_Think( void );
 	virtual		int			CAM_IsThirdPerson( void );
 	virtual		void		CAM_GetCameraOffset( Vector& ofs );
+#if defined( HL2_EPISODIC )
+	// Underhell OTS free-aim
+	virtual bool		CAM_IsFreeAiming( void );
+	virtual Vector2D	CAM_GetFreeAimCursor( void );
+	virtual void		CAM_ResetFreeAimCursor( void );
+	void				TryCursorMove( QAngle& viewangles, CUserCmd *cmd, float x, float y );
+	virtual void		CAM_FreeAimDecay( float frametime );
+#endif
 	virtual		void		CAM_ToThirdPerson(void);
 	virtual		void		CAM_ToFirstPerson(void);
 	virtual		void		CAM_StartMouseMove(void);
@@ -230,6 +238,13 @@ private:
 	bool		m_CameraIsOrthographic;
 
 	QAngle		m_angPreviousViewAngles;
+
+#if defined( HL2_EPISODIC )
+	// Underhell OTS free-aim state
+	QAngle		m_angViewAngle_Delta;
+	Vector2D	m_vecFreeAimPos;
+	Vector2D	m_vecFreeAimPos_Delta;
+#endif
 
 	float		m_flLastForwardMove;
 

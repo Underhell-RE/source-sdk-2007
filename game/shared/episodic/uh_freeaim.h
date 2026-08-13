@@ -1,12 +1,13 @@
 //========= Copyright 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Underhell OTS free-aim (cam_ots_freeaim_*).
+// Purpose: Underhell OTS free-aim (cam_ots_freeaim_*) — client-side accessors.
 //
 //  In hip-fire the weapon is offset from the view center and auto-turns back;
 //  ironsighting locks it to center. See docs/underhell-weapons-aiming.md §2.8.
 //
-//  Client computes the offset (mouse-driven) and sends it to the server via
-//  "update_freeaim" so bullets leave the barrel where the weapon points.
+//  The crosshair/cursor state lives in CInput (game/client/in_camera.cpp);
+//  these helpers expose it to the viewmodel (weapon angle) and to the
+//  C_BaseHLPlayer::CreateMove sync (update_freeaim to the server).
 //
 //=============================================================================//
 
@@ -18,20 +19,15 @@
 
 #include "mathlib/vector.h"
 
-class CUserCmd;
-
 #if defined( CLIENT_DLL )
 
-// Current free-aim angle offset (pitch/yaw, degrees) for the local player.
+// Free-aim angle offset (pitch/yaw degrees) for the local player's weapon/bullets.
 QAngle	UH_FreeAim_GetOffset( void );
 
 // True when the OTS free-aim system is enabled.
 bool	UH_FreeAim_IsEnabled( void );
 
-// Accumulate mouse input / auto-turn back to center. Called from CreateMove.
-void	UH_FreeAim_Update( CUserCmd *pCmd, float flFrameTime );
-
-// Force the free-aim offset back to zero (e.g. while ironsighted).
+// Force the free-aim cursor back to center (e.g. when ironsighting).
 void	UH_FreeAim_Reset( void );
 
 #endif // CLIENT_DLL

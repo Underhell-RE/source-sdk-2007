@@ -13,6 +13,7 @@
 #include "collisionutils.h"
 #if defined( HL2_EPISODIC )
 #include "episodic/uh_freeaim.h"
+#include "iinput.h"
 #include "usercmd.h"
 #endif
 
@@ -35,87 +36,35 @@ ConVar cl_npc_speedmod_outtime( "cl_npc_speedmod_outtime", "1.5", FCVAR_CLIENTDL
 #if defined( HL2_EPISODIC )
 
 //-----------------------------------------------------------------------------
-// Underhell OTS free-aim (cam_ots_freeaim_*). ConVar names/defaults recovered
-// from the decompiled client (sub_102B85xx).
+// Underhell OTS free-aim sync (cursor state lives in CInput; see
+// game/client/in_camera.cpp and docs/underhell-weapons-aiming.md §2.8).
 //-----------------------------------------------------------------------------
-static ConVar cam_ots_freeaim_enable( "cam_ots_freeaim_enable", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
-static ConVar cam_ots_freeaim_interval_enable( "cam_ots_freeaim_interval_enable", "0", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
-static ConVar cam_ots_freeaim_move_threshold( "cam_ots_freeaim_move_threshold", "0.05", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
-static ConVar cam_ots_freeaim_move_max( "cam_ots_freeaim_move_max", "0.1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
-static ConVar cam_ots_freeaim_speed_turn( "cam_ots_freeaim_speed_turn", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
-static ConVar cam_ots_freeaim_speed_evenYawSpeed( "cam_ots_freeaim_speed_evenYawSpeed", "0", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
-static ConVar cam_ots_freeaim_autoturn_speed( "cam_ots_freeaim_autoturn_speed", "250", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
-
-// Hard clamps recovered from the decompiled server (sub_101F1D70).
-#define UH_FREEAIM_MAX_PITCH		25.0f
-#define UH_FREEAIM_MAX_YAW			12.0f
-#define UH_FREEAIM_MOUSE_TO_DEG		0.022f	// Source m_yaw/m_pitch scale (deg per mickey)
 #define UH_FREEAIM_SEND_INTERVAL	0.1f	// update_freeaim throttle
 
-static QAngle s_FreeAimOffset( 0, 0, 0 );
-static float  s_flLastFreeAimSend = 0.0f;
+static float s_flLastFreeAimSend = 0.0f;
 
-QAngle UH_FreeAim_GetOffset( void )
+void UH_FreeAim_SyncToServer( float flFrameTime )
 {
-	return s_FreeAimOffset;
-}
+	// Camera recenter toward the aim point (autoturn).
+	::input->CAM_FreeAimDecay( flFrameTime );
 
-bool UH_FreeAim_IsEnabled( void )
-{
-	return cam_ots_freeaim_enable.GetBool();
-}
-
-void UH_FreeAim_Reset( void )
-{
-	s_FreeAimOffset.Init();
-}
-
-void UH_FreeAim_Update( CUserCmd *pCmd, float flFrameTime )
-{
-	if ( !cam_ots_freeaim_enable.GetBool() )
-	{
-		s_FreeAimOffset.Init();
+	C_BaseHLPlayer *pPlayer = dynamic_cast< C_BaseHLPlayer * >( C_BasePlayer::GetLocalPlayer() );
+	if ( !pPlayer )
 		return;
-	}
 
 	// While ironsighted the weapon locks to the view center.
-	C_BaseHLPlayer *pPlayer = dynamic_cast< C_BaseHLPlayer * >( C_BasePlayer::GetLocalPlayer() );
-	if ( pPlayer && pPlayer->IsIronSighted() )
+	if ( pPlayer->IsIronSighted() )
 	{
-		s_FreeAimOffset.Init();
+		::input->CAM_ResetFreeAimCursor();
 		return;
 	}
 
-	// Mouse delta -> angle offset (dead zone on tiny movement).
-	float flYaw = pCmd->mousedx * UH_FREEAIM_MOUSE_TO_DEG * cam_ots_freeaim_speed_turn.GetFloat();
-	float flPitch = pCmd->mousedy * UH_FREEAIM_MOUSE_TO_DEG * cam_ots_freeaim_speed_turn.GetFloat();
-	float flThreshold = cam_ots_freeaim_move_threshold.GetFloat();
-	if ( fabs( flYaw ) < flThreshold )		flYaw = 0.0f;
-	if ( fabs( flPitch ) < flThreshold )	flPitch = 0.0f;
-
-	s_FreeAimOffset.y += flYaw;
-	s_FreeAimOffset.x -= flPitch;
-
-	// Auto-turn back to center.
-	float flAuto = cam_ots_freeaim_autoturn_speed.GetFloat() * flFrameTime;
-	for ( int i = 0; i < 2; i++ )
-	{
-		float *p = ( i == 0 ) ? &s_FreeAimOffset.x : &s_FreeAimOffset.y;
-		if ( *p > flAuto )			*p -= flAuto;
-		else if ( *p < -flAuto )	*p += flAuto;
-		else						*p = 0.0f;
-	}
-
-	// Clamp (server-side limits from the decompile).
-	s_FreeAimOffset.x = clamp( s_FreeAimOffset.x, -UH_FREEAIM_MAX_PITCH, UH_FREEAIM_MAX_PITCH );
-	s_FreeAimOffset.y = clamp( s_FreeAimOffset.y, -UH_FREEAIM_MAX_YAW, UH_FREEAIM_MAX_YAW );
-
-	// Sync to the server so bullets follow the free-aim point.
+	// Sync the aim offset so server bullets follow the free-aim point.
 	if ( ( gpGlobals->curtime - s_flLastFreeAimSend ) >= UH_FREEAIM_SEND_INTERVAL )
 	{
 		s_flLastFreeAimSend = gpGlobals->curtime;
-		engine->ServerCmd( VarArgs( "update_freeaim %f %f %f",
-			s_FreeAimOffset.x, s_FreeAimOffset.y, s_FreeAimOffset.z ) );
+		QAngle ang = UH_FreeAim_GetOffset();
+		engine->ServerCmd( VarArgs( "update_freeaim %f %f %f", ang.x, ang.y, ang.z ) );
 	}
 }
 
@@ -749,7 +698,7 @@ bool C_BaseHLPlayer::CreateMove( float flInputSampleTime, CUserCmd *pCmd )
 #if defined( HL2_EPISODIC )
 	if ( IsLocalPlayer() )
 	{
-		UH_FreeAim_Update( pCmd, flInputSampleTime );
+		UH_FreeAim_SyncToServer( flInputSampleTime );
 	}
 #endif
 

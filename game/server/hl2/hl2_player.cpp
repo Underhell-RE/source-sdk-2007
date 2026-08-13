@@ -514,8 +514,13 @@ void CHL2_Player::ThrowGrenadeQuick( void )
 
 	RemoveAmmo( 1, iGrenade );
 
-	// Throw animation (body + viewmodel).
+	// Throw animation (body + grenade viewmodel, mirrors Throw_Nade / sub_101ED130).
 	SetAnimation( PLAYER_ATTACK1 );
+	CBaseViewModel *pViewModel = GetViewModel();
+	if ( pViewModel )
+	{
+		pViewModel->SetWeaponModel( "models/weapons/v_grenade.mdl", GetActiveWeapon() );
+	}
 	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
 	if ( pWeapon )
 		pWeapon->SendWeaponAnim( ACT_VM_THROW );
@@ -677,6 +682,7 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.kick_fire_fly" );
 	PrecacheScriptSound( "Player.Voice.Kick" );
 	PrecacheScriptSound( "Player.Voice.Kick.Exhausted" );
+	PrecacheModel( "models/weapons/v_grenade.mdl" );
 #endif
 }
 
