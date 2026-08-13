@@ -18,27 +18,16 @@
 //-----------------------------------------------------------------------------
 // Console commands.
 //
-// NOTE: "switch", "dropitem" and "useitem" are intentionally NOT registered
-// as ConCommands — like the original they arrive through the engine's
-// client-command route (unknown commands are forwarded to the server and
-// dispatched by CHL2_Player::ClientCommand). "emit" stays in the vanilla
-// base handler. Only "UpdateInventory" is a real ConCommand.
+// NOTE: "switch", "dropitem", "useitem" and "UpdateInventory" are
+// intentionally NOT registered as ConCommands — exactly like the original,
+// they arrive through the engine's client-command route (unknown commands are
+// forwarded to the server and dispatched by CHL2_Player::ClientCommand).
+// "emit" stays in the vanilla base handler.
 //-----------------------------------------------------------------------------
 static CHL2_Player *UH_GetCommandPlayer( void )
 {
 	return dynamic_cast<CHL2_Player *>( UTIL_GetCommandClient() );
 }
-
-static void UH_CC_UpdateInventory( const CCommand &args )
-{
-	CHL2_Player *pPlayer = UH_GetCommandPlayer();
-	if ( pPlayer )
-		pPlayer->UH_UpdateInventory();
-}
-
-// TODO: verify the original registration flags (sub_102DDDE0's ConCommand
-// initializer was not recovered from the binary).
-static ConCommand uh_cc_update_inventory( "UpdateInventory", UH_CC_UpdateInventory, "Updates the inventory", FCVAR_CLIENTCMD_CAN_EXECUTE );
 
 //-----------------------------------------------------------------------------
 // Dev/testing helper — not part of the original. Lets the inventory UI and
@@ -320,6 +309,12 @@ bool CHL2_Player::UH_HandleInventoryCommand( const CCommand &args )
 		{
 			UH_ItemAction( atoi( args[1] ), true );
 		}
+		return true;
+	}
+
+	if ( !Q_stricmp( pszCommand, "UpdateInventory" ) )
+	{
+		UH_UpdateInventory();
 		return true;
 	}
 

@@ -48,11 +48,13 @@ public:
 
 	void SetSlotContents( const char *pszSprite, const char *pszTextToken );
 	void Clear( void );
+	void SetSelected( bool bSelected ) { m_bSelected = bSelected; }
 
 private:
 	const char		*m_pszSprite;	// static table pointer, NULL = nothing to draw
 	vgui::Label		*m_pLabel;
 	int				m_iTextureId;
+	bool			m_bSelected;
 };
 
 //-----------------------------------------------------------------------------

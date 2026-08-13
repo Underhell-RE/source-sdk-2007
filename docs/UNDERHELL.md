@@ -119,10 +119,14 @@ Original save parsed. Confirmations:
 ## Mod asset findings
 
 - `resource/ui/inventorypanel.res`: panel = `CInventoryPanel`, x=368, y=84, wide=1024, tall=512, titlebar visible, `Texture1 = Sprites/Hud/Inventory/Inventory`, PaintBackgroundType 1. OB-era vgui has no `Texture1` key (newer-vgui feature) — background applied manually in our port.
-- Slot structure (ctor, sub_1012E360): 28 slot panels = 4x6 grid (indices 0..23) + row of 4 (24..27). Icons 28x28. Slot children created visible. Ctor ends by setting the refresh flag.
-- Sprites: `materials/Sprites/Hud/Items/*.vmt` — every name from the id switch exists (128x128). `Inventory.vtf` = 1024x512 background. `Blank.vtf` = 1x1 with alpha 0 (empty slots invisible — a "blank" panel is the original behaviour, minus the background texture).
+- Slot structure (ctor, sub_1012E360): 28 slot panels = 4x6 grid (indices 0..23) + 4 extras (24..27) at (82,81), (82,118), (343,81), (343,118). Pitch 37, origin (44, 28), icon size 28 — all passed through the vgui scheme's proportional scaling (`dword_1047CA7C` = `VGUI_Scheme010` interface). Our layout uses the same constants through `GetProportionalScaledValueEx`.
+- Sprites: `materials/Sprites/Hud/Items/*.vmt` — every name from the id switch exists (128x128). `Inventory.vtf` = 1024x512 background (DXT5). `Blank.vtf` = 1x1 with alpha 0 (empty slots invisible — a "blank" panel is the original behaviour, minus the background texture).
 - Localization (`resource/Underhell_english.txt`, UTF-16): all `UnderHell_Inventory_*` tokens exist; no Painkillers/Syringe tokens (quest items, text-only slots). Item descriptions document real effects: food = endurance + health, bandages stop bleeding, healthvial slows bleeding, radio/radiocracker attract enemies after 5s, flare ignites enemies, glowsticks strap to waist.
 - Engine: build 4104 (OB Ep2, Feb 2010). `sv_sendtables` / `sv_dump_class_info` are 2013-era commands — unavailable here. Verification instead comes from the hexrays sendtable decode + the save file.
+
+## Command-flow note (important)
+
+`UpdateInventory` must NOT be a server ConCommand. Original message flow: client registers it plain (no FCVAR_CLIENTCMD_CAN_EXECUTE), so `engine->ClientCmd("UpdateInventory")` (from cl_inventoryToggle) is NOT run locally but forwarded to the server → `CHL2_Player::ClientCommand` dispatches it → resync → server sends `engine->ClientCommand(edict, "UpdateInventory")` → client executes its local handler (refresh flag). A server-side ConCommand registration would double-handle the message and risk a client/server ping-pong. Our port mirrors the original flow exactly.
 
 ## TODOs (tracked)
 

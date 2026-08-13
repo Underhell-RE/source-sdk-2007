@@ -20,6 +20,7 @@
 #include "cbase.h"
 #include "c_basehlplayer.h"
 #include "vgui/ISurface.h"
+#include "vgui/IScheme.h"
 #include "inputsystem/buttoncode.h"
 #include "c_inventory_panel.h"
 
@@ -81,7 +82,25 @@ static const UHInventorySlotInfo_t s_InventorySlotInfo[UH_INVENTORY_ITEM_TABLE_S
 #define UH_INVENTORY_BLANK_SPRITE "Sprites/Hud/Inventory/Blank"
 
 #define UH_INVENTORY_BG_SPRITE    "Sprites/Hud/Inventory/Inventory"
-#define UH_INVENTORY_ICON_SIZE    28	// original icon size (hexrays sub_1012E360)
+
+// Layout constants from the original slot creation code (hexrays
+// sub_1012E360) — the original scales them through the vgui scheme, so do we.
+#define UH_SLOT_PITCH     37	// column/row pitch
+#define UH_SLOT_ORIGIN_X  44	// grid origin
+#define UH_SLOT_ORIGIN_Y  28
+#define UH_SLOT_ICON_SIZE 28	// icon size drawn per slot
+#define UH_SLOT_COLS      4
+#define UH_SLOT_ROWS      6
+
+// The 4 extra slots (indices 24..27) form a 2x2 block; positions from the
+// same function (82/343 x, 81/118 y).
+static const int s_nExtraSlotPos[4][2] =
+{
+	{  82,  81 },
+	{  82, 118 },
+	{ 343,  81 },
+	{ 343, 118 },
+};
 
 //-----------------------------------------------------------------------------
 // Singleton.
@@ -104,7 +123,9 @@ CInventoryPanel *GetInventoryPanel( void )
 CON_COMMAND( cl_inventoryToggle, "Toggles the inventory." )
 {
 	// Original (hexrays sub_1012E690): ask the server for a resync, then flip
-	// the panel's visibility.
+	// the panel's visibility. No FCVAR_CLIENTCMD_CAN_EXECUTE on the client's
+	// UpdateInventory, so the ClientCmd string is forwarded to the server —
+	// the original's exact message flow.
 	engine->ClientCmd( "UpdateInventory" );
 
 	if ( GetInventoryPanel() )
@@ -116,6 +137,7 @@ CON_COMMAND( cl_inventoryToggle, "Toggles the inventory." )
 CON_COMMAND( UpdateInventory, "Updates the inventory" )
 {
 	// Original (hexrays sub_102BC600/sub_1012E660): flags a full refresh.
+	// Executed locally when the server sends it via engine->ClientCommand.
 	if ( GetInventoryPanel() )
 	{
 		GetInventoryPanel()->RequestRefresh();
@@ -130,13 +152,12 @@ CInventorySlotPanel::CInventorySlotPanel( vgui::Panel *pParent, const char *pszN
 {
 	m_pszSprite = NULL;
 	m_iTextureId = vgui::surface()->CreateNewTextureID();
+	m_bSelected = false;
 
 	m_pLabel = new vgui::Label( this, "ItemName", "" );
 	m_pLabel->SetContentAlignment( vgui::Label::a_northwest );
 	m_pLabel->SetWrap( false );
-
-	// Slots never take input — clicks pass through to the frame.
-	SetMouseInputEnabled( false );
+	m_pLabel->SetMouseInputEnabled( false );
 }
 
 CInventorySlotPanel::~CInventorySlotPanel()
@@ -147,18 +168,31 @@ void CInventorySlotPanel::PerformLayout( void )
 {
 	BaseClass::PerformLayout();
 
-	// Original drew the icons at 28x28 (hexrays sub_1012E360).
-	m_pLabel->SetBounds( 2, UH_INVENTORY_ICON_SIZE + 2, GetWide() - 4, GetTall() - UH_INVENTORY_ICON_SIZE - 2 );
+	int iIcon = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
+
+	// Original drew the icons at 28 (scheme-scaled) in the slot corner.
+	m_pLabel->SetBounds( 2, iIcon + 2, GetWide() - 4, GetTall() - iIcon - 2 );
 }
 
 void CInventorySlotPanel::PaintBackground( void )
 {
-	if ( !m_pszSprite || !*m_pszSprite )
-		return;
+	BaseClass::PaintBackground();
 
-	vgui::surface()->DrawSetColor( 255, 255, 255, 255 );
-	vgui::surface()->DrawSetTextureFile( m_iTextureId, m_pszSprite, true, false );
-	vgui::surface()->DrawTexturedRect( 0, 0, UH_INVENTORY_ICON_SIZE, UH_INVENTORY_ICON_SIZE );
+	int iIcon = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
+
+	if ( m_bSelected )
+	{
+		// Selection feedback (original selection visuals still TODO).
+		vgui::surface()->DrawSetColor( 255, 200, 0, 60 );
+		vgui::surface()->DrawFilledRect( 0, 0, GetWide(), GetTall() );
+	}
+
+	if ( m_pszSprite && *m_pszSprite )
+	{
+		vgui::surface()->DrawSetColor( 255, 255, 255, 255 );
+		vgui::surface()->DrawSetTextureFile( m_iTextureId, m_pszSprite, true, false );
+		vgui::surface()->DrawTexturedRect( 0, 0, iIcon, iIcon );
+	}
 }
 
 void CInventorySlotPanel::SetSlotContents( const char *pszSprite, const char *pszTextToken )
@@ -174,6 +208,7 @@ void CInventorySlotPanel::Clear( void )
 	// alpha 0 — empty slots are invisible, like in the original.
 	m_pszSprite = UH_INVENTORY_BLANK_SPRITE;
 	m_pLabel->SetText( "" );
+	m_bSelected = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -204,7 +239,7 @@ CInventoryPanel::CInventoryPanel( vgui::VPANEL parent )
 	// (hexrays sub_1012EDC0) — only shows through if the texture is missing.
 	SetBgColor( Color( 255, 255, 255, 128 ) );
 
-	// 28 slot panels: a 4x6 grid (slots 0..23) plus a row of 4 (24..27),
+	// 28 slot panels: a 4x6 grid (slots 0..23) plus 4 extra slots (24..27),
 	// mirroring the original creation loops (hexrays sub_1012E360).
 	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
 	{
@@ -230,18 +265,30 @@ void CInventoryPanel::PerformLayout( void )
 {
 	BaseClass::PerformLayout();
 
-	// 4 columns x 7 rows: slots 0..23 fill rows 0..5, slots 24..27 the last row.
-	int iCols = 4;
-	int iRows = 7;
-	int iSlotW = GetWide() / iCols;
-	int iSlotH = GetTall() / iRows;
+	// Original layout values, scheme-scaled (the original scales the same
+	// constants through the scheme interface — hexrays sub_1012E360).
+	int iPitch = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_PITCH );
+	int iOriginX = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ORIGIN_X );
+	int iOriginY = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ORIGIN_Y );
+	int iIcon = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
 
-	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
+	int iSlotW = iPitch + iIcon;
+	int iSlotH = iPitch + iIcon + 20;
+
+	for ( int i = 0; i < UH_SLOT_COLS * UH_SLOT_ROWS; ++i )
 	{
-		int iX = ( i % iCols ) * iSlotW;
-		int iY = ( i / iCols ) * iSlotH;
+		int iX = iOriginX + ( i % UH_SLOT_COLS ) * iPitch;
+		int iY = iOriginY + ( i / UH_SLOT_COLS ) * iPitch;
 
 		m_pSlots[i]->SetBounds( iX, iY, iSlotW, iSlotH );
+	}
+
+	for ( int i = 0; i < 4; ++i )
+	{
+		int iX = scheme()->GetProportionalScaledValueEx( GetScheme(), s_nExtraSlotPos[i][0] );
+		int iY = scheme()->GetProportionalScaledValueEx( GetScheme(), s_nExtraSlotPos[i][1] );
+
+		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetBounds( iX, iY, iSlotW, iSlotH );
 	}
 }
 
@@ -255,10 +302,13 @@ void CInventoryPanel::PaintBackground( void )
 
 void CInventoryPanel::OnKeyCodePressed( vgui::KeyCode code )
 {
-	// ESC closes the inventory (the original's frame handled this too).
-	if ( code == (vgui::KeyCode)KEY_ESCAPE )
+	// Close on ESC. Also handle the toggle key here so it works even when
+	// the frame has keyboard focus (focus would otherwise swallow the
+	// engine's key binding).
+	if ( code == (vgui::KeyCode)KEY_ESCAPE ||
+		 code == (vgui::KeyCode)KEY_I )
 	{
-		SetVisible( false );
+		Toggle();
 		return;
 	}
 
@@ -306,9 +356,11 @@ void CInventoryPanel::Toggle( void )
 		ClearSlots();
 		RefreshSlots();
 
-		// Activate() shows the frame, moves it to the front and requests
-		// focus — so ESC (and the titlebar close button) work right away.
-		Activate();
+		// Show + raise WITHOUT taking keyboard focus: the engine's key
+		// binding (i = cl_inventoryToggle) must keep working so the panel
+		// can be toggled closed again.
+		SetVisible( true );
+		MoveToFront();
 	}
 }
 
@@ -346,8 +398,10 @@ void CInventoryPanel::SetSlot( int iSlot, const char *pszSprite, const char *psz
 }
 
 //-----------------------------------------------------------------------------
-// vgui messages the original panel handled.
-// TODO: reconstruct the selection/mouse behaviour (slot drag, use on click).
+// vgui messages the original panel handled. The original forwards both to
+// virtuals of the panel — slot selection / release behaviour still TODO.
+// For now, clicking a slot toggles a selection highlight so the grid is
+// visibly interactive.
 //-----------------------------------------------------------------------------
 void CInventoryPanel::OnNewSelection( void )
 {
@@ -355,4 +409,26 @@ void CInventoryPanel::OnNewSelection( void )
 
 void CInventoryPanel::OnNewMouseReleased( void )
 {
+	// Find the slot under the cursor and select it (visual feedback only;
+	// the original use/drop wiring is still TODO).
+	C_BaseHLPlayer *pPlayer = dynamic_cast<C_BaseHLPlayer *>( C_BasePlayer::GetLocalPlayer() );
+	if ( !pPlayer )
+		return;
+
+	for ( int i = 0; i < UH_INVENTORY_SLOTS; ++i )
+	{
+		if ( !m_pSlots[i]->IsCursorOver() )
+			continue;
+
+		// Only filled slots are selectable.
+		if ( !UH_IsValidInventoryItem( pPlayer->m_iInventory[i] ) )
+			continue;
+
+		// Move the selection highlight to this slot.
+		for ( int j = 0; j < UH_INVENTORY_SLOTS; ++j )
+		{
+			m_pSlots[j]->SetSelected( j == i );
+		}
+		break;
+	}
 }
