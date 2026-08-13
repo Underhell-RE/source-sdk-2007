@@ -2082,7 +2082,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\shared\weapon_parse_default.cpp"
+				RelativePath="..\shared\episodic\uh_weapon_parse.cpp"
 				>
 			</File>
 			<File
@@ -2626,6 +2626,14 @@
 				</File>
 				<File
 					RelativePath=".\episodic\c_weapon_hopwire.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\c_weapon__stubs_underhell.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_freeaim_client.cpp"
 					>
 				</File>
 				<File
@@ -5063,6 +5071,14 @@
 			</File>
 			<File
 				RelativePath="..\shared\weapon_parse.h"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\episodic\uh_weapon_parse.h"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\episodic\uh_freeaim.h"
 				>
 			</File>
 			<File

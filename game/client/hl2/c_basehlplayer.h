@@ -52,12 +52,22 @@ public:
 
 	bool				IsWeaponLowered( void ) { return m_HL2Local.m_bWeaponLowered; }
 
+#if defined( HL2_EPISODIC )
+	bool				IsIronSighted( void ) const { return m_bIronSighted; }
+#endif
+
 public:
 
 	C_HL2PlayerLocalData		m_HL2Local;
 	EHANDLE				m_hClosestNPC;
 	float				m_flSpeedModTime;
 	bool				m_fIsSprinting;
+
+#if defined( HL2_EPISODIC )
+	// Underhell: ironsight state (mirrors the server-side CHL2_Player fields).
+	CNetworkVar( bool, m_bIronSighted );
+	CNetworkVar( float, m_fIronsightedTime );
+#endif
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible

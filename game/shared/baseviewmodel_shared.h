@@ -85,6 +85,11 @@ public:
 
 	Vector					m_vecLastFacing;
 
+#if defined( HL2_EPISODIC )
+	// Underhell: ironsight state. True when the weapon is raised to the eye.
+	CNetworkVar( bool, m_bExpSighted );
+#endif
+
 	// Only support prediction in TF2 for now
 #if defined( INVASION_DLL ) || defined( INVASION_CLIENT_DLL )
 	// All predicted weapons need to implement and return true
@@ -191,6 +196,13 @@ private:
 
 #if defined( CLIENT_DLL )
 	int						m_nOldAnimationParity;
+
+#if defined( HL2_EPISODIC )
+	// Underhell: local ironsight blend state (not networked).
+	float						m_expFactor;				// 0..1 blend toward ironsight pose
+	bool						m_bPrevExpSighted;			// last known networked state
+	float						m_flIronsightedChangeTime;	// when the state last changed
+#endif
 #endif
 
 

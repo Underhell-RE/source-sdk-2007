@@ -3214,7 +3214,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\shared\weapon_parse_default.cpp"
+				RelativePath="..\shared\episodic\uh_weapon_parse.h"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\episodic\uh_weapon_parse.cpp"
 				>
 			</File>
 			<File
@@ -4418,6 +4422,38 @@
 				</File>
 				<File
 					RelativePath=".\episodic\weapon_striderbuster.h"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_weapon_melee.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_basefirearm.h"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_basefirearm.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_weapon_pistols.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_weapon_smg.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_weapon_shotguns.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_weapon_rifles.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\uh_weapon_bfg.cpp"
 					>
 				</File>
 				<File

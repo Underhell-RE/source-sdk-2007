@@ -1749,6 +1749,10 @@ typedef enum
 	ACT_ITEM2_VM_IDLE_LOWERED,
 	ACT_ITEM2_VM_LOWERED_TO_IDLE,
 
+	// Underhell: unarmed kick (see docs/underhell-weapons-aiming.md)
+	ACT_KICK,
+	ACT_KICK_CROUCHED,
+
 	// this is the end of the global activities, private per-monster activities start here.
 	LAST_SHARED_ACTIVITY,
 } Activity;
