@@ -19,6 +19,8 @@
 
 #include "mathlib/vector.h"
 
+class CUserCmd;
+
 #if defined( CLIENT_DLL )
 
 // Free-aim angle offset (pitch/yaw degrees) for the local player's weapon/bullets.
@@ -29,6 +31,9 @@ bool	UH_FreeAim_IsEnabled( void );
 
 // Force the free-aim cursor back to center (e.g. when ironsighting).
 void	UH_FreeAim_Reset( void );
+
+// Accumulate/decay the free-aim offset from the mouse delta (CreateMove).
+void	UH_FreeAim_Update( CUserCmd *pCmd, float flFrameTime );
 
 #endif // CLIENT_DLL
 

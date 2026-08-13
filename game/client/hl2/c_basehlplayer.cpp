@@ -13,7 +13,6 @@
 #include "collisionutils.h"
 #if defined( HL2_EPISODIC )
 #include "episodic/uh_freeaim.h"
-#include "iinput.h"
 #include "usercmd.h"
 #endif
 
@@ -36,30 +35,17 @@ ConVar cl_npc_speedmod_outtime( "cl_npc_speedmod_outtime", "1.5", FCVAR_CLIENTDL
 #if defined( HL2_EPISODIC )
 
 //-----------------------------------------------------------------------------
-// Underhell OTS free-aim sync (cursor state lives in CInput; see
-// game/client/in_camera.cpp and docs/underhell-weapons-aiming.md §2.8).
+// Underhell OTS free-aim sync: accumulate/decay the aim offset and send it to
+// the server so bullets follow the free-aim point (docs §2.8).
 //-----------------------------------------------------------------------------
 #define UH_FREEAIM_SEND_INTERVAL	0.1f	// update_freeaim throttle
 
 static float s_flLastFreeAimSend = 0.0f;
 
-void UH_FreeAim_SyncToServer( float flFrameTime )
+void UH_FreeAim_SyncToServer( CUserCmd *pCmd, float flFrameTime )
 {
-	// Camera recenter toward the aim point (autoturn).
-	::input->CAM_FreeAimDecay( flFrameTime );
+	UH_FreeAim_Update( pCmd, flFrameTime );
 
-	C_BaseHLPlayer *pPlayer = dynamic_cast< C_BaseHLPlayer * >( C_BasePlayer::GetLocalPlayer() );
-	if ( !pPlayer )
-		return;
-
-	// While ironsighted the weapon locks to the view center.
-	if ( pPlayer->IsIronSighted() )
-	{
-		::input->CAM_ResetFreeAimCursor();
-		return;
-	}
-
-	// Sync the aim offset so server bullets follow the free-aim point.
 	if ( ( gpGlobals->curtime - s_flLastFreeAimSend ) >= UH_FREEAIM_SEND_INTERVAL )
 	{
 		s_flLastFreeAimSend = gpGlobals->curtime;
@@ -698,7 +684,7 @@ bool C_BaseHLPlayer::CreateMove( float flInputSampleTime, CUserCmd *pCmd )
 #if defined( HL2_EPISODIC )
 	if ( IsLocalPlayer() )
 	{
-		UH_FreeAim_SyncToServer( flInputSampleTime );
+		UH_FreeAim_SyncToServer( pCmd, flInputSampleTime );
 	}
 #endif
 

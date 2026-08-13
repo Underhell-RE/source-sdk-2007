@@ -515,7 +515,17 @@ void CHL2_Player::ThrowGrenadeQuick( void )
 	RemoveAmmo( 1, iGrenade );
 
 	// Throw animation (body + grenade viewmodel, mirrors Throw_Nade / sub_101ED130).
-	SetAnimation( PLAYER_ATTACK1 );
+	int seq = SelectWeightedSequence( ACT_HANDGRENADE_THROW1 );
+	if ( seq >= 0 )
+	{
+		ResetSequence( seq );
+		SetActivity( ACT_HANDGRENADE_THROW1 );
+	}
+	else
+	{
+		SetAnimation( PLAYER_ATTACK1 );
+	}
+
 	CBaseViewModel *pViewModel = GetViewModel();
 	if ( pViewModel )
 	{
@@ -556,8 +566,20 @@ void CHL2_Player::PerformKick( void )
 	if ( IsIronSighted() )
 		ToggleIronsight();
 
-	// Kick animation (body + viewmodel melee swing).
-	SetAnimation( PLAYER_ATTACK1 );
+	// Kick animation. The body plays ACT_KICK when the player model provides it
+	// (Underhell models do; fallback is the standard attack pose), and the
+	// viewmodel plays a melee swing. Mirrors uh_jake_kick.
+	int seq = SelectWeightedSequence( ACT_KICK );
+	if ( seq >= 0 )
+	{
+		ResetSequence( seq );
+		SetActivity( ACT_KICK );
+	}
+	else
+	{
+		SetAnimation( PLAYER_ATTACK1 );
+	}
+
 	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
 	if ( pWeapon )
 		pWeapon->SendWeaponAnim( ACT_VM_HITCENTER );
