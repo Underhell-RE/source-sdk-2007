@@ -103,11 +103,26 @@ Full classname list: `FGD/Item List.txt` (food, ammo, equipment, health) + `Weap
 Stage 1–6 done (first batch):
 
 - Shared: item id enum + id→classname/print-name table (exact original strings).
-- Server: 40 item entity classes registered under original classnames (Spawn/Precache stubbed, models from FGD), `item_random` stub, `CHL2_Player` inventory state (sendtable in original order, datamap per original save format), `UH_ItemAction` use/drop logic ported 1:1, `switch`/`dropitem`/`useitem` via `ClientCommand`, `UpdateInventory` resync command.
-- Client: `C_BaseHLPlayer` inventory props (recv table matches server order), `CInventoryPanel` + 28 slots + original sprite/token table, `cl_inventoryToggle` + `UpdateInventory` commands.
+- Server: 40 item entity classes registered under original classnames (Spawn/Precache stubbed, models from FGD), `item_random` stub, `CHL2_Player` inventory state (sendtable in original order, datamap per original save format), `UH_ItemAction` use/drop logic ported 1:1, `switch`/`dropitem`/`useitem` via `ClientCommand`, `UpdateInventory` resync command, `uh_give_item` dev cheat.
+- Client: `C_BaseHLPlayer` inventory props (recv table matches server order), `CInventoryPanel` loaded from the original `resource/UI/InventoryPanel.res` + 28 slots (4x6 grid + row of 4, per original creation loops) + original sprite/token table, `cl_inventoryToggle` + `UpdateInventory` commands.
 - Build: sources registered in both episodic vcproj files.
 
 Next stage: item pickup flow (`CUHItem::MyTouch` → `UH_AddInventoryItem`), per-item use effects, held-item handle, equip counter at player+848.
+
+## Save-file validation (inventory_is_full.sav)
+
+Original save parsed. Confirmations:
+- Datamap field names in the file match the implementation: `m_iInventory`, `m_bInventoryEnabled`, `m_bShoulderFlashlight`, `m_iUHBatteryCount`, `m_HL2Local` all present.
+- Player inventory array decoded: 28 x 4-byte ints, empty slot = 0. The "full" save holds 27 items — values all within 1..32 and consistent with the id table (2=apple, 5=sandwich, 10/11=soda, 14/18=glowsticks, 26=bandages, 27=healthkit, 28=healthvial, 29=chocobar, 30=orange). No 19..23 saved — lit glowsticks are runtime state, as expected.
+- Field records: `u16 fieldIndex, u16 dataLength, data` — the inventory record's length field = 112 (28 x 4). Matches the network array layout.
+
+## Mod asset findings
+
+- `resource/ui/inventorypanel.res`: panel = `CInventoryPanel`, x=368, y=84, wide=1024, tall=512, titlebar visible, `Texture1 = Sprites/Hud/Inventory/Inventory`, PaintBackgroundType 1. OB-era vgui has no `Texture1` key (newer-vgui feature) — background applied manually in our port.
+- Slot structure (ctor, sub_1012E360): 28 slot panels = 4x6 grid (indices 0..23) + row of 4 (24..27). Icons 28x28. Slot children created visible. Ctor ends by setting the refresh flag.
+- Sprites: `materials/Sprites/Hud/Items/*.vmt` — every name from the id switch exists (128x128). `Inventory.vtf` = 1024x512 background. `Blank.vtf` = 1x1 with alpha 0 (empty slots invisible — a "blank" panel is the original behaviour, minus the background texture).
+- Localization (`resource/Underhell_english.txt`, UTF-16): all `UnderHell_Inventory_*` tokens exist; no Painkillers/Syringe tokens (quest items, text-only slots). Item descriptions document real effects: food = endurance + health, bandages stop bleeding, healthvial slows bleeding, radio/radiocracker attract enemies after 5s, flare ignites enemies, glowsticks strap to waist.
+- Engine: build 4104 (OB Ep2, Feb 2010). `sv_sendtables` / `sv_dump_class_info` are 2013-era commands — unavailable here. Verification instead comes from the hexrays sendtable decode + the save file.
 
 ## TODOs (tracked)
 
