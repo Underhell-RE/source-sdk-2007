@@ -163,19 +163,22 @@ const char *CMessage::ParseTitlesReference( const char *pszInput, char *outBuf, 
 // This replicates original Underhell's handling of @titles_*.txt_* references
 // and ensures correct color/position (middle bottom for chest comments vs
 // middle for objectives). Uses filesystem and KeyValues parser.
+// Note: scripts/titles.txt is GoldSrc-style titles file, not KeyValues, so
+// we skip it to avoid "KeyValues Error: missing { in file scripts/titles.txt"
+// spam in console. Only KeyValues-style titles_*.txt files are parsed.
 bool CMessage::GetTitlesEntry( const char *pszEntryName, hudtextparms_t &outParms, char *outMessage, int outMessageSize )
 {
 	if ( !pszEntryName || !*pszEntryName )
 		return false;
 
 	// List of known titles files from Underhell (from scripts/ folder)
+	// titles.txt is intentionally excluded — it's not KeyValues format and
+	// causes console spam "missing { in file scripts/titles.txt"
 	const char *pszFiles[] =
 	{
-		"titles.txt",
 		"titles_Prologue.txt",
 		"titles_House.txt",
 		"titles_Chapter1.txt",
-		"titles_Chapter1.txt", // duplicate for safety, engine also loads mod-specific
 		NULL
 	};
 
