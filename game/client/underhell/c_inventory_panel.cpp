@@ -85,11 +85,15 @@ static const UHInventorySlotInfo_t s_InventorySlotInfo[UH_INVENTORY_ITEM_TABLE_S
 #define UH_INVENTORY_BG_SPRITE    "Sprites/Hud/Inventory/Inventory"
 
 // Layout constants from the original slot creation code (hexrays
-// sub_1012E360) — the original scales them through the vgui scheme, so do we.
-#define UH_SLOT_PITCH     37	// column/row pitch
-#define UH_SLOT_ORIGIN_X  44	// grid origin
-#define UH_SLOT_ORIGIN_Y  28
-#define UH_SLOT_ICON_SIZE 28	// icon size drawn per slot
+// sub_1012E360). Exact scaling of that function is still being decoded, so
+// the grid is runtime-tunable until the values are confirmed — tune in game,
+// report the numbers, they get hardcoded.
+static ConVar uh_inv_grid_origin_x( "uh_inv_grid_origin_x", "44", FCVAR_ARCHIVE, "Inventory grid origin X (dev)" );
+static ConVar uh_inv_grid_origin_y( "uh_inv_grid_origin_y", "28", FCVAR_ARCHIVE, "Inventory grid origin Y (dev)" );
+static ConVar uh_inv_grid_pitch_x( "uh_inv_grid_pitch_x", "37", FCVAR_ARCHIVE, "Inventory grid column pitch (dev)" );
+static ConVar uh_inv_grid_pitch_y( "uh_inv_grid_pitch_y", "37", FCVAR_ARCHIVE, "Inventory grid row pitch (dev)" );
+static ConVar uh_inv_grid_icon_size( "uh_inv_grid_icon_size", "28", FCVAR_ARCHIVE, "Inventory icon size (dev)" );
+
 #define UH_SLOT_COLS      4
 #define UH_SLOT_ROWS      6
 
@@ -169,7 +173,7 @@ void CInventorySlotPanel::PerformLayout( void )
 {
 	BaseClass::PerformLayout();
 
-	int iIcon = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
+	int iIcon = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), uh_inv_grid_icon_size.GetInt() );
 
 	// Original drew the icons at 28 (scheme-scaled) in the slot corner.
 	m_pLabel->SetBounds( 2, iIcon + 2, GetWide() - 4, GetTall() - iIcon - 2 );
@@ -179,7 +183,7 @@ void CInventorySlotPanel::PaintBackground( void )
 {
 	BaseClass::PaintBackground();
 
-	int iIcon = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
+	int iIcon = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), uh_inv_grid_icon_size.GetInt() );
 
 	if ( m_bSelected )
 	{
@@ -266,20 +270,20 @@ void CInventoryPanel::PerformLayout( void )
 {
 	BaseClass::PerformLayout();
 
-	// Original layout values, scheme-scaled (the original scales the same
-	// constants through the scheme interface — hexrays sub_1012E360).
-	int iPitch = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_PITCH );
-	int iOriginX = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ORIGIN_X );
-	int iOriginY = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ORIGIN_Y );
-	int iIcon = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
+	// Grid values, scheme-scaled like the original panel code.
+	int iPitchX = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), uh_inv_grid_pitch_x.GetInt() );
+	int iPitchY = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), uh_inv_grid_pitch_y.GetInt() );
+	int iOriginX = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), uh_inv_grid_origin_x.GetInt() );
+	int iOriginY = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), uh_inv_grid_origin_y.GetInt() );
+	int iIcon = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), uh_inv_grid_icon_size.GetInt() );
 
-	int iSlotW = iPitch + iIcon;
-	int iSlotH = iPitch + iIcon + 20;
+	int iSlotW = iPitchX + iIcon;
+	int iSlotH = iPitchY + iIcon + 20;
 
 	for ( int i = 0; i < UH_SLOT_COLS * UH_SLOT_ROWS; ++i )
 	{
-		int iX = iOriginX + ( i % UH_SLOT_COLS ) * iPitch;
-		int iY = iOriginY + ( i / UH_SLOT_COLS ) * iPitch;
+		int iX = iOriginX + ( i % UH_SLOT_COLS ) * iPitchX;
+		int iY = iOriginY + ( i / UH_SLOT_COLS ) * iPitchY;
 
 		m_pSlots[i]->SetBounds( iX, iY, iSlotW, iSlotH );
 	}
@@ -327,11 +331,17 @@ void CInventoryPanel::OnThink( void )
 		return;
 	}
 
-	// Original gates the panel on the player's health and inventory flag
-	// (hexrays sub_1012E6C0). It also checked a bool at client player offset
-	// 3681 that is not yet identified — see docs/UNDERHELL.md.
-	// TODO: identify and honour that flag.
-	if ( !pPlayer->IsAlive() || !pPlayer->m_bInventoryEnabled )
+	// Original gates the panel on the suit, the player's health and the
+	// inventory flag (hexrays sub_1012E6C0: client player offsets 3681 =
+	// suit bool and 136 = health). The inventory only exists while the HEV
+	// suit is worn — matches the original behaviour you reported.
+	if ( !pPlayer->IsSuitEquipped() || pPlayer->GetHealth() <= 0 )
+	{
+		SetVisible( false );
+		return;
+	}
+
+	if ( !pPlayer->m_bInventoryEnabled )
 	{
 		SetVisible( false );
 		return;
