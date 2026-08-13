@@ -21,6 +21,7 @@
 #include "c_basehlplayer.h"
 #include "vgui/ISurface.h"
 #include "vgui/IScheme.h"
+#include "vgui_controls/controls.h"
 #include "inputsystem/buttoncode.h"
 #include "c_inventory_panel.h"
 
@@ -168,7 +169,7 @@ void CInventorySlotPanel::PerformLayout( void )
 {
 	BaseClass::PerformLayout();
 
-	int iIcon = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
+	int iIcon = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
 
 	// Original drew the icons at 28 (scheme-scaled) in the slot corner.
 	m_pLabel->SetBounds( 2, iIcon + 2, GetWide() - 4, GetTall() - iIcon - 2 );
@@ -178,7 +179,7 @@ void CInventorySlotPanel::PaintBackground( void )
 {
 	BaseClass::PaintBackground();
 
-	int iIcon = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
+	int iIcon = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
 
 	if ( m_bSelected )
 	{
@@ -267,10 +268,10 @@ void CInventoryPanel::PerformLayout( void )
 
 	// Original layout values, scheme-scaled (the original scales the same
 	// constants through the scheme interface — hexrays sub_1012E360).
-	int iPitch = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_PITCH );
-	int iOriginX = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ORIGIN_X );
-	int iOriginY = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ORIGIN_Y );
-	int iIcon = scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
+	int iPitch = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_PITCH );
+	int iOriginX = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ORIGIN_X );
+	int iOriginY = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ORIGIN_Y );
+	int iIcon = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), UH_SLOT_ICON_SIZE );
 
 	int iSlotW = iPitch + iIcon;
 	int iSlotH = iPitch + iIcon + 20;
@@ -285,8 +286,8 @@ void CInventoryPanel::PerformLayout( void )
 
 	for ( int i = 0; i < 4; ++i )
 	{
-		int iX = scheme()->GetProportionalScaledValueEx( GetScheme(), s_nExtraSlotPos[i][0] );
-		int iY = scheme()->GetProportionalScaledValueEx( GetScheme(), s_nExtraSlotPos[i][1] );
+		int iX = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), s_nExtraSlotPos[i][0] );
+		int iY = vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), s_nExtraSlotPos[i][1] );
 
 		m_pSlots[UH_SLOT_COLS * UH_SLOT_ROWS + i]->SetBounds( iX, iY, iSlotW, iSlotH );
 	}

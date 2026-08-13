@@ -33,7 +33,7 @@ static CHL2_Player *UH_GetCommandPlayer( void )
 // Dev/testing helper — not part of the original. Lets the inventory UI and
 // use/drop flows be exercised without the (still stubbed) pickup logic.
 //-----------------------------------------------------------------------------
-CON_COMMAND( uh_give_item, "Adds an item to your inventory (dev/testing).", FCVAR_CHEAT )
+CON_COMMAND_F( uh_give_item, "Adds an item to your inventory (dev/testing).", FCVAR_CHEAT )
 {
 	CHL2_Player *pPlayer = UH_GetCommandPlayer();
 	if ( !pPlayer )
