@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		Player for HL2.
 //
@@ -309,6 +309,10 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_nControlClass, FIELD_INTEGER ),
 	DEFINE_EMBEDDED( m_HL2Local ),
 
+	// Underhell inventory save data (original datamap, hexrays sub_102E21B0)
+	DEFINE_ARRAY( m_iInventory, FIELD_INTEGER, UH_INVENTORY_SLOTS ),
+	DEFINE_FIELD( m_bShoulderFlashlight, FIELD_BOOLEAN ),
+
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),
 	DEFINE_FIELD( m_fIsSprinting, FIELD_BOOLEAN ),
@@ -386,6 +390,8 @@ CHL2_Player::CHL2_Player()
 
 	m_flArmorReductionTime = 0.0f;
 	m_iArmorReductionFrom = 0;
+
+	UH_InitializeInventory();
 }
 
 //
@@ -410,6 +416,19 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100 
 IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropDataTable(SENDINFO_DT(m_HL2Local), &REFERENCE_SEND_TABLE(DT_HL2Local), SendProxy_SendLocalDataTable),
 	SendPropBool( SENDINFO(m_fIsSprinting) ),
+
+	// Underhell inventory props. Order below is the original binary's send
+	// table order (hexrays sub_102DD5E0) â€” the engine matches server and
+	// client tables by index, so it must stay exactly like this on both.
+	SendPropBool( SENDINFO(m_bShoulderFlashlight) ),
+	SendPropBool( SENDINFO(m_bFlashlightOn) ),
+	SendPropBool( SENDINFO(m_bInventoryEnabled) ),
+	SendPropInt( SENDINFO(m_iUHBatteryCount) ),
+	SendPropInt( SENDINFO(m_iUHHermitCardsCount) ),
+	SendPropInt( SENDINFO(m_iUHHermitCurrentQuestCount) ),
+	SendPropInt( SENDINFO(m_iUHHermitTotalQuestCount) ),
+	SendPropBool( SENDINFO(m_bDisplayHermitCard) ),
+	SendPropArray3( SENDINFO_ARRAY3(m_iInventory), SendPropInt( SENDINFO_ARRAY(m_iInventory) ) ),
 END_SEND_TABLE()
 
 
@@ -2769,6 +2788,10 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 		}
 		return true;
 	}
+
+	// Underhell inventory commands (switch / dropitem / useitem).
+	if ( UH_HandleInventoryCommand( args ) )
+		return true;
 
 	return BaseClass::ClientCommand( args );
 }

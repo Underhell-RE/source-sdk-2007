@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -15,6 +15,7 @@
 
 #include "c_baseplayer.h"
 #include "c_hl2_playerlocaldata.h"
+#include "underhell/uh_inventory.h"
 
 class C_BaseHLPlayer : public C_BasePlayer
 {
@@ -54,10 +55,25 @@ public:
 
 public:
 
+	// Underhell inventory state. Declaration order mirrors the original
+	// client binary layout (m_iInventory @5052, the bools @5284+, the ints
+	// @5292+). Do not reorder.
+	int							m_iInventory[UH_INVENTORY_SLOTS];	// item ids, 0 = empty slot
+
 	C_HL2PlayerLocalData		m_HL2Local;
-	EHANDLE				m_hClosestNPC;
-	float				m_flSpeedModTime;
-	bool				m_fIsSprinting;
+	EHANDLE						m_hClosestNPC;
+	float						m_flSpeedModTime;
+	bool						m_fIsSprinting;
+
+	// Underhell flags/counters (networked, see DT_HL2_Player recv table).
+	bool						m_bShoulderFlashlight;				// shoulder-mounted flashlight fitted
+	bool						m_bFlashlightOn;					// inventory flashlight state
+	bool						m_bDisplayHermitCard;				// TODO: hermit card system
+	bool						m_bInventoryEnabled;				// inventory system enabled
+	int							m_iUHBatteryCount;					// battery items held
+	int							m_iUHHermitCardsCount;				// TODO: hermit card system
+	int							m_iUHHermitCurrentQuestCount;		// TODO: hermit card system
+	int							m_iUHHermitTotalQuestCount;			// TODO: hermit card system
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible

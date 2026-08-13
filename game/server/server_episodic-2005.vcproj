@@ -261,6 +261,30 @@
 		<Filter
 			Name="Source Files"
 			>
+			<Filter
+				Name="underhell"
+				>
+				<File
+					RelativePath=".\underhell\uh_items.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_player_inventory.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\underhell\uh_inventory.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_items.h"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\underhell\uh_inventory.h"
+					>
+				</File>
+			</Filter>
 			<File
 				RelativePath="..\shared\achievement_saverestore.cpp"
 				>
