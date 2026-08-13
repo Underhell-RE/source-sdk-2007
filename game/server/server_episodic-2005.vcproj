@@ -273,6 +273,14 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\uh_player_objectives.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_player_objectives.h"
+					>
+				</File>
+				<File
 					RelativePath="..\shared\underhell\uh_inventory.cpp"
 					>
 				</File>

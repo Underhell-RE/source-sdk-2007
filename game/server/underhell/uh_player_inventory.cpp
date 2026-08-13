@@ -331,9 +331,10 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Inventory command dispatcher. Runs from ClientCommand — the engine
-// forwards unknown client commands here, exactly like the original (hexrays
-// sub_102DDBF0). Returns true when the command was consumed.
+// Purpose: Pure inventory command dispatcher. Only inventory commands here —
+// objective / signaling commands live in uh_player_objectives.cpp for
+// code quality / portability (see CHL2_Player::UH_HandleObjectiveCommand).
+// Original: hexrays sub_102DDBF0 for switch/dropitem/useitem.
 //-----------------------------------------------------------------------------
 bool CHL2_Player::UH_HandleInventoryCommand( const CCommand &args )
 {

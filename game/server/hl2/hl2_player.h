@@ -331,6 +331,19 @@ public:
 	bool				UH_HandleInventoryCommand( const CCommand &args );	// dispatch: switch/dropitem/useitem
 	void				UH_UpdateInventory( void );			// "UpdateInventory" server handler
 
+	//-----------------------------------------------------------------------------
+	// Underhell objectives / map signaling (implementation in
+	// game/server/underhell/uh_player_objectives.cpp).
+	// Original: CBasePlayer::ClientCommand sub_101F11D0 in serveror.dll
+	// handles DispObj, GiveSign, SkipScene via gEntList.FindEntityByName
+	// + CLogicRelay::InputTrigger.
+	// Separated out for code quality / portability — inventory file stays
+	// pure inventory.
+	//-----------------------------------------------------------------------------
+	bool				UH_HandleObjectiveCommand( const CCommand &args );
+	void				UH_DisplayObjective( void );
+	void				UH_TriggerMapEntity( const char *pszTargetName );
+
 private:
 	bool				CommanderExecuteOne( CAI_BaseNPC *pNpc, const commandgoal_t &goal, CAI_BaseNPC **Allies, int numAllies );
 

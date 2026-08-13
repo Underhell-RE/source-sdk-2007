@@ -2793,6 +2793,12 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	if ( UH_HandleInventoryCommand( args ) )
 		return true;
 
+	// Underhell objective / signaling commands (DispObj / GiveSign / SkipScene).
+	// Separated from inventory for code quality & portability — see
+	// uh_player_objectives.cpp (original: CBasePlayer::ClientCommand sub_101F11D0).
+	if ( UH_HandleObjectiveCommand( args ) )
+		return true;
+
 	return BaseClass::ClientCommand( args );
 }
 
