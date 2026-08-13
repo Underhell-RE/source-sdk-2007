@@ -15,12 +15,15 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+IMPLEMENT_NULL_DATADESC( CUHItem );
+
 //-----------------------------------------------------------------------------
 // Sounds shared by the pickup flow (original precaches these per item).
 //-----------------------------------------------------------------------------
 static void UH_PrecacheItemSounds( void )
 {
-	PrecacheScriptSound( "HL2Player.PickupItems" );
+	// Free function — must qualify; PrecacheScriptSound is CBaseEntity::.
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupItems" );
 }
 
 //-----------------------------------------------------------------------------

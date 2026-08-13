@@ -32,6 +32,7 @@ class CUHItem : public CItem
 {
 public:
 	DECLARE_CLASS( CUHItem, CItem );
+	DECLARE_DATADESC();
 
 	// Item id written into CHL2_Player::m_iInventory when picked up.
 	// UH_ITEM_UNKNOWN = not an inventory item (auto-applies on pickup).
@@ -188,6 +189,7 @@ class CItemRandom : public CUHItem
 {
 public:
 	DECLARE_CLASS( CItemRandom, CUHItem );
+	DECLARE_DATADESC();
 
 	virtual void Spawn( void );
 	virtual void Precache( void );
@@ -195,10 +197,8 @@ public:
 
 	void InputRespawn( inputdata_t &inputdata );
 
-private:
-	void SpawnRandomItem( void );
-
 	// Enable flags per pool entry. Names + order = the original datamap.
+	// Public: s_ItemRandomPool takes offsetof() on these (MSVC C2248 if private).
 	bool	m_bitem_chocobar, m_bitem_sandwich, m_bitem_apple, m_bitem_orange;
 	bool	m_bitem_banana, m_bitem_bananabunch, m_bitem_burrito, m_bitem_soda;
 	bool	m_bitem_flarepack, m_bitem_glowstick, m_bitem_painkillers;
@@ -228,7 +228,8 @@ private:
 	bool	m_bDisableShadows;	// EF_NOSHADOW on the spawned item
 	EHANDLE	m_hOldItem;			// last spawned item (original m_hOldItem)
 
-	DECLARE_DATADESC();
+private:
+	void SpawnRandomItem( void );
 };
 
 #endif // UH_ITEMS_H
