@@ -48,6 +48,8 @@ IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropInt( RECVINFO( m_iEndurance ) ),
 	RecvPropInt( RECVINFO( m_iBleedCounter ) ),
 	RecvPropFloat( RECVINFO( m_flUHBatteryCharge ) ),
+	RecvPropBool( RECVINFO( m_bIronSighted ) ),
+	RecvPropFloat( RECVINFO( m_fIronsightedTime ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )

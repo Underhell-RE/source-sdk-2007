@@ -327,6 +327,8 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
+	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
 
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),
@@ -450,6 +452,8 @@ IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropInt( SENDINFO(m_iEndurance) ),
 	SendPropInt( SENDINFO(m_iBleedCounter) ),
 	SendPropFloat( SENDINFO(m_flUHBatteryCharge), 0, SPROP_NOSCALE ),
+	SendPropBool( SENDINFO(m_bIronSighted) ),
+	SendPropFloat( SENDINFO(m_fIronsightedTime), 0, SPROP_NOSCALE ),
 END_SEND_TABLE()
 
 
@@ -471,6 +475,10 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "Player.Eat" );
 	PrecacheScriptSound( "Player.Eat.Apple" );
 	PrecacheScriptSound( "Player.Drink" );
+
+	// Underhell ironsight sounds.
+	PrecacheScriptSound( "HL2Player.Ironsighton" );
+	PrecacheScriptSound( "HL2Player.Ironsightoff" );
 }
 
 //-----------------------------------------------------------------------------
@@ -2839,6 +2847,13 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	// Underhell inventory commands (switch / dropitem / useitem).
 	if ( UH_HandleInventoryCommand( args ) )
 		return true;
+
+	// Underhell ironsight toggle (original sub_101F11D0 dispatch).
+	if ( !Q_stricmp( args[0], "ironsight_toggle" ) )
+	{
+		UH_ToggleIronsight();
+		return true;
+	}
 
 	// Underhell objective / signaling commands (DispObj / GiveSign / SkipScene).
 	// Separated from inventory for code quality & portability — see

@@ -277,6 +277,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\uh_ironsight.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\uh_player_inventory.cpp"
 					>
 				</File>

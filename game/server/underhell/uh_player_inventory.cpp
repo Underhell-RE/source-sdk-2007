@@ -104,6 +104,8 @@ void CHL2_Player::UH_InitializeInventory( void )
 	m_bFlashlightOn = false;
 	m_bInventoryEnabled = true;
 	m_hActiveGlowStick = NULL;
+	m_bIronSighted = false;
+	m_fIronsightedTime = 0.0f;
 }
 
 //-----------------------------------------------------------------------------

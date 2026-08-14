@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -11,6 +11,8 @@
 #if defined( CLIENT_DLL )
 #include "iprediction.h"
 #include "prediction.h"
+#include "weapon_parse.h"
+#include "basecombatweapon_shared.h"
 #else
 #include "vguiscreen.h"
 #endif
@@ -30,6 +32,10 @@ CBaseViewModel::CBaseViewModel()
 	// NOTE: We do this here because the color is never transmitted for the view model.
 	m_nOldAnimationParity = 0;
 	m_EntClientFlags |= ENTCLIENTFLAG_ALWAYS_INTERPOLATE;
+
+	// Underhell ironsight defaults (VDC "Adding Ironsights").
+	m_bExpSighted = false;
+	m_expFactor = 0.0f;
 #endif
 	SetRenderColor( 255, 255, 255, 255 );
 
@@ -72,6 +78,12 @@ void CBaseViewModel::Spawn( void )
 	Precache( );
 	SetSize( Vector( -8, -4, -2), Vector(8, 4, 2) );
 	SetSolid( SOLID_NONE );
+
+#if defined( CLIENT_DLL )
+	// Underhell: reset ironsight state on spawn (VDC "Adding Ironsights").
+	m_bExpSighted = false;
+	m_expFactor = 0.0f;
+#endif
 }
 
 
@@ -370,6 +382,36 @@ void CBaseViewModel::SendViewModelMatchingSequence( int sequence )
 #include "ivieweffects.h"
 #endif
 
+//-----------------------------------------------------------------------------
+// Underhell ironsight (VDC "Adding Ironsights", jorg40/Cin).
+// Applies the active weapon's ExpOffset (position + orientation) to the
+// viewmodel's hip position so it lines up with the eye when ironsighted.
+//-----------------------------------------------------------------------------
+#if defined( CLIENT_DLL )
+static void UH_CalcExpWpnOffsets( CBasePlayer *owner, Vector &pos, QAngle &ang )
+{
+	CBaseCombatWeapon *pWeapon = owner->GetActiveWeapon();
+	if ( !pWeapon )
+		return;
+
+	const FileWeaponInfo_t &info = pWeapon->GetWpnData();
+	if ( !info.m_bHasExpOffset )
+		return;
+
+	Vector forward, right, up;
+
+	// Orientation offset first, so the position offset is applied in the
+	// ironsighted reference frame.
+	ang += info.m_expOriOffset;
+
+	AngleVectors( ang, &forward, &right, &up );
+
+	pos += forward * info.m_expOffset.x;
+	pos += right   * info.m_expOffset.y;
+	pos += up      * info.m_expOffset.z;
+}
+#endif
+
 void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePosition, const QAngle& eyeAngles )
 {
 	// UNDONE: Calc this on the server?  Disabled for now as it seems unnecessary to have this info on the server
@@ -401,6 +443,24 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 		// Let the viewmodel shake at about 10% of the amplitude of the player's view
 		vieweffects->ApplyShake( vmorigin, vmangles, 0.1 );	
 	}
+#endif
+
+	// Underhell ironsight: slide the viewmodel up to the eye by the weapon's
+	// ExpOffset, interpolated over ~0.1 s (VDC "Adding Ironsights").
+#if defined( CLIENT_DLL )
+	UH_CalcExpWpnOffsets( owner, vmorigin, vmangles );
+
+	// Interpolate m_expFactor toward the target (1 = sighted, 0 = hip).
+	float flTarget = m_bExpSighted ? 1.0f : 0.0f;
+	float flSpeed = 10.0f;	// 1 / gMoveTime(0.1)
+	if ( m_expFactor < flTarget )
+		m_expFactor = min( flTarget, m_expFactor + flSpeed * gpGlobals->frametime );
+	else if ( m_expFactor > flTarget )
+		m_expFactor = max( flTarget, m_expFactor - flSpeed * gpGlobals->frametime );
+
+	// Scale the offset from the hip position toward the eye position.
+	Vector difPos = vmorigin - eyePosition;
+	vmorigin = eyePosition + difPos * m_expFactor;
 #endif
 
 	SetLocalOrigin( vmorigin );

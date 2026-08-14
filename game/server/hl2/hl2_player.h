@@ -388,6 +388,15 @@ public:
 	void				UH_UpdateFlashlightBattery( void );	// drain a battery while the flashlight is on
 
 	//-----------------------------------------------------------------------------
+	// Underhell ironsight. The "ironsight_toggle" client command toggles
+	// m_bIronSighted (networked so accuracy/FOV follow); m_fIronsightedTime is
+	// the last toggle time (debounce + viewmodel interpolation). Decoded from
+	// sub_101ECF40.
+	//-----------------------------------------------------------------------------
+	bool				UH_IsIronSighted( void ) const { return m_bIronSighted; }
+	void				UH_ToggleIronsight( void );
+
+	//-----------------------------------------------------------------------------
 	// Underhell glowstick. The lit glowstick prop is parented to the player and
 	// tracked here (original m_hActiveGlowStick @2164) so it can be removed when
 	// the player uses the lit-glowstick inventory slot again.
@@ -440,6 +449,8 @@ private:
 	CNetworkVar( int, m_iEndurance );	// "hunger" meter, 0..100. Restored by eating.
 	CNetworkVar( int, m_iBleedCounter );	// bleeding state (0 = clean, >0 = bleeding).
 	CNetworkVar( float, m_flUHBatteryCharge );	// 0..100 charge of the current flashlight battery
+	CNetworkVar( bool, m_bIronSighted );		// ironsight active (accuracy + FOV zoom)
+	CNetworkVar( float, m_fIronsightedTime );	// last ironsight toggle time
 
 	// Server-only runtime accumulators (mirror the original binary's members;
 	// not networked, saved for parity).

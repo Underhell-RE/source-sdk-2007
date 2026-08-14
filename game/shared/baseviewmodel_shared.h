@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -51,10 +51,19 @@ public:
 	virtual void			SendViewModelMatchingSequence( int sequence );
 	virtual void			SetWeaponModel( const char *pszModelname, CBaseCombatWeapon *weapon );
 
-	virtual void			CalcViewModelLag( Vector& origin, QAngle& angles, QAngle& original_angles );
-	virtual void			CalcViewModelView( CBasePlayer *owner, const Vector& eyePosition, 
+	virtual void				CalcViewModelLag( Vector& origin, QAngle& angles, QAngle& original_angles );
+	virtual void				CalcViewModelView( CBasePlayer *owner, const Vector& eyePosition, 
 								const QAngle& eyeAngles );
-	virtual void			AddViewModelBob( CBasePlayer *owner, Vector& eyePosition, QAngle& eyeAngles ) {};
+	virtual void				AddViewModelBob( CBasePlayer *owner, Vector& eyePosition, QAngle& eyeAngles ) {};
+
+#if defined( CLIENT_DLL )
+	// Underhell ironsight state (VDC "Adding Ironsights", jorg40/Cin).
+	// m_bExpSighted is toggled by ironsight_toggle; CalcViewModelView slides
+	// the viewmodel up to the eye by the weapon's ExpOffset, interpolated over
+	// time by m_expFactor (0 = hip, 1 = fully sighted).
+	bool						m_bExpSighted;
+	float						m_expFactor;
+#endif
 
 	// Initializes the viewmodel for use							
 	void					SetOwner( CBaseEntity *pEntity );

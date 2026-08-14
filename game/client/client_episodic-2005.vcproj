@@ -277,6 +277,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\uh_ironsight.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\hud_endurance.cpp"
 					>
 				</File>

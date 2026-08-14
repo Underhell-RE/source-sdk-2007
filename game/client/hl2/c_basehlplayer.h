@@ -79,6 +79,8 @@ public:
 	int								m_iEndurance;						// "hunger" meter, 0..100
 	int								m_iBleedCounter;					// bleeding state (0 = clean)
 	float							m_flUHBatteryCharge;				// 0..100 current battery charge
+	bool							m_bIronSighted;						// ironsight active
+	float							m_fIronsightedTime;					// last ironsight toggle time
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible
