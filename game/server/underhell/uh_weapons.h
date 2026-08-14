@@ -171,10 +171,10 @@ UH_DECLARE_WEAPON( CWeaponG36K,		WeaponG36K,		ACT_RANGE_ATTACK_AR2 )
 UH_DECLARE_WEAPON( CWeaponSniper,	WeaponSniper,	ACT_RANGE_ATTACK_AR2 )
 
 //-----------------------------------------------------------------------------
-// BFG — mgl = grenade launcher (shotgun pose); minigun = rifle pose.
+// BFG — mgl = grenade launcher (shotgun pose); minigun = SMG pose (anim_prefix smg2).
 //-----------------------------------------------------------------------------
 UH_DECLARE_WEAPON( CWeaponBfgMgl,		WeaponBfgMgl,		ACT_RANGE_ATTACK_SHOTGUN )
-UH_DECLARE_WEAPON( CWeaponBfgMinigun,	WeaponBfgMinigun,	ACT_RANGE_ATTACK_AR2 )
+UH_DECLARE_WEAPON( CWeaponBfgMinigun,	WeaponBfgMinigun,	ACT_RANGE_ATTACK_SMG1 )
 
 // Helper used by the "give all weapons" cheat (impulse 101).
 void UH_GiveAllWeapons( CBasePlayer *pPlayer );

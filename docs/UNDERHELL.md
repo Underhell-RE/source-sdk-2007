@@ -858,3 +858,25 @@ inputs + Bryan the NPC driver), while the player mans a mounted gun on top.
   visual driver). Not yet ported — Bryan won't appear seated until they are.
 - `r_JeepViewZHeight 10` (map-fired client command) already exists and raises
   the jeep view for the gunner.
+
+## NPC weapon acttables (stage follow-up — fixes allies-can't-shoot + T-pose)
+
+The NPC acttable maps the NPC's activities (ACT_RANGE_ATTACK1, ACT_IDLE,
+ACT_RELOAD, ...) to the weapon-specific model activities. Our port had only
+`{ ACT_RANGE_ATTACK1, ACT_RANGE_ATTACK_AR2, true }` for every gun, so:
+
+- Citizens / cops (npc_citizen with nypdcop models) holding pistols had no
+  fire animation (they need ACT_RANGE_ATTACK_PISTOL, not AR2) -> T-pose + no
+  shooting.
+- SMGs mapped to AR2 too (combine_soldier has AR2, but citizens don't).
+
+Decoded the original acttables from the binary (pistol->ACT_RANGE_ATTACK_PISTOL,
+smg->ACT_RANGE_ATTACK_SMG1, shotgun->ACT_RANGE_ATTACK_SHOTGUN, rifle->AR2) and
+ported the FULL per-category acttables (idle/idle_angry/reload/walk_aim/run_aim/
+crouch/gesture + low variants) matching vanilla weapon_pistol/smg1/shotgun/ar2.
+BFG minigun (anim_prefix smg2) uses the SMG1 acttable.
+
+This is the fix for "special forces allies can't shoot" and the NPC T-pose
+("Bad sequence (-1 ...) in GetSequenceLinearMotion"): the NPC requested an
+activity its model lacked, SelectWeightedSequence returned -1, and the model
+froze in the reference pose.
