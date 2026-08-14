@@ -35,11 +35,6 @@ CHudStamina::CHudStamina( const char *pElementName ) : CHudElement( pElementName
 	vgui::Panel *pParent = g_pClientMode->GetViewport();
 	SetParent( pParent );
 
-	// HudStamina: xpos 32 ypos 448 wide 240 tall 18.
-	SetProportional( false );
-	SetPos( 32, 448 );
-	SetSize( 240, 18 );
-
 	// Hidden with the health cluster, when the player is dead, or when no suit
 	// is equipped (the original bars only exist once the suit is on).
 	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );

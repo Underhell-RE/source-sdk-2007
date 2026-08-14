@@ -39,18 +39,18 @@ private:
 	CPanelAnimationVar( Color, m_HullColor, "HullColor", "2 127 252 192" );
 	CPanelAnimationVar( int, m_iHullDisabledAlpha, "HullDisabledAlpha", "0" );
 
-	CPanelAnimationVarAliasType( float, m_flBarInsetX, "BarInsetX", "6", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarInsetY, "BarInsetY", "31", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarWidth, "BarWidth", "14", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarHeight, "BarHeight", "23", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarChunkHeight, "BarChunkHeight", "2", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarChunkGap, "BarChunkGap", "1", "float" );
+	CPanelAnimationVarAliasType( float, m_flBarInsetX, "BarInsetX", "6", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarInsetY, "BarInsetY", "31", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarWidth, "BarWidth", "14", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarHeight, "BarHeight", "23", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarChunkHeight, "BarChunkHeight", "2", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarChunkGap, "BarChunkGap", "1", "proportional_float" );
 
 	// Contour sprite (battery outline).
-	CPanelAnimationVarAliasType( float, m_flContourX, "contourx", "1", "float" );
-	CPanelAnimationVarAliasType( float, m_flContourY, "contoury", "0", "float" );
-	CPanelAnimationVarAliasType( float, m_flContourWide, "contourwide", "24", "float" );
-	CPanelAnimationVarAliasType( float, m_flContourTall, "contourtall", "42", "float" );
+	CPanelAnimationVarAliasType( float, m_flContourX, "contourx", "1", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flContourY, "contoury", "0", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flContourWide, "contourwide", "24", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flContourTall, "contourtall", "42", "proportional_float" );
 
 	CPanelAnimationVar( vgui::HFont, m_hNumberFont, "NumberFont", "HudNumbers" );
 	CPanelAnimationVar( vgui::HFont, m_hTextFont, "TextFont", "HUDBarText" );

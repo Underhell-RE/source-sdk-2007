@@ -38,12 +38,12 @@ private:
 	// Original bar geometry (scripts/HudLayout.res "HudStamina"):
 	//   BarInsetX 26, BarInsetY 7, BarWidth 210, BarHeight 4,
 	//   BarChunkWidth 1, BarChunkGap 0  -> a thin horizontal bar.
-	CPanelAnimationVarAliasType( float, m_flBarInsetX, "BarInsetX", "26", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarInsetY, "BarInsetY", "7", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarWidth, "BarWidth", "210", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarHeight, "BarHeight", "4", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarChunkWidth, "BarChunkWidth", "1", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarChunkGap, "BarChunkGap", "0", "float" );
+	CPanelAnimationVarAliasType( float, m_flBarInsetX, "BarInsetX", "26", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarInsetY, "BarInsetY", "7", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarWidth, "BarWidth", "210", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarHeight, "BarHeight", "4", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarChunkWidth, "BarChunkWidth", "1", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarChunkGap, "BarChunkGap", "0", "proportional_float" );
 
 	CPanelAnimationVar( int, m_iBarDisabledAlpha, "BarDisabledAlpha", "20" );
 

@@ -34,12 +34,6 @@ CHudUHBattery::CHudUHBattery( const char *pElementName ) : CHudElement( pElement
 	vgui::Panel *pParent = g_pClientMode->GetViewport();
 	SetParent( pParent );
 
-	// The mod's HudLayout.res isn't loaded, so pin the panel to its original
-	// geometry (HudUHBattery: xpos 8 ypos 200 wide 40 tall 64).
-	SetProportional( false );
-	SetPos( 8, 200 );
-	SetSize( 40, 64 );
-
 	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
 
 	m_iBatteryCount = -1;

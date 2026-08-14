@@ -39,11 +39,6 @@ CHudEndurance::CHudEndurance( const char *pElementName ) : CHudElement( pElement
 	vgui::Panel *pParent = g_pClientMode->GetViewport();
 	SetParent( pParent );
 
-	// HudEndurance: xpos 10 ypos 332 wide 18 tall 134.
-	SetProportional( false );
-	SetPos( 10, 332 );
-	SetSize( 18, 134 );
-
 	// Hidden with the health cluster, when the player is dead, or when no suit
 	// is equipped (the original bars only exist once the suit is on).
 	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );

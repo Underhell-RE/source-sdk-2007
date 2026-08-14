@@ -44,12 +44,12 @@ private:
 	//   BarInsetX 7, BarInsetY 104, BarWidth 4, BarHeight 84,
 	//   BarChunkHeight 1, BarChunkGap 0  -> a thin vertical gauge that fills
 	//   bottom-up (BarInsetY is the bottom edge of the full bar).
-	CPanelAnimationVarAliasType( float, m_flBarInsetX, "BarInsetX", "7", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarInsetY, "BarInsetY", "104", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarWidth, "BarWidth", "4", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarHeight, "BarHeight", "84", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarChunkHeight, "BarChunkHeight", "1", "float" );
-	CPanelAnimationVarAliasType( float, m_flBarChunkGap, "BarChunkGap", "0", "float" );
+	CPanelAnimationVarAliasType( float, m_flBarInsetX, "BarInsetX", "7", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarInsetY, "BarInsetY", "104", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarWidth, "BarWidth", "4", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarHeight, "BarHeight", "84", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarChunkHeight, "BarChunkHeight", "1", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBarChunkGap, "BarChunkGap", "0", "proportional_float" );
 
 	// Exhausted portion is drawn with the foreground colour at this alpha.
 	CPanelAnimationVar( int, m_iBarDisabledAlpha, "BarDisabledAlpha", "20" );

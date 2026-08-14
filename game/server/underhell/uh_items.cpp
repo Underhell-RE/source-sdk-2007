@@ -349,20 +349,21 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	if ( !pGlow )
 		return;
 
-	pGlow->SetModel( "models/pg_props/pg_obj/pg_glow_stick.mdl" );
+	pGlow->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
 	static_cast<CBaseAnimating *>( pGlow )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
 
 	pGlow->SetAbsOrigin( pPlayer->GetAbsOrigin() + Vector( 0, 0, 36 ) );
 	pGlow->SetAbsAngles( pPlayer->GetAbsAngles() );
 
-	// Additive glow + a centred dynamic light so the stick actually emits
-	// light (the original creates an env_flare via sub_1020FA00; EF_BRIGHTLIGHT
-	// is the closest stock equivalent).
+	pGlow->Spawn();
+
+	// Spawn() resets the render state, so the additive glow + the centred
+	// dynamic light must be applied afterwards. EF_BRIGHTLIGHT emits a dlight
+	// tinted by m_clrRender, so each colour lights its own shade (the original
+	// adds an env_flare via sub_1020FA00; this is the stock equivalent).
 	pGlow->SetRenderMode( kRenderGlow );
 	pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
 	pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
-
-	pGlow->Spawn();
 
 	// Follow the player (strapped to the waist).
 	pGlow->SetParent( pPlayer );
