@@ -47,6 +47,7 @@ IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	// Underhell endurance / hunger props (order mirrors the server send table).
 	RecvPropInt( RECVINFO( m_iEndurance ) ),
 	RecvPropInt( RECVINFO( m_iBleedCounter ) ),
+	RecvPropFloat( RECVINFO( m_flUHBatteryCharge ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )

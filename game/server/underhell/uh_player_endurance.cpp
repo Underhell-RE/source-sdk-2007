@@ -182,23 +182,33 @@ void CHL2_Player::UH_UpdateFlashlightBattery( void )
 	if ( !FlashlightIsOn() )
 		return;
 
-	if ( gpGlobals->curtime < m_flNextFlashlightBatteryTime )
-		return;
+	// Continuous drain: one battery lasts uh_flashlight_battery_time seconds.
+	float flBatteryLife = uh_flashlight_battery_time.GetFloat();
+	if ( flBatteryLife <= 0.0f )
+		flBatteryLife = 60.0f;
 
-	if ( m_iUHBatteryCount > 0 )
+	float flDrain = ( 100.0f / flBatteryLife ) * gpGlobals->frametime;
+	m_flUHBatteryCharge = m_flUHBatteryCharge - flDrain;
+
+	if ( m_flUHBatteryCharge <= 0.0f )
 	{
-		m_iUHBatteryCount = m_iUHBatteryCount - 1;
-	}
+		if ( m_iUHBatteryCount > 0 )
+		{
+			m_iUHBatteryCount = m_iUHBatteryCount - 1;
+		}
 
-	if ( m_iUHBatteryCount <= 0 )
-	{
-		// Out of batteries: the light goes out.
-		m_iUHBatteryCount = 0;
-		FlashlightTurnOff();
-		return;
-	}
+		if ( m_iUHBatteryCount <= 0 )
+		{
+			// Out of batteries: the light goes out.
+			m_iUHBatteryCount = 0;
+			m_flUHBatteryCharge = 0.0f;
+			FlashlightTurnOff();
+			return;
+		}
 
-	m_flNextFlashlightBatteryTime = gpGlobals->curtime + uh_flashlight_battery_time.GetFloat();
+		// Move on to the next battery.
+		m_flUHBatteryCharge = 100.0f;
+	}
 }
 
 //-----------------------------------------------------------------------------

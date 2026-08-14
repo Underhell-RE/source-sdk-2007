@@ -37,6 +37,14 @@ CHudUHHermitCards::CHudUHHermitCards( const char *pElementName ) : CHudElement( 
 	vgui::Panel *pParent = g_pClientMode->GetViewport();
 	SetParent( pParent );
 
+	// HudUHHermitCards: right-aligned, ypos 16, wide 128 tall 100. Right-align
+	// against a 1280-wide reference (xpos r124).
+	SetProportional( false );
+	int sw, sh;
+	vgui::surface()->GetScreenSize( sw, sh );
+	SetPos( sw - 124 - 128, 16 );
+	SetSize( 128, 100 );
+
 	SetHiddenBits( HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
 
 	m_iCardsCount = -1;

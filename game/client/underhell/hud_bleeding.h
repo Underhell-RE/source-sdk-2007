@@ -35,10 +35,10 @@ protected:
 
 private:
 	// Original blood-drop sprite placement (scripts/HudLayout.res "HudBleeding").
-	CPanelAnimationVarAliasType( float, m_flBloodX, "bloodx", "1", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flBloodY, "bloody", "0", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flBloodWide, "bloodwide", "24", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flBloodTall, "bloodtall", "42", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flBloodX, "bloodx", "1", "float" );
+	CPanelAnimationVarAliasType( float, m_flBloodY, "bloody", "0", "float" );
+	CPanelAnimationVarAliasType( float, m_flBloodWide, "bloodwide", "24", "float" );
+	CPanelAnimationVarAliasType( float, m_flBloodTall, "bloodtall", "42", "float" );
 
 	int		m_iBleedCounter;	// cached m_iBleedCounter
 	int		m_iBloodTexture;

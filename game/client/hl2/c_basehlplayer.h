@@ -78,6 +78,7 @@ public:
 	// Underhell endurance / hunger state (networked; drawn by CHudEndurance).
 	int								m_iEndurance;						// "hunger" meter, 0..100
 	int								m_iBleedCounter;					// bleeding state (0 = clean)
+	float							m_flUHBatteryCharge;				// 0..100 current battery charge
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible

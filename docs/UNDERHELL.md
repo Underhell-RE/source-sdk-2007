@@ -112,6 +112,10 @@ Full classname list: `FGD/Item List.txt` (food, ammo, equipment, health) + `Weap
 | 19 | feat(server) | working glowsticks (lit prop strapped to player) |
 | 20 | fix(server) | healthkit/healthvial always stash into inventory (+use) |
 | 21 | fix(client) | battery/cards HUD fade rate (icons now persist) |
+| 22 | fix(server) | battery item (pg_battery model, +1/+2, max 20, removed on pickup) |
+| 23 | fix(client) | HUD panels pinned to original geometry (no proportional blow-up) |
+| 24 | feat(client) | flashlight battery charge (m_flUHBatteryCharge) drains smoothly |
+| 25 | feat(server) | npc_infected functional port (variants + fast claw AI) |
 
 ## Progress
 
@@ -388,3 +392,46 @@ Original save parsed. Confirmations:
 - [ ] item_random pool behavior.
 - [ ] Post-build copy path → mod dir (currently copies to `game/hl2/bin`).
 - [ ] Client slot panel visuals + icon mapping (vgui materials).
+
+## npc_infected (stage 25)
+
+`CNPC_UH_Infected` (classname `npc_infected`) is a fast feral zombie. This is a
+functional port on CAI_BaseNPC + ai_default schedules (the original carries a
+16-entry vtable with custom climb/sprint/infection logic that is out of scope
+for one pass). Faithfully reproduced from the FGD + string table:
+
+- 8 body variants (inmate/guard/worker/rural/doctor/uniform/office/urban),
+  each with a "disable" keyvalue restricting the random pool. Models
+  `models/infected/infected_*.mdl`.
+- `SpeedModifier` (0..1, blank = random) — parsed; actual run-speed scaling
+  waits on the infected's animation ground-speed (TODO).
+- `additionalequipment` melee weapon — parsed; the Underhell melee weapons
+  (`weapon_melee_pipe` etc.) are not ported yet, so the innate claw attack
+  covers melee.
+- Random limb loss flag (`m_bInfectedFlag`) — visual limp TODO.
+- `OnSpotInfectedBody` output fired on death.
+- Intelligence: standard NPC senses + hunt/chase/melee; a custom fast claw
+  attack (AE_NPC_ATTACK_BROADCAST -> direct DMG_SLASH + lunge) and a
+  climb-touch stub. `SCHED_MELEE_ATTACK1` when in range.
+
+TODO: climb animation, sprint speed, infection spread, gibs, the weapon give.
+
+## Battery items (stage 22)
+
+From the original: `item_battery` uses `models/PG_props/pg_obj/pg_battery.mdl`
+and grants **+1** battery; `item_batterypack` grants **+2**; both cap at
+**20** (`m_iUHBatteryCount`). Both are +use only (no touch auto-pickup) and
+remove themselves on pickup. The flashlight charge is a networked float
+`m_flUHBatteryCharge` (0..100) that drains continuously over
+`uh_flashlight_battery_time`, giving the HUD a smooth meter (the original
+reads the same value from a float at client offset 5212, inside
+C_HL2PlayerLocalData — ported as a plain CHL2_Player network var).
+
+## HUD geometry (stage 23)
+
+The Underhell `scripts/HudLayout.res` is a mod asset not present in the SDK,
+so the ported HUD panels had no size and their bar/contour offsets were
+proportional-scaled (blown up ~2.25x at 1080p). Each panel now pins itself to
+the original .res geometry (SetProportional(false) + SetSize + SetPos) and
+uses raw-pixel offsets, so the battery/cards/bleeding icons and the
+stamina/endurance bars render at their intended size.

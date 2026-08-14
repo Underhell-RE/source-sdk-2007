@@ -439,6 +439,7 @@ private:
 	//-----------------------------------------------------------------------------
 	CNetworkVar( int, m_iEndurance );	// "hunger" meter, 0..100. Restored by eating.
 	CNetworkVar( int, m_iBleedCounter );	// bleeding state (0 = clean, >0 = bleeding).
+	CNetworkVar( float, m_flUHBatteryCharge );	// 0..100 charge of the current flashlight battery
 
 	// Server-only runtime accumulators (mirror the original binary's members;
 	// not networked, saved for parity).

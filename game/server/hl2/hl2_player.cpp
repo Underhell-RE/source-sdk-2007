@@ -324,6 +324,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flLastBleedTickBase, FIELD_TIME ),
 	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
 
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),
@@ -446,6 +447,7 @@ IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	// Underhell endurance / hunger props (order mirrors the client recv table).
 	SendPropInt( SENDINFO(m_iEndurance) ),
 	SendPropInt( SENDINFO(m_iBleedCounter) ),
+	SendPropFloat( SENDINFO(m_flUHBatteryCharge), 0, SPROP_NOSCALE ),
 END_SEND_TABLE()
 
 
@@ -2080,7 +2082,11 @@ void CHL2_Player::FlashlightTurnOn( void )
 	AddEffects( EF_DIMLIGHT );
 	EmitSound( "HL2Player.FlashLightOn" );
 
-	m_flNextFlashlightBatteryTime = gpGlobals->curtime + uh_flashlight_battery_time.GetFloat();
+	// Start draining the current battery.
+	if ( m_flUHBatteryCharge <= 0.0f )
+	{
+		m_flUHBatteryCharge = 100.0f;
+	}
 
 	variant_t flashlighton;
 	flashlighton.SetFloat( m_HL2Local.m_flSuitPower / 100.0f );

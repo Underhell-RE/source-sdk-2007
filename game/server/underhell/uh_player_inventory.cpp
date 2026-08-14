@@ -96,6 +96,7 @@ void CHL2_Player::UH_InitializeInventory( void )
 
 	m_bShoulderFlashlight = false;
 	m_iUHBatteryCount = 0;
+	m_flUHBatteryCharge = 0.0f;
 	m_iUHHermitCardsCount = 0;
 	m_iUHHermitCurrentQuestCount = 0;
 	m_iUHHermitTotalQuestCount = 0;

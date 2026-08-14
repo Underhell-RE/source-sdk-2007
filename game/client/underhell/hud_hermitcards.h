@@ -37,15 +37,15 @@ protected:
 
 private:
 	// Original contour geometry (scripts/HudLayout.res "HudUHHermitCards").
-	CPanelAnimationVarAliasType( float, m_flContourX, "contourx", "34", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flContourY, "contoury", "10", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flContourWide, "contourwide", "78", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flContourTall, "contourtall", "54", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flContourX, "contourx", "34", "float" );
+	CPanelAnimationVarAliasType( float, m_flContourY, "contoury", "10", "float" );
+	CPanelAnimationVarAliasType( float, m_flContourWide, "contourwide", "78", "float" );
+	CPanelAnimationVarAliasType( float, m_flContourTall, "contourtall", "54", "float" );
 
-	CPanelAnimationVarAliasType( float, m_flText1X, "text1x", "78", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flText1Y, "text1y", "30", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flText2X, "text2x", "10", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flText2Y, "text2y", "30", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_flText1X, "text1x", "78", "float" );
+	CPanelAnimationVarAliasType( float, m_flText1Y, "text1y", "30", "float" );
+	CPanelAnimationVarAliasType( float, m_flText2X, "text2x", "10", "float" );
+	CPanelAnimationVarAliasType( float, m_flText2Y, "text2y", "30", "float" );
 
 	CPanelAnimationVar( vgui::HFont, m_hNumberFont, "NumberFont", "HudNumbers" );
 

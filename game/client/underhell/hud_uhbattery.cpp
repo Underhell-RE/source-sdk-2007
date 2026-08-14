@@ -34,6 +34,12 @@ CHudUHBattery::CHudUHBattery( const char *pElementName ) : CHudElement( pElement
 	vgui::Panel *pParent = g_pClientMode->GetViewport();
 	SetParent( pParent );
 
+	// The mod's HudLayout.res isn't loaded, so pin the panel to its original
+	// geometry (HudUHBattery: xpos 8 ypos 200 wide 40 tall 64).
+	SetProportional( false );
+	SetPos( 8, 200 );
+	SetSize( 40, 64 );
+
 	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
 
 	m_iBatteryCount = -1;
@@ -106,31 +112,25 @@ void CHudUHBattery::Paint()
 		(int)m_flContourX, (int)m_flContourY,
 		(int)( m_flContourX + m_flContourWide ), (int)( m_flContourY + m_flContourTall ) );
 
-	// Charge bar: each battery is one chunk, filling bottom-up.
-	float flChunkStep = m_flBarChunkHeight + m_flBarChunkGap;
-	int chunkCount = ( flChunkStep > 0.0f ) ? (int)( m_flBarHeight / flChunkStep ) : 0;
-	int enabledChunks = clamp( m_iBatteryCount, 0, chunkCount );
+	// Charge bar: continuous fill from m_flUHBatteryCharge (0..100) of the
+	// current battery, bottom-up.
+	C_BaseHLPlayer *pPlayer = (C_BaseHLPlayer *)C_BasePlayer::GetLocalPlayer();
+	float flCharge = pPlayer ? clamp( pPlayer->m_flUHBatteryCharge, 0.0f, 100.0f ) : 0.0f;
+
+	float flFillHeight = m_flBarHeight * ( flCharge / 100.0f );
+	int yBottom = (int)m_flBarInsetY;
+	int yTop = yBottom - (int)flFillHeight;
 
 	vgui::surface()->DrawSetColor( m_HullColor[0], m_HullColor[1], m_HullColor[2], m_HullColor[3] * m_iAlpha / 255 );
-	for ( int i = 0; i < enabledChunks; i++ )
-	{
-		int yBottom = (int)( m_flBarInsetY - i * flChunkStep );
-		int yTop = yBottom - (int)m_flBarChunkHeight;
-		vgui::surface()->DrawFilledRect(
-			(int)m_flBarInsetX, yTop,
-			(int)( m_flBarInsetX + m_flBarWidth ), yBottom );
-	}
+	vgui::surface()->DrawFilledRect(
+		(int)m_flBarInsetX, yTop,
+		(int)( m_flBarInsetX + m_flBarWidth ), yBottom );
 
 	// Exhausted portion.
 	vgui::surface()->DrawSetColor( m_HullColor[0], m_HullColor[1], m_HullColor[2], m_iHullDisabledAlpha );
-	for ( int i = enabledChunks; i < chunkCount; i++ )
-	{
-		int yBottom = (int)( m_flBarInsetY - i * flChunkStep );
-		int yTop = yBottom - (int)m_flBarChunkHeight;
-		vgui::surface()->DrawFilledRect(
-			(int)m_flBarInsetX, yTop,
-			(int)( m_flBarInsetX + m_flBarWidth ), yBottom );
-	}
+	vgui::surface()->DrawFilledRect(
+		(int)m_flBarInsetX, (int)( m_flBarInsetY - m_flBarHeight ),
+		(int)( m_flBarInsetX + m_flBarWidth ), yTop );
 
 	// Battery count: original prints "   x<N>" with the HudNumbers font.
 	wchar_t szText[16];

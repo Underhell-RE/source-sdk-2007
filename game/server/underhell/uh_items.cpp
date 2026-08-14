@@ -265,6 +265,20 @@ bool CItemUHSoda::MyTouch( CBasePlayer *pPlayer )
 //-----------------------------------------------------------------------------
 LINK_ENTITY_TO_CLASS( item_glowstick, CItemGlowStick );
 
+// Light colour per glowstick (red/yellow/green/blue/purple).
+static Color UH_GetGlowstickColor( int iItem )
+{
+	switch ( UH_GetGlowstickBodyGroup( iItem ) )
+	{
+	case 0:		return Color( 255, 40, 40, 255 );	// red
+	case 2:		return Color( 255, 255, 60, 255 );	// yellow
+	case 4:		return Color( 60, 255, 60, 255 );	// green
+	case 6:		return Color( 60, 120, 255, 255 );	// blue
+	case 8:		return Color( 200, 60, 255, 255 );	// purple
+	default:	return Color( 255, 40, 40, 255 );
+	}
+}
+
 void CItemGlowStick::Precache( void )
 {
 	BaseClass::Precache();
@@ -319,6 +333,7 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 		return;
 
 	int iItem = (int)value;
+	Color glowColor = UH_GetGlowstickColor( iItem );
 
 	// Replace any existing lit glowstick with the new one.
 	CBaseEntity *pOldGlow = pPlayer->UH_GetActiveGlowStick();
@@ -328,22 +343,24 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 		pPlayer->UH_SetActiveGlowStick( NULL );
 	}
 
-	CBaseEntity *pGlow = CreateEntityByName( "prop_physics" );
+	// A prop_dynamic has no physics object, so it neither collides with the
+	// player nor needs a collision solver — it just rides along as a child.
+	CBaseEntity *pGlow = CreateEntityByName( "prop_dynamic" );
 	if ( !pGlow )
 		return;
 
 	pGlow->SetModel( "models/pg_props/pg_obj/pg_glow_stick.mdl" );
 	static_cast<CBaseAnimating *>( pGlow )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
 
-	Vector vecOrigin = pPlayer->GetAbsOrigin() + Vector( 0, 0, 36 );
-	pGlow->SetAbsOrigin( vecOrigin );
+	pGlow->SetAbsOrigin( pPlayer->GetAbsOrigin() + Vector( 0, 0, 36 ) );
 	pGlow->SetAbsAngles( pPlayer->GetAbsAngles() );
 
-	// The glow-stick model's bodygroup picks the colour; the material is
-	// self-illuminated so no extra light entity is needed (original
-	// sub_101742D0 only adds EF_BONEMERGE + EF_NOSHADOW and goes non-solid).
-	pGlow->AddEffects( EF_BONEMERGE | EF_NOSHADOW );
-	pGlow->AddSolidFlags( FSOLID_NOT_SOLID );
+	// Additive glow + a centred dynamic light so the stick actually emits
+	// light (the original creates an env_flare via sub_1020FA00; EF_BRIGHTLIGHT
+	// is the closest stock equivalent).
+	pGlow->SetRenderMode( kRenderGlow );
+	pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
+	pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
 
 	pGlow->Spawn();
 
@@ -375,14 +392,18 @@ UH_DEFINE_ITEM( CItem_UHBuckShot,	item_ammo_buckshot,		"models/items/buckshot.md
 LINK_ENTITY_TO_CLASS( item_batterypack, CItemBatteryPack );
 UH_DEFINE_ITEM( CItemBatteryPack,	item_battery_pack,	"models/pg_props/pg_obj/pg_battery_pack.mdl" )
 
-// A battery pack grants several flashlight batteries (the vanilla item_battery
-// grants one). TODO: verify the exact count against the original.
-#define UH_BATTERY_PACK_COUNT 5
+// A battery pack grants two flashlight batteries (original sub_101727F0:
+// +2, max 20).
+#define UH_BATTERY_PACK_COUNT 2
+#define UH_MAX_BATTERIES 20
 
 bool CItemBatteryPack::MyTouch( CBasePlayer *pPlayer )
 {
 	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
 	if ( !pHL2Player )
+		return false;
+
+	if ( pHL2Player->UH_GetBatteryCount() >= UH_MAX_BATTERIES )
 		return false;
 
 	pHL2Player->UH_AddBattery( UH_BATTERY_PACK_COUNT );

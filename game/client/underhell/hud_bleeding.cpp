@@ -32,6 +32,11 @@ CHudBleeding::CHudBleeding( const char *pElementName ) : CHudElement( pElementNa
 	vgui::Panel *pParent = g_pClientMode->GetViewport();
 	SetParent( pParent );
 
+	// HudBleeding: xpos 248 ypos 408 wide 24 tall 36.
+	SetProportional( false );
+	SetPos( 248, 408 );
+	SetSize( 24, 36 );
+
 	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
 
 	m_iBleedCounter = 0;
