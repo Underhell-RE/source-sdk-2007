@@ -435,3 +435,38 @@ proportional-scaled (blown up ~2.25x at 1080p). Each panel now pins itself to
 the original .res geometry (SetProportional(false) + SetSize + SetPos) and
 uses raw-pixel offsets, so the battery/cards/bleeding icons and the
 stamina/endurance bars render at their intended size.
+
+## Weapon system (stage 26 — foundation)
+
+Weapon scripts (`scripts/weapon_*.txt`) are complete mod assets carrying all
+the Underhell tuning (StaminaToDrain, MeleeRange, PunchPitch/Yaw, ExpOffset
+ironsight, ...). The SDK's `weapon_parse` reads them automatically, so the
+port only needed to:
+
+- **Extend `FileWeaponInfo_t`** (shared) with the Underhell keys, parsed in
+  `FileWeaponInfo_t::Parse` (decode sub_10274870): `OneHanded`,
+  `MeleeDelayedFire`/`MeleeRoF`/`MeleeRange`, `StaminaToDrain`,
+  `PunchPitch`/`PunchYaw`/`SnapPitch`/`SnapYaw` ("min, max" ranges),
+  `CrouchRecoilMult`/`CrouchAccuracyMult`/`RunAccuracyMult`,
+  `UH_Weapon_Special`→`Penetration`, and `ExpOffset` (ironsight x/y/z +
+  xori/yori/zori + accuracy).
+- **21 weapon classes** (classnames from serveror.dll RTTI + Weapon List.txt):
+  melee axe/baton/pipe/wrench/cleaver → `CBaseHLBludgeonWeapon`; pistols
+  (glock/beretta/socom/python/dualberetta), SMGs (mp5/mp5_eod/mp7), shotguns
+  (m3/m5/spas12/xm1014), rifles (g36k/sniper), BFG (mgl/minigun) →
+  `CBaseHLCombatWeapon`. Matching thin client stubs in `c_uh_weapons.cpp`.
+  Vanilla weapons stay vanilla.
+- **impulse 101** gives the full Underhell set (CHL2_Player::CheatImpulseCommands
+  case 101 → `UH_GiveAllWeapons`).
+- **One weapon per slot**: `Weapon_Equip` ejects the occupied slot's weapon.
+- **Melee stamina**: `CUHMeleeWeapon::PrimaryAttack` drains `StaminaToDrain`.
+
+### TODO (weapon stage)
+
+- Per-weapon damage / fire rate / recoil application (currently melee damage
+  is a hardcoded per-class value; guns use the base fire path).
+- Ironsight (ExpOffset) viewmodel offset + accuracy — client viewmodel work.
+- Silencer + laser sight toggles (script data exists; needs networking + viewmodel).
+- Free-aim camera (viewmodel lags the crosshair) + dynamic hand switching
+  (OneHanded / BuiltRightHanded / cl_righthand flip).
+- NPC acttables for the melee weapons (player works, NPCs TODO).
