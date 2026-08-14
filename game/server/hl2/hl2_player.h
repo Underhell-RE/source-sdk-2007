@@ -428,6 +428,7 @@ public:
 	// Underhell kick attack ("uh_jake_kick"). See uh_kick.cpp.
 	void				UH_Kick( void );
 	void				UH_KickThink( void );
+	void				UH_DoKickStrike( void );
 	bool				UH_CanKick( void );
 	void				InputDisableKick( inputdata_t &inputdata );
 	void				InputEnableKick( inputdata_t &inputdata );
