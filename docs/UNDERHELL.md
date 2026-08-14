@@ -821,3 +821,23 @@ and zip at 2500 normally.)
 
 The heaviest unknown is #3 (the exact FireBullets -> CBullet wiring) since
 sub_100EAFB0 is a large inlined tracer loop.
+
+## Self-driving jeep + gunner seat (stage follow-up)
+
+`prop_vehicle_jeep` in Uh_Chapter1_16_d is self-driven: the map fires
+`Vehicle_Jeep,Throttle,1` / `HandBrakeOff` etc., Bryan enters as the NPC driver,
+and the player sits at the mounted gun. Decoded from the original
+`CPropVehicleDriveable` (datamap sub_102692E0, sendtable sub_10266BA0):
+
+- `m_bPlayerAtGun` (networked bool) — true while the player mans the gun.
+- `ToggleGunMode` input (sub_103EC3C0) toggles it; `EnableMountedGun` keyvalue
+  (`m_bEnableMountedGun`).
+- `DriveVehicle` (sub_103ED6A0) only calls the driving input
+  (`CFourWheelVehiclePhysics::UpdateDriverControls`) when `!m_bPlayerAtGun`.
+  Otherwise the player's (absent) driving input would stomp the scripted
+  throttle every frame and the jeep would never move / get stuck in geometry.
+
+Ported: `m_bPlayerAtGun` (server + client send/recv), `ToggleGunMode` input,
+`EnableMountedGun` keyvalue, and the `DriveVehicle` gate. TODO: gunner eye
+attachment (`vehicle_gunner_eyes` vs `vehicle_driver_eyes`, sub_103EA8F0) for
+the correct gun camera, and the mounted-gun tracer (AR2Tracer vs tau cannon).

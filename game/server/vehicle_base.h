@@ -192,6 +192,8 @@ public:
 	void	InputUnlock( inputdata_t &inputdata );
 	void	InputTurnOn( inputdata_t &inputdata );
 	void	InputTurnOff( inputdata_t &inputdata );
+	// Underhell: toggle between driving and gunning (see m_bPlayerAtGun).
+	void	InputToggleGunMode( inputdata_t &inputdata );
 
 	// Locals
 	void	ResetUseKey( CBasePlayer *pPlayer );
@@ -264,6 +266,10 @@ public:
 	CNetworkVector( m_vecGunCrosshair );
 	CNetworkVar( bool, m_bUnableToFire );
 	CNetworkVar( bool, m_bHasGun );
+	// Underhell: player is manning the (mounted) gun rather than driving. While
+	// set, the vehicle is self-driven via the "Throttle"/"HandBrake" inputs and
+	// the player's driving input must NOT stomp the scripted throttle.
+	CNetworkVar( bool, m_bPlayerAtGun );
 
 	CNetworkVar( bool, m_nScannerDisabledWeapons );
 	CNetworkVar( bool, m_nScannerDisabledVehicle );

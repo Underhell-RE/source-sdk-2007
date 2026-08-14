@@ -117,6 +117,7 @@ protected:
 	CInterpolatedVar<Vector>	m_iv_vecGunCrosshair;
 	Vector						m_vecEyeExitEndpoint;
 	bool						m_bHasGun;
+	bool						m_bPlayerAtGun;
 	bool						m_bUnableToFire;
 
 	// Used to smooth view entry

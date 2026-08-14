@@ -163,6 +163,11 @@ protected:
 	bool			m_bHasPoop;
 
 	CNetworkVar( bool, m_bHeadlightIsOn );
+
+	// Underhell: "EnableMountedGun" keyvalue — the jeep carries a mounted gun
+	// (gunner seat) rather than only the driver tau cannon. TODO: drive the
+	// gunner-seat visuals (AR2Tracer vs tau cannon) off this flag.
+	bool			m_bEnableMountedGun;
 };
 
 #endif // VEHICLE_JEEP_H

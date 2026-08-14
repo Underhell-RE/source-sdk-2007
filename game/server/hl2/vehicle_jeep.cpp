@@ -135,6 +135,9 @@ BEGIN_DATADESC( CPropJeep )
 	DEFINE_INPUTFUNC( FIELD_VOID, "StartRemoveTauCannon", InputStartRemoveTauCannon ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "FinishRemoveTauCannon", InputFinishRemoveTauCannon ),
 
+	// Underhell: mounted-gun (gunner seat) flag.
+	DEFINE_KEYFIELD( m_bEnableMountedGun, FIELD_BOOLEAN, "EnableMountedGun" ),
+
 	DEFINE_THINKFUNC( JeepSeagullThink ),
 END_DATADESC()
 
@@ -167,6 +170,7 @@ CPropJeep::CPropJeep( void )
 
 	m_bUnableToFire = true;
 	m_flAmmoCrateCloseTime = 0;
+	m_bEnableMountedGun = false;
 }
 
 //-----------------------------------------------------------------------------
