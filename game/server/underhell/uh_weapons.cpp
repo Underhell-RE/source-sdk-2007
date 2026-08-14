@@ -356,10 +356,89 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 // Shotgun / sniper / BFG MGL use custom pump/delay fire paths (not GetFireRate);
 // their values below are close estimates — TODO: recover the exact delay.
 //-----------------------------------------------------------------------------
-#define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damageConVar, _weaponType, _npcActivity ) \
+//-----------------------------------------------------------------------------
+// Full NPC acttables (1:1 with the original / vanilla per weapon category).
+// The single { ACT_RANGE_ATTACK1, X, true } entry we used before left NPCs with
+// no weapon-specific idle/aim/run poses and, worse, mapped pistols/smgs to AR2
+// (which citizen/cop models lack) -> T-pose + no shooting.
+//-----------------------------------------------------------------------------
+#define UH_ACTTABLE_PISTOL \
+	{ ACT_IDLE,					ACT_IDLE_PISTOL,				true }, \
+	{ ACT_IDLE_ANGRY,			ACT_IDLE_ANGRY_PISTOL,			true }, \
+	{ ACT_RANGE_ATTACK1,		ACT_RANGE_ATTACK_PISTOL,		true }, \
+	{ ACT_RELOAD,				ACT_RELOAD_PISTOL,				true }, \
+	{ ACT_WALK_AIM,				ACT_WALK_AIM_PISTOL,			true }, \
+	{ ACT_RUN_AIM,				ACT_RUN_AIM_PISTOL,				true }, \
+	{ ACT_GESTURE_RANGE_ATTACK1, ACT_GESTURE_RANGE_ATTACK_PISTOL, true }, \
+	{ ACT_RELOAD_LOW,			ACT_RELOAD_PISTOL_LOW,			false }, \
+	{ ACT_RANGE_ATTACK1_LOW,	ACT_RANGE_ATTACK_PISTOL_LOW,	false }, \
+	{ ACT_COVER_LOW,			ACT_COVER_PISTOL_LOW,			false }, \
+	{ ACT_RANGE_AIM_LOW,		ACT_RANGE_AIM_PISTOL_LOW,		false }, \
+	{ ACT_GESTURE_RELOAD,		ACT_GESTURE_RELOAD_PISTOL,		false }, \
+	{ ACT_WALK,					ACT_WALK_PISTOL,				false }, \
+	{ ACT_RUN,					ACT_RUN_PISTOL,					false },
+
+#define UH_ACTTABLE_SMG1 \
+	{ ACT_RANGE_ATTACK1,		ACT_RANGE_ATTACK_SMG1,			true }, \
+	{ ACT_RELOAD,				ACT_RELOAD_SMG1,				true }, \
+	{ ACT_IDLE,					ACT_IDLE_SMG1,					true }, \
+	{ ACT_IDLE_ANGRY,			ACT_IDLE_ANGRY_SMG1,			true }, \
+	{ ACT_WALK,					ACT_WALK_RIFLE,					true }, \
+	{ ACT_WALK_AIM,				ACT_WALK_AIM_RIFLE,				true }, \
+	{ ACT_WALK_CROUCH,			ACT_WALK_CROUCH_RIFLE,			true }, \
+	{ ACT_WALK_CROUCH_AIM,		ACT_WALK_CROUCH_AIM_RIFLE,		true }, \
+	{ ACT_RUN,					ACT_RUN_RIFLE,					true }, \
+	{ ACT_RUN_AIM,				ACT_RUN_AIM_RIFLE,				true }, \
+	{ ACT_RUN_CROUCH,			ACT_RUN_CROUCH_RIFLE,			true }, \
+	{ ACT_RUN_CROUCH_AIM,		ACT_RUN_CROUCH_AIM_RIFLE,		true }, \
+	{ ACT_GESTURE_RANGE_ATTACK1, ACT_GESTURE_RANGE_ATTACK_SMG1, true }, \
+	{ ACT_RANGE_ATTACK1_LOW,	ACT_RANGE_ATTACK_SMG1_LOW,		false }, \
+	{ ACT_COVER_LOW,			ACT_COVER_SMG1_LOW,				false }, \
+	{ ACT_RANGE_AIM_LOW,		ACT_RANGE_AIM_SMG1_LOW,			false }, \
+	{ ACT_RELOAD_LOW,			ACT_RELOAD_SMG1_LOW,			false }, \
+	{ ACT_GESTURE_RELOAD,		ACT_GESTURE_RELOAD_SMG1,		false },
+
+#define UH_ACTTABLE_SHOTGUN \
+	{ ACT_IDLE,					ACT_IDLE_SMG1,					true }, \
+	{ ACT_RANGE_ATTACK1,		ACT_RANGE_ATTACK_SHOTGUN,		true }, \
+	{ ACT_RELOAD,				ACT_RELOAD_SHOTGUN,				false }, \
+	{ ACT_WALK,					ACT_WALK_RIFLE,					true }, \
+	{ ACT_IDLE_ANGRY,			ACT_IDLE_ANGRY_SHOTGUN,			true }, \
+	{ ACT_WALK_AIM,				ACT_WALK_AIM_SHOTGUN,			true }, \
+	{ ACT_WALK_CROUCH,			ACT_WALK_CROUCH_RIFLE,			true }, \
+	{ ACT_WALK_CROUCH_AIM,		ACT_WALK_CROUCH_AIM_RIFLE,		true }, \
+	{ ACT_RUN,					ACT_RUN_RIFLE,					true }, \
+	{ ACT_RUN_AIM,				ACT_RUN_AIM_SHOTGUN,			true }, \
+	{ ACT_RUN_CROUCH,			ACT_RUN_CROUCH_RIFLE,			true }, \
+	{ ACT_RUN_CROUCH_AIM,		ACT_RUN_CROUCH_AIM_RIFLE,		true }, \
+	{ ACT_GESTURE_RANGE_ATTACK1, ACT_GESTURE_RANGE_ATTACK_SHOTGUN, true }, \
+	{ ACT_RANGE_ATTACK1_LOW,	ACT_RANGE_ATTACK_SHOTGUN_LOW,	true }, \
+	{ ACT_GESTURE_RELOAD,		ACT_GESTURE_RELOAD_SHOTGUN,		false },
+
+#define UH_ACTTABLE_AR2 \
+	{ ACT_RANGE_ATTACK1,		ACT_RANGE_ATTACK_AR2,			true }, \
+	{ ACT_RELOAD,				ACT_RELOAD_SMG1,				true }, \
+	{ ACT_IDLE,					ACT_IDLE_SMG1,					true }, \
+	{ ACT_IDLE_ANGRY,			ACT_IDLE_ANGRY_SMG1,			true }, \
+	{ ACT_WALK,					ACT_WALK_RIFLE,					true }, \
+	{ ACT_WALK_AIM,				ACT_WALK_AIM_RIFLE,				true }, \
+	{ ACT_WALK_CROUCH,			ACT_WALK_CROUCH_RIFLE,			true }, \
+	{ ACT_WALK_CROUCH_AIM,		ACT_WALK_CROUCH_AIM_RIFLE,		true }, \
+	{ ACT_RUN,					ACT_RUN_RIFLE,					true }, \
+	{ ACT_RUN_AIM,				ACT_RUN_AIM_RIFLE,				true }, \
+	{ ACT_RUN_CROUCH,			ACT_RUN_CROUCH_RIFLE,			true }, \
+	{ ACT_RUN_CROUCH_AIM,		ACT_RUN_CROUCH_AIM_RIFLE,		true }, \
+	{ ACT_GESTURE_RANGE_ATTACK1, ACT_GESTURE_RANGE_ATTACK_AR2,	false }, \
+	{ ACT_RANGE_ATTACK1_LOW,	ACT_RANGE_ATTACK_AR2_LOW,		false }, \
+	{ ACT_COVER_LOW,			ACT_COVER_SMG1_LOW,				false }, \
+	{ ACT_RANGE_AIM_LOW,		ACT_RANGE_AIM_AR2_LOW,			false }, \
+	{ ACT_RELOAD_LOW,			ACT_RELOAD_SMG1_LOW,			false }, \
+	{ ACT_GESTURE_RELOAD,		ACT_GESTURE_RELOAD_SMG1,		false },
+
+#define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damageConVar, _weaponType, _acttable ) \
 	acttable_t _className::m_acttable[] = \
 	{ \
-		{ ACT_RANGE_ATTACK1, _npcActivity, true }, \
+		_acttable \
 	}; \
 	IMPLEMENT_ACTTABLE( _className ); \
 	IMPLEMENT_SERVERCLASS_ST( _className, DT_##_shortName ) \
@@ -393,42 +472,42 @@ UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	sk_plr_dmg
 // Pistols — semi-auto, shared fire routine (0.2 s).
 // Weapon type 1 = pistol (silencer-gated on m_bHavePistolSilencer).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1, ACT_RANGE_ATTACK_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1, ACT_RANGE_ATTACK_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1, ACT_RANGE_ATTACK_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1, ACT_RANGE_ATTACK_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1, ACT_RANGE_ATTACK_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1, UH_ACTTABLE_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1, UH_ACTTABLE_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1, UH_ACTTABLE_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1, UH_ACTTABLE_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1, UH_ACTTABLE_PISTOL )
 
 //-----------------------------------------------------------------------------
 // SMGs — full auto, 0.075 s (exact, GetFireRate).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, sk_plr_dmg_smg_mp5, 0, ACT_RANGE_ATTACK_SMG1 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, sk_plr_dmg_smg_mp5_eod, 0, ACT_RANGE_ATTACK_SMG1 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0, ACT_RANGE_ATTACK_SMG1 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, sk_plr_dmg_smg_mp5, 0, UH_ACTTABLE_SMG1 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, sk_plr_dmg_smg_mp5_eod, 0, UH_ACTTABLE_SMG1 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0, UH_ACTTABLE_SMG1 )
 
 //-----------------------------------------------------------------------------
 // Shotguns — pump-action. All four share one fire/pump routine (sub_1027E0A0 +
 // sub_1027F4E0); the pump cycle constant in the DLL is 0.8 s (0x10487878).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0, ACT_RANGE_ATTACK_SHOTGUN )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0, ACT_RANGE_ATTACK_SHOTGUN )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0, ACT_RANGE_ATTACK_SHOTGUN )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0, ACT_RANGE_ATTACK_SHOTGUN )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0, UH_ACTTABLE_SHOTGUN )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0, UH_ACTTABLE_SHOTGUN )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0, UH_ACTTABLE_SHOTGUN )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0, UH_ACTTABLE_SHOTGUN )
 
 //-----------------------------------------------------------------------------
 // Rifles — G36K is select-fire (0.1 s full-auto). Weapon type 4 = rifle.
 // The sniper is bolt-action: refire is gated on the bolt sequence duration
 // (like the vanilla sniper), so 1.0 s.
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, sk_plr_dmg_rifle_g36k, 4, ACT_RANGE_ATTACK_AR2 )
-UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.0f, sk_plr_dmg_rifle_sniper, 4, ACT_RANGE_ATTACK_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, sk_plr_dmg_rifle_g36k, 4, UH_ACTTABLE_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.0f, sk_plr_dmg_rifle_sniper, 4, UH_ACTTABLE_AR2 )
 
 //-----------------------------------------------------------------------------
 // BFG — minigun is 0.075 s (exact, GetFireRate); MGL is a single-shot grenade
 // launcher (custom fire path, ~1.0 s — TODO exact).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, sk_plr_dmg_bfg_mgl, 0, ACT_RANGE_ATTACK_SHOTGUN )
-UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, sk_plr_dmg_bfg_minigun, 0, ACT_RANGE_ATTACK_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, sk_plr_dmg_bfg_mgl, 0, UH_ACTTABLE_SHOTGUN )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,	weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, sk_plr_dmg_bfg_minigun, 0, UH_ACTTABLE_SMG1 )
 
 //-----------------------------------------------------------------------------
 // Purpose: The original impulse-101 loadout (decode sub_101EC700 case 101):
