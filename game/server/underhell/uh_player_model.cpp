@@ -76,3 +76,37 @@ void CHL2_Player::InputSetPlayerKickModel( inputdata_t &inputdata )
 	PrecacheModel( pszModel );
 	m_iszKickViewModel = AllocPooledString( pszModel );
 }
+
+//-----------------------------------------------------------------------------
+// Purpose: "Give" input — mirrors the vanilla "give" ConCommand (client.cpp).
+// item_suit is special-cased so it doesn't play the pickup sound.
+//-----------------------------------------------------------------------------
+void CHL2_Player::InputGive( inputdata_t &inputdata )
+{
+	const char *psz = inputdata.value.String();
+	if ( !psz || !*psz )
+		return;
+
+	if ( !Q_stricmp( psz, "item_suit" ) )
+	{
+		EquipSuit( false );
+		return;
+	}
+
+	GiveNamedItem( psz );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: "GiveInv" input — hands the named weapon/item to the player. The
+// maps use it for both weapons (weapon_bfg_minigun) and items (item_heavyarmor);
+// GiveNamedItem routes weapons through Use -> BumpWeapon (one-weapon-per-slot
+// replace) and Underhell items through Use -> MyTouch (pickup into inventory).
+//-----------------------------------------------------------------------------
+void CHL2_Player::InputGiveInv( inputdata_t &inputdata )
+{
+	const char *psz = inputdata.value.String();
+	if ( !psz || !*psz )
+		return;
+
+	GiveNamedItem( psz );
+}

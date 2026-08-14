@@ -401,6 +401,10 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "ViewModelSkin", InputViewModelSkin ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetPlayerKickModel", InputSetPlayerKickModel ),
 
+	// Underhell "give" inputs (classname parameter).
+	DEFINE_INPUTFUNC( FIELD_STRING, "Give", InputGive ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "GiveInv", InputGiveInv ),
+
 	DEFINE_SOUNDPATCH( m_sndLeeches ),
 	DEFINE_SOUNDPATCH( m_sndWaterSplashes ),
 

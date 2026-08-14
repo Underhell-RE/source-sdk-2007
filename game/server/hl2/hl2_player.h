@@ -418,6 +418,13 @@ public:
 	void				InputViewModelSkin( inputdata_t &inputdata );
 	void				InputSetPlayerKickModel( inputdata_t &inputdata );
 
+	// Underhell "give" inputs (fired at !player from the maps). "Give" mirrors
+	// the vanilla "give" ConCommand (item_suit is special-cased); "GiveInv"
+	// hands a weapon/item to the player's arsenal. Both take the entity
+	// classname as the parameter (e.g. weapon_bfg_minigun, item_heavyarmor).
+	void				InputGive( inputdata_t &inputdata );
+	void				InputGiveInv( inputdata_t &inputdata );
+
 	//-----------------------------------------------------------------------------
 	// Underhell glowstick. The lit glowstick prop is parented to the player and
 	// tracked here (original m_hActiveGlowStick @2164) so it can be removed when
