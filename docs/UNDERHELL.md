@@ -577,9 +577,7 @@ the authoritative server state).
 `CUHGunWeapon` now reads the parsed weapon-script stats in the fire path:
 
 - **Fire rate** (`GetFireRate`): the Underhell scripts carry no cycle-time key,
-  so each class gets a sensible default (pistols ~0.15 s, SMGs ~0.08 s,
-  shotguns ~0.9 s, rifles ~0.1 s, sniper ~1.2 s, BFG minigun ~0.07 s). TODO:
-  recover the exact per-class rates.
+  so each class gets a value recovered from serveror.dll (see stage 30).
 - **Recoil** (`AddViewKick`): `PunchPitch`/`PunchYaw` ranges, scaled by
   `CrouchRecoilMult` while ducked.
 - **Spread** (`GetBulletSpread`): a base cone lerped by an accumulated spam
@@ -604,12 +602,15 @@ C++ classes. Recovered from the original:
   | mp5 / mp5_eod / mp7 | 12 / 10 / 8 | | m3 / m5 / spas12 / xm1014 | 12 / 16 / 14 / 12 |
   | g36k / sniper | 20 / 80 | | bfg_mgl / bfg_minigun | 200 / 50 |
 
-- **Fire rate**: the semi-auto pistols share one fire routine
-  (`sub_1027AEC0` → `m_flNextPrimaryAttack = curtime + 0.2`), so glock/beretta/
-  socom/dualies fire at 0.2 s. The G36K is a `CHLSelectFireMachineGun`
-  (`FireMode 1` = full-auto) → 0.1 s (vanilla select-fire rate). The remaining
-  rates (SMG/shotgun/sniper/BFG) are close estimates — TODO: recover each from
-  its own fire function.
+- **Fire rate** (extracted from serveror.dll vtable + disassembly):
+
+  | Weapon | Rate | Source |
+  |---|---|---|
+  | pistols (glock/beretta/socom/python/dualies) | 0.2 s | shared fire routine `sub_1027AEC0` |
+  | SMG mp5 / mp5_eod / mp7 | 0.075 s | `GetFireRate` vtable slot 277 → `sub_102801F0` (`flds 0x105300E4`) |
+  | BFG minigun | 0.075 s | same `GetFireRate` (`sub_102801F0`) |
+  | G36K | 0.1 s | select-fire `GetFireRate` `sub_103F5150` (`flds 0x1048775C`) |
+  | shotgun m3/m5/spas12/xm1014, sniper, BFG mgl | ~0.75 / ~1.5 / ~1.0 s | custom pump/delay fire paths — TODO exact |
 
 - **Note**: the vanilla base `CBaseCombatWeapon::PrimaryAttack` never sets
   `info.m_iDamage`, so the previous port fired with the ammo-definition damage
@@ -627,9 +628,14 @@ Decoded from `sub_101E2F50` (toggle) + `sub_101F11D0` (ClientCommand dispatch)
   silencer; other weapons toggle freely. `SetPistolSilencer` /
   `SetRifleSilencer` inputs grant the silencer. The original's SoundData adds
   `single_shot_silenced` at index 2 (`SINGLE_SILENCED`), used when silenced.
-- **Laser sight**: `m_bLaserToggleState` (networked) + `UH_ToggleLaser`.
-  The client draws a beam + dot from `laserbeam` / `laserpointer` / `laserdot`
-  sprites (TODO).
+- **Laser sight**: `m_bLaserToggleState` (networked) + `UH_ToggleLaser` +
+  `laser_toggle` command. Client `uh_laser.cpp` draws a per-frame beam + impact
+  dot from the eye along aim (`sprites/laserbeam.vmt` + `sprites/laserdot.vmt`).
+- **DropWeapon**: `UH_DropWeapon` (command) — un-sight, refuse in vehicle /
+  sprinting / melee, toss the active weapon forward at 300; `m_bDisableWeaponDrop`
+  + `DisableDropWeapon` / `EnableDropWeapon` inputs.
+- **Throw_Nade**: `UH_ThrowNade` (command) — un-sight then start the
+  `weapon_frag` throw (arm-deploy flare branch TODO).
 
 ### TODO (ironsight / weapons)
 
