@@ -390,6 +390,9 @@ void CBaseViewModel::SendViewModelMatchingSequence( int sequence )
 #if defined( CLIENT_DLL )
 static void UH_CalcExpWpnOffsets( CBasePlayer *owner, Vector &pos, QAngle &ang )
 {
+	if ( !owner )
+		return;
+
 	CBaseCombatWeapon *pWeapon = owner->GetActiveWeapon();
 	if ( !pWeapon )
 		return;
