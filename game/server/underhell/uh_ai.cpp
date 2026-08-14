@@ -239,7 +239,10 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 }
 
 //-----------------------------------------------------------------------------
-// Spawn a severed part / dropped item as a pickable physics prop.
+// Spawn a severed limb as a ragdoll prop (matches the original sub_101CDCC0,
+// which creates a "prop_ragdoll" with the per-bodypart gib model). A ragdoll
+// limb flops naturally; a plain prop_physics with these models renders as an
+// invisible/static body.
 //-----------------------------------------------------------------------------
 static void UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, const Vector &vecDir, CBaseEntity *pOwner )
 {
@@ -248,19 +251,23 @@ static void UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, co
 	// "UTIL_SetModel: not precached" and the game crashes.
 	CBaseEntity::PrecacheModel( pszModel );
 
-	CBaseEntity *pProp = CreateEntityByName( "prop_physics" );
+	CBaseEntity *pProp = CreateEntityByName( "prop_ragdoll" );
 	if ( !pProp )
 		return;
 
 	pProp->SetModel( pszModel );
 	pProp->SetAbsOrigin( vecPosition );
+	pProp->SetAbsAngles( vec3_angle );
 	DispatchSpawn( pProp );
 
 	IPhysicsObject *pPhys = pProp->VPhysicsGetObject();
 	if ( pPhys )
 	{
+		// vecDir is the (unit) shot direction; scale it so the severed limb
+		// visibly flies off instead of just dropping in place.
+		Vector vecVelocity = vecDir * 150.0f;
 		AngularImpulse angImpulse( random->RandomFloat(-200,200), random->RandomFloat(-200,200), random->RandomFloat(-200,200) );
-		pPhys->SetVelocity( &vecDir, &angImpulse );
+		pPhys->SetVelocity( &vecVelocity, &angImpulse );
 	}
 
 	pProp->SetOwnerEntity( pOwner );

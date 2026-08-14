@@ -71,6 +71,13 @@ public:
 
 	virtual bool	IsRagdoll() { return true; }
 
+	// Underhell: ragdolls (bodies and severed limbs) are NOT treated as "flesh"
+	// for the physcannon — the player can pick them up and drag them around
+	// (see the "Bodygroups, Gibs, Ragdolls and Decals" tutorial). Vanilla
+	// CBaseEntity::VPhysicsIsFlesh() returns true for ragdolls, which makes
+	// CWeaponPhysCannon::CanPickupObject() reject them.
+	virtual bool	VPhysicsIsFlesh( void ) { return false; }
+
 	// Damage passing
 	virtual void	SetDamageEntity( CBaseEntity *pEntity );
 	virtual int		OnTakeDamage( const CTakeDamageInfo &info );
