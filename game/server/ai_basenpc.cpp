@@ -10791,6 +10791,7 @@ BEGIN_DATADESC( CAI_BaseNPC )
 
 	// Underhell AI + dismemberment inputs.
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetSquadTemp", InputSetSquadTemp ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetFos", InputSetFos ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetViewDistance", InputSetViewDistance ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "SetSpotBodiesOn", InputSetSpotBodiesOn ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "SetSpotBodiesOff", InputSetSpotBodiesOff ),
@@ -10930,6 +10931,10 @@ void CAI_BaseNPC::Precache( void )
 			}
 		}
 	}
+
+	// Underhell: precache the severed-limb + helmet models for this NPC's body
+	// (they are spawned dynamically on dismemberment / helmet loss).
+	UH_PrecacheGibModels();
 
 	// Make sure schedules are loaded for this NPC type
 	if (!LoadedSchedules())

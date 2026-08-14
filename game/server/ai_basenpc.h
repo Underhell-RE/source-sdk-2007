@@ -1888,6 +1888,7 @@ public:
 
 	// Methods (implemented in underhell/uh_ai.cpp).
 	void					UH_ApplySpawnSettings( void );	// bodygroup string + FOV/view distance
+	void					UH_PrecacheGibModels( void );	// severed-limb + helmet models for this NPC's body
 	void					UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, const Vector &vecDir );
 	bool					UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &vecPosition, const Vector &vecDir );
 	void					UH_ShootOffHelmet( const Vector &vecPosition, const Vector &vecDir );
@@ -1896,6 +1897,7 @@ public:
 
 	// Inputs.
 	void					InputSetSquadTemp( inputdata_t &inputdata );
+	void					InputSetFos( inputdata_t &inputdata );
 	void					InputSetViewDistance( inputdata_t &inputdata );
 	void					InputSetSpotBodiesOn( inputdata_t &inputdata );
 	void					InputSetSpotBodiesOff( inputdata_t &inputdata );

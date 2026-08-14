@@ -154,11 +154,46 @@ void CAI_BaseNPC::UH_ApplySpawnSettings( void )
 		m_flFieldOfView = cos( DEG2RAD( m_flUhFOV * 0.5f ) );
 	}
 
-	// View distance ("uh_viewdistance").
+	// View distance ("uh_viewdistance"). The original (sub_10022930) sets BOTH
+	// the NPC's "too far to attack" distance AND the senses' look distance
+	// (CAI_Senses::m_LookDist), so the soldier can't SEE the player past that
+	// range. Setting only m_flDistTooFar left the senses at the 2048 default.
 	if ( m_flUhViewDistance > 0.0f )
 	{
 		m_flDistTooFar = m_flUhViewDistance;
+		GetSenses()->SetDistLook( m_flUhViewDistance );
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Precache the severed-limb and helmet models for this NPC's body, so they are
+// available when dismemberment / helmet-loss spawns them dynamically.
+//-----------------------------------------------------------------------------
+void CAI_BaseNPC::UH_PrecacheGibModels( void )
+{
+	const char *pszModel = STRING( GetModelName() );
+
+	// Severed limbs (arms + legs).
+	const char *pszFolder = NULL;
+	if ( V_stristr( pszModel, "combine_soldier_prisonguard" ) )
+		pszFolder = "models/Gibs/BodyParts/Soldier_PrisonGuard";
+	else if ( V_stristr( pszModel, "combine_soldier" ) )
+		pszFolder = "models/Gibs/BodyParts/Soldier";
+
+	if ( pszFolder )
+	{
+		PrecacheModel( UTIL_VarArgs( "%s/leftarm.mdl", pszFolder ) );
+		PrecacheModel( UTIL_VarArgs( "%s/rightarm.mdl", pszFolder ) );
+		PrecacheModel( UTIL_VarArgs( "%s/leftleg.mdl", pszFolder ) );
+		PrecacheModel( UTIL_VarArgs( "%s/rightleg.mdl", pszFolder ) );
+	}
+
+	// Helmet drops (prison guard has a plain helmet; the regular soldier has
+	// the visored helmet).
+	if ( V_stristr( pszModel, "prisonguard" ) )
+		PrecacheModel( "models/items/helmet.mdl" );
+	else if ( V_stristr( pszModel, "combine_soldier" ) )
+		PrecacheModel( "models/items/helmet_visor.mdl" );
 }
 
 //-----------------------------------------------------------------------------
@@ -166,6 +201,11 @@ void CAI_BaseNPC::UH_ApplySpawnSettings( void )
 //-----------------------------------------------------------------------------
 static void UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, const Vector &vecDir, CBaseEntity *pOwner )
 {
+	// The gib models are spawned dynamically (after the map precache phase),
+	// so force-precache them here. Without this, SetModel() fires
+	// "UTIL_SetModel: not precached" and the game crashes.
+	CBaseEntity::PrecacheModel( pszModel );
+
 	CBaseEntity *pProp = CreateEntityByName( "prop_physics" );
 	if ( !pProp )
 		return;
@@ -410,10 +450,21 @@ void CAI_BaseNPC::InputSetSquadTemp( inputdata_t &inputdata )
 	m_bUhSquadTemp = ( atoi( inputdata.value.String() ) != 0 );
 }
 
+void CAI_BaseNPC::InputSetFos( inputdata_t &inputdata )
+{
+	// Original sub_100228B0: FOS in degrees -> m_flFieldOfView = cos(fos/2).
+	m_flUhFOV = atof( inputdata.value.String() );
+	if ( m_flUhFOV > 0.0f )
+	{
+		m_flFieldOfView = cos( DEG2RAD( m_flUhFOV * 0.5f ) );
+	}
+}
+
 void CAI_BaseNPC::InputSetViewDistance( inputdata_t &inputdata )
 {
 	m_flUhViewDistance = atof( inputdata.value.String() );
 	m_flDistTooFar = m_flUhViewDistance;
+	GetSenses()->SetDistLook( m_flUhViewDistance );
 }
 
 void CAI_BaseNPC::InputSetSpotBodiesOn( inputdata_t &inputdata )
