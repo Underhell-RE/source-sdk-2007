@@ -649,10 +649,52 @@ static CUHRagdollManager g_UHRagdollManager;
 // gib at the hit position — matching the original's "ragdolls can be
 // dismembered completely".
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Map a ragdoll physics bone -> hitgroup. Ragdolls are SOLID_VPHYSICS, so a
+// bullet trace against them returns physicsbone but leaves hitgroup = generic
+// (CRagdollProp::TestCollision only sets tr.physicsbone). Recover the hitgroup
+// from the physics bone's studio bone via the model's hitbox set.
+//-----------------------------------------------------------------------------
+static int UH_RagdollBoneToHitgroup( CRagdollProp *pRagdoll, int iPhysicsBone )
+{
+	ragdoll_t *pRagdollPhys = pRagdoll->GetRagdoll();
+	if ( iPhysicsBone < 0 || iPhysicsBone >= pRagdollPhys->listCount )
+		return HITGROUP_GENERIC;
+
+	int iStudioBone = pRagdollPhys->boneIndex[iPhysicsBone];
+	if ( iStudioBone < 0 )
+		return HITGROUP_GENERIC;
+
+	CStudioHdr *pHdr = pRagdoll->GetModelPtr();
+	if ( !pHdr )
+		return HITGROUP_GENERIC;
+
+	for ( int iSet = 0; iSet < pHdr->numhitboxsets(); iSet++ )
+	{
+		mstudiohitboxset_t *pSet = pHdr->pHitboxSet( iSet );
+		for ( int i = 0; i < pSet->numhitboxes; i++ )
+		{
+			mstudiobbox_t *pBox = pSet->pHitbox( i );
+			if ( pBox->bone == iStudioBone )
+			{
+				return pBox->group;
+			}
+		}
+	}
+
+	return HITGROUP_GENERIC;
+}
+
 void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage, int iPhysicsBone, const Vector &pos, const Vector &dir )
 {
 	if ( !pRagdoll )
 		return;
+
+	// A bullet trace against a ragdoll reports hitgroup = generic (see
+	// CRagdollProp::TestCollision); recover the real hitgroup from the
+	// physics bone so limb damage / helmet knock-off actually trigger.
+	if ( iHitGroup == HITGROUP_GENERIC )
+		iHitGroup = UH_RagdollBoneToHitgroup( pRagdoll, iPhysicsBone );
 
 	// Helmet knock-off (head hit while the corpse still wears a helmet):
 	// accumulate helmet damage, and once past uh_helmethealth, remove the
