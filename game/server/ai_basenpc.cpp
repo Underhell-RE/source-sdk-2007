@@ -11138,6 +11138,19 @@ void CAI_BaseNPC::OnRestore()
 	}
 	BaseClass::OnRestore();
 	m_bCheckContacts = true;
+
+	// Underhell: the base CBaseAnimating::OnRestore deliberately skips clamping
+	// m_nSequence when it is exactly -1 (it treats -1 as "no sequence yet").
+	// For an NPC that state is never valid — a restored -1 leaves the soldier
+	// frozen in the reference (T-)pose and spams "Bad sequence (-1 ...)" from
+	// GetSequenceLinearMotion. Re-resolve a valid sequence here.
+	if ( GetModelPtr() && ( GetSequence() < 0 || !IsValidSequence( GetSequence() ) ) )
+	{
+		int iSequence = SelectWeightedSequence( ACT_IDLE );
+		if ( iSequence == ACTIVITY_NOT_AVAILABLE )
+			iSequence = 0;
+		SetSequence( iSequence );
+	}
 }
 
 
