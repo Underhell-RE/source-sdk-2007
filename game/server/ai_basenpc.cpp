@@ -1218,6 +1218,9 @@ void CAI_BaseNPC::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 		subInfo.SetInflictor( info.GetAttacker() );
 	}
 
+	// Underhell dismemberment: gib the struck limb once its threshold is met.
+	UH_ConsiderGib( ptr->hitgroup, subInfo.GetDamage(), ptr->endpos, vecDir );
+
 	AddMultiDamage( subInfo, this );
 }
 
@@ -4747,6 +4750,10 @@ void CAI_BaseNPC::PrescheduleThink( void )
 #ifdef HL2_EPISODIC
 	CheckForScriptedNPCInteractions();
 #endif
+
+	// Underhell: spot dead bodies + temporary squads (throttled internals).
+	UH_SpotBodiesThink();
+	UH_TempSquadUpdate();
 
 	// If we use weapons, and our desired weapon state is not the current, fix it
 	if( (CapabilitiesGet() & bits_CAP_USE_WEAPONS) && (m_iDesiredWeaponState == DESIREDWEAPONSTATE_HOLSTERED || m_iDesiredWeaponState == DESIREDWEAPONSTATE_UNHOLSTERED || m_iDesiredWeaponState == DESIREDWEAPONSTATE_HOLSTERED_DESTROYED ) )
@@ -10673,6 +10680,16 @@ BEGIN_DATADESC( CAI_BaseNPC )
 	DEFINE_FIELD( m_flTimeLastMovement,			FIELD_TIME ),
 	DEFINE_KEYFIELD(m_spawnEquipment,			FIELD_STRING, "additionalequipment" ),
   	DEFINE_FIELD( m_fNoDamageDecal,			FIELD_BOOLEAN ),
+
+	// Underhell AI + dismemberment fields.
+	DEFINE_KEYFIELD( m_uh_bodygroup,			FIELD_STRING, "uh_bodygroup" ),
+	DEFINE_KEYFIELD( m_flUhFOV,					FIELD_FLOAT,  "uh_fos" ),
+	DEFINE_KEYFIELD( m_flUhViewDistance,		FIELD_FLOAT,  "uh_viewdistance" ),
+	DEFINE_KEYFIELD( m_bUhSquadTemp,			FIELD_BOOLEAN, "squadtemp" ),
+	DEFINE_KEYFIELD( m_bUhSpotBodies,			FIELD_BOOLEAN, "uh_spotbodies" ),
+	DEFINE_ARRAY( m_flGibDamage,				FIELD_FLOAT, 5 ),
+	DEFINE_FIELD( m_flNextSpotBodiesTime,		FIELD_TIME ),
+	DEFINE_FIELD( m_flNextTempSquadTime,		FIELD_TIME ),
   	DEFINE_FIELD( m_hStoredPathTarget,			FIELD_EHANDLE ),
 	DEFINE_FIELD( m_vecStoredPathGoal,		FIELD_POSITION_VECTOR ),
 	DEFINE_FIELD( m_nStoredPathType,			FIELD_INTEGER ),
@@ -10737,6 +10754,11 @@ BEGIN_DATADESC( CAI_BaseNPC )
 	DEFINE_OUTPUT( m_OnForcedInteractionAborted,	"OnForcedInteractionAborted" ),
 	DEFINE_OUTPUT( m_OnForcedInteractionFinished,	"OnForcedInteractionFinished" ),
 
+	// Underhell spot-bodies outputs.
+	DEFINE_OUTPUT( m_OnSpotSoldierBody,			"OnSpotSoldierBody" ),
+	DEFINE_OUTPUT( m_OnSpotInfectedBody,		"OnSpotInfectedBody" ),
+	DEFINE_OUTPUT( m_OnSpotDefaultBody,			"OnSpotDefaultBody" ),
+
 	// Inputs
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetRelationship", InputSetRelationship ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetEnemyFilter", InputSetEnemyFilter ),
@@ -10762,6 +10784,17 @@ BEGIN_DATADESC( CAI_BaseNPC )
 	DEFINE_INPUTFUNC( FIELD_VOID,	"UnholsterWeapon", InputUnholsterWeapon ),
 	DEFINE_INPUTFUNC( FIELD_STRING,	"ForceInteractionWithNPC", InputForceInteractionWithNPC ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "UpdateEnemyMemory", InputUpdateEnemyMemory ),
+
+	// Underhell AI + dismemberment inputs.
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetSquadTemp", InputSetSquadTemp ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetViewDistance", InputSetViewDistance ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "SetSpotBodiesOn", InputSetSpotBodiesOn ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "SetSpotBodiesOff", InputSetSpotBodiesOff ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "GibHead", InputGibHead ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "GibLeftArm", InputGibLeftArm ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "GibRightArm", InputGibRightArm ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "GibLeftLeg", InputGibLeftLeg ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "GibRightLeg", InputGibRightLeg ),
 
 	// Function pointers
 	DEFINE_USEFUNC( NPCUse ),
@@ -10854,6 +10887,9 @@ void CAI_BaseNPC::Activate( void )
 	{
 		ParseScriptedNPCInteractions();
 	}
+
+	// Underhell: apply "uh_bodygroup" + "uh_fos" + "uh_viewdistance".
+	UH_ApplySpawnSettings();
 
 	// Get a handle to my enemy filter entity if there is one.
 	if ( m_iszEnemyFilterName != NULL_STRING )
@@ -11347,6 +11383,17 @@ CAI_BaseNPC::CAI_BaseNPC(void)
 	m_spawnEquipment			= NULL_STRING;
 	m_pEnemies					= new CAI_Enemies;
 	m_bIgnoreUnseenEnemies		= false;
+
+	// Underhell AI + dismemberment defaults.
+	m_uh_bodygroup				= NULL_STRING;
+	m_flUhFOV					= -1.0f;
+	m_flUhViewDistance			= -1.0f;
+	m_bUhSquadTemp				= true;		// temp squads on by default ("SquadTemp : 1")
+	m_bUhSpotBodies				= false;
+	for ( int i = 0; i < 5; i++ )
+		m_flGibDamage[i]		= 0.0f;
+	m_flNextSpotBodiesTime		= 0.0f;
+	m_flNextTempSquadTime		= 0.0f;
 	m_flEyeIntegRate			= 0.95;
 	SetTarget( NULL );
 
