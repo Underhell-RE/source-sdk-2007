@@ -271,6 +271,10 @@ public:
 	// the player's driving input must NOT stomp the scripted throttle.
 	CNetworkVar( bool, m_bPlayerAtGun );
 
+	// Underhell: gunner-seat view uses "vehicle_gunner_eyes" instead of
+	// "vehicle_driver_eyes".
+	bool IsPlayerAtGun( void ) const { return m_bPlayerAtGun; }
+
 	CNetworkVar( bool, m_nScannerDisabledWeapons );
 	CNetworkVar( bool, m_nScannerDisabledVehicle );
 
