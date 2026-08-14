@@ -77,6 +77,11 @@ public:
 	virtual void OnSave( IEntitySaveUtils *pUtils );
 	virtual void OnRestore();
 
+	// Underhell dismemberment. Sever a limb (break its ragdoll constraint) so a
+	// dead body can be shot apart, and accumulate per-hitgroup gib damage.
+	void			UH_SeverLimb( int iPhysicsBone );
+	float			m_flGibDamage[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
+
 	// Purpose: CDefaultPlayerPickupVPhysics
 	virtual void VPhysicsCollision( int index, gamevcollisionevent_t *pEvent );
  	virtual void OnPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGunPickup_t reason );

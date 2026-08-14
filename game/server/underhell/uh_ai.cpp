@@ -146,6 +146,32 @@ void CAI_BaseNPC::UH_ApplySpawnSettings( void )
 			}
 		}
 	}
+	else
+	{
+		// No explicit bodygroups: randomize armor / helmet / legs, exactly like
+		// the original (sub_10338D30): Armor 0-2, Helmet 0-5, Legs 0 or 4
+		// (heavy). This is what gives combine soldiers their helmets + armor
+		// variety. Clamped to each bodygroup's actual variant count.
+		int iArmor = FindBodygroupByName( "Armor" );
+		if ( iArmor >= 0 )
+			SetBodygroup( iArmor, random->RandomInt( 0, min( 2, GetBodygroupCount( iArmor ) - 1 ) ) );
+
+		int iHelmet = FindBodygroupByName( "Helmet" );
+		if ( iHelmet >= 0 )
+			SetBodygroup( iHelmet, random->RandomInt( 0, min( 5, GetBodygroupCount( iHelmet ) - 1 ) ) );
+
+		int iLegs = FindBodygroupByName( "Legs" );
+		if ( iLegs >= 0 )
+		{
+			int iHeavy = ( GetBodygroupCount( iLegs ) > 4 ) ? 4 : 0;
+			SetBodygroup( iLegs, random->RandomInt( 0, 1 ) ? iHeavy : 0 );
+		}
+	}
+
+	// Underhell keeps dead NPCs as server-side ragdolls (pickable + dismemberable),
+	// capped by uh_maxseragdolls. Vanilla only does this for vehicle kills / the
+	// mega-physcannon, otherwise it becomes a client ragdoll ("soft body").
+	m_bForceServerRagdoll = true;
 
 	// Field of view ("uh_fos" in degrees -> dot product).
 	if ( m_flUhFOV > 0.0f )
@@ -577,3 +603,60 @@ private:
 };
 
 static CUHRagdollManager g_UHRagdollManager;
+
+//-----------------------------------------------------------------------------
+// Ragdoll dismemberment: shoot limbs off a dead body. Called from
+// CRagdollProp::TraceAttack. Accumulates per-hitgroup damage and, once a limb's
+// threshold is crossed, severs it (breaks the ragdoll constraint) and spawns a
+// gib at the hit position — matching the original's "ragdolls can be
+// dismembered completely".
+//-----------------------------------------------------------------------------
+void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage, int iPhysicsBone, const Vector &pos, const Vector &dir )
+{
+	if ( !pRagdoll )
+		return;
+
+	int idx = -1;
+	const char *pszLimb = NULL;
+	switch ( iHitGroup )
+	{
+	case HITGROUP_HEAD:		idx = 0; break;
+	case HITGROUP_LEFTARM:	idx = 1; pszLimb = "leftarm"; break;
+	case HITGROUP_RIGHTARM:	idx = 2; pszLimb = "rightarm"; break;
+	case HITGROUP_LEFTLEG:	idx = 3; pszLimb = "leftleg"; break;
+	case HITGROUP_RIGHTLEG:	idx = 4; pszLimb = "rightleg"; break;
+	}
+	if ( idx < 0 )
+		return;
+
+	pRagdoll->m_flGibDamage[idx] += flDamage;
+
+	float flThreshold = 0.0f;
+	if ( iHitGroup == HITGROUP_HEAD )
+		flThreshold = uh_headhealth.GetFloat();
+	else if ( iHitGroup == HITGROUP_LEFTARM || iHitGroup == HITGROUP_RIGHTARM )
+		flThreshold = uh_gibhealth.GetFloat() * 0.5f;	// arms = 50% of legs
+	else
+		flThreshold = uh_gibhealth.GetFloat();
+
+	if ( pRagdoll->m_flGibDamage[idx] < flThreshold )
+		return;
+
+	pRagdoll->m_flGibDamage[idx] = 0.0f;	// reset so the limb can be re-hit
+
+	// Sever the bone (falls free from the rest of the body).
+	pRagdoll->UH_SeverLimb( iPhysicsBone );
+
+	// Spawn a severed-limb gib at the hit position.
+	if ( pszLimb )
+	{
+		const char *pszModel = UH_GibModelFor( STRING( pRagdoll->GetModelName() ), pszLimb );
+		if ( pszModel )
+		{
+			UH_SpawnGibProp( pszModel, pos, dir, pRagdoll );
+		}
+	}
+
+	// Blood at the wound.
+	SpawnBlood( pos, dir, BLOOD_COLOR_RED, 24.0f );
+}
