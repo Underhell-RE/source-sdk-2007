@@ -6,11 +6,10 @@
 // original does not register one either (the string only appears in a
 // server-resync path, sub_100D8E90): the keybinding forwards "ironsight_toggle"
 // to the server through the engine's client-command route (exactly like
-// dropitem/useitem/switch), the server toggles the networked m_bIronSighted,
-// and the client viewmodel slides by reading C_BaseHLPlayer::IsIronSighted()
-// every frame in CalcViewModelView. A single source of truth avoids the
-// client/server desync (and any double-execution) a locally-toggled flag
-// would cause.
+// dropitem/useitem/switch). The server toggles the networked flags —
+// CHL2_Player::m_bIronSighted and the viewmodel's m_bExpSighted — and the
+// client viewmodel slides by reading its own m_bExpSighted every frame in
+// CBaseViewModel::CalcViewModelView (baseviewmodel_shared.cpp).
 //
 // $NoKeywords: $
 //=============================================================================//

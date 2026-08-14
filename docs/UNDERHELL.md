@@ -515,19 +515,59 @@ attack viewmodels (distinct from weapons).
 
 ## Ironsight (stage 27)
 
-Port of the VDC "Adding Ironsights" system (jorg40/Cin) that Underhell uses:
+Port of the VDC "Adding Ironsights" system (jorg40/Cin) that Underhell uses.
+Decoded 1:1 from the original toggle (`server/sub_101ECF40`), the viewmodel
+send/recv tables (`sub_100F8EA0` / `sub_10015160`) and the player sendtable
+(`sub_101E6C70`).
 
-- **Shared viewmodel** (`baseviewmodel_shared.h/.cpp`): client-only
-  `m_bExpSighted` + `m_expFactor`. `UH_CalcExpWpnOffsets` applies the active
-  weapon's `ExpOffset` (position in eye-local space + orientation), then
-  `CalcViewModelView` interpolates the viewmodel toward the eye over ~0.1 s.
-- **Server** (`uh_ironsight.cpp`): `ironsight_toggle` client command →
-  `CHL2_Player::UH_ToggleIronsight()` (decode sub_101ECF40): 0.1 s debounce,
-  drop sprint, toggle networked `m_bIronSighted`, FOV zoom
-  (`defaultFOV - uh_ironsight_zoom_focus`, default 40), sounds
-  `HL2Player.Ironsighton/Ironsightoff`, and `m_fIronsightedTime`.
-- **Client** (`uh_ironsight.cpp`): `ironsight_toggle` CON_COMMAND flips the
-  local viewmodel `m_bExpSighted` and forwards the command to the server.
+State (all networked, mirrors the original binary):
+
+- `CBaseViewModel::m_bExpSighted` — networked bool (server @1120, client
+  @1960) that the server toggles; the client `CalcViewModelView` reads it to
+  slide the viewmodel up to the eye by the weapon's `ExpOffset`
+  (`m_expFactor` interpolates 0 hip → 1 sighted over ~0.1 s).
+- `CHL2_Player::m_bIronSighted` — authoritative flag (accuracy + HUD).
+- `CHL2_Player::m_fIronsightedTime` — last toggle time (0.1 s debounce).
+
+Server toggle (`UH_ToggleIronsight`, decode `sub_101ECF40`):
+
+1. Debounce 0.1 s.
+2. Preconditions: active weapon exists and is not a melee weapon (weapon-info
+   `MeleeWeapon` flag → `m_bMeleeWeapon`, hexrays `sub_100D0E00` reads info
+   offset 1832). TODO: the original also gates on a weapon flag @1144 and
+   `m_bHardLowered` (each with an `|| m_bIronSighted` escape) — not ported.
+3. Drop sprint (`StopSprinting`).
+4. `m_Local.m_iHideHUD ^= HIDEHUD_CROSSHAIR` (original toggles bit 256).
+5. Toggle the viewmodel `m_bExpSighted` (networked).
+6. Enter: `ClearUseEntity()`, `HL2Player.Ironsighton`, FOV =
+   `GetDefaultFOV() * uh_ironsight_zoom` (default 0.9 → mild zoom; the real
+   sighting effect is the viewmodel slide), `m_bIronSighted = true`, and
+   `m_flMaxspeed = uh_ironsight_zoom_focus` (default 40) if lower.
+7. Leave: `HL2Player.Ironsightoff`, `m_bIronSighted = false`, FOV = 0
+   (default), restore `m_flMaxspeed = hl2_walkspeed` (150) if higher.
+8. `m_fIronsightedTime = curtime`.
+
+Key corrections vs. the earlier (wrong) reading of the hexrays:
+
+- **`uh_ironsight_zoom` (0.9) is a FOV *multiplier*, not a transition rate**:
+  `FOV = GetDefaultFOV() * uh_ironsight_zoom`, not a subtraction.
+- **`uh_ironsight_zoom_focus` (40) is the aim-walk speed, not a FOV value**:
+  despite its help text ("subtracted from the default FOV" — stale), the code
+  writes it to `m_flMaxspeed` (`sub_100EA7B0` → player offset 4132) and
+  restores `hl2_walkspeed` on leave.
+- **`m_bExpSighted` is networked on the viewmodel**, not a client-local flag;
+  the client reads it directly (single source of truth, no client
+  `ironsight_toggle` CON_COMMAND — the string only appears in the resync path
+  `sub_100D8E90`). This also keeps the `CBaseViewModel` layout identical in
+  both DLLs (the earlier `#if CLIENT_DLL`-guarded members shifted every
+  `CNetworkVar` below them and corrupted memory → the crash).
+
+The FOV is set directly (`m_iFOV`/`m_flFOVTime`/`m_iFOVStart`/`m_flFOVRate`),
+not via `CBasePlayer::SetFOV`. The original's custom setter `sub_100F8040`
+also claims `m_hZoomOwner` (passing the player itself); going through it makes
+`IsZooming()` true while only ironsighted and collides with the vanilla suit
+zoom. A direct set gives the same `GetFOV()` result without touching
+`m_hZoomOwner` — intentional, documented divergence.
 
 `m_bIronSighted` / `m_fIronsightedTime` are networked (accuracy + FOV follow
 the authoritative server state).
@@ -546,7 +586,7 @@ the authoritative server state).
   penalty, scaled by `CrouchAccuracyMult` (duck), `RunAccuracyMult` (moving)
   and the `ExpOffset` accuracy while ironsighted (`m_bIronSighted`).
 - **Ironsight desync**: switching weapons while sighted now un-sights
-  (`Weapon_Switch` calls `UH_ToggleIronsight`).
+  (`Weapon_Switch` calls `UH_DisableIronsight`).
 
 ### TODO (ironsight / weapons)
 

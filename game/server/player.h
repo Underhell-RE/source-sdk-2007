@@ -202,10 +202,6 @@ public:
 	virtual const int GetHealth();
 	virtual const int GetMaxHealth();
 
-	// Underhell: ironsight state (server-authoritative). Base players never
-	// ironsight; CHL2_Player overrides with m_bIronSighted.
-	virtual bool IsIronSighted() { return false; }
-
 	// bot specific functions	
 	virtual void SetAbsOrigin( Vector & vec );
 	virtual void SetAbsAngles( QAngle & ang );

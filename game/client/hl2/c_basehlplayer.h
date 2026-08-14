@@ -46,9 +46,6 @@ public:
 	virtual void		ExitLadder();
 	bool				IsSprinting() const { return m_fIsSprinting; }
 
-	// C_BasePlayer::IsIronSighted override (mirrors the networked flag).
-	virtual bool		IsIronSighted() { return m_bIronSighted; }
-	
 	// Input handling
 	virtual bool	CreateMove( float flInputSampleTime, CUserCmd *pCmd );
 	void			PerformClientSideObstacleAvoidance( float flFrameTime, CUserCmd *pCmd );

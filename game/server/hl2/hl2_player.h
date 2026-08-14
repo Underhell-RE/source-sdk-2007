@@ -389,16 +389,14 @@ public:
 
 	//-----------------------------------------------------------------------------
 	// Underhell ironsight. The "ironsight_toggle" client command toggles
-	// m_bIronSighted (networked so accuracy/FOV follow); m_fIronsightedTime is
-	// the last toggle time (debounce + viewmodel interpolation). Decoded from
+	// m_bIronSighted (networked so accuracy/FOV follow) and the viewmodel's
+	// m_bExpSighted (networked so the client slides the gun to the eye);
+	// m_fIronsightedTime is the last toggle time (debounce). Decoded from
 	// sub_101ECF40.
 	//-----------------------------------------------------------------------------
 	bool				UH_IsIronSighted( void ) const { return m_bIronSighted; }
 	void				UH_ToggleIronsight( void );
 	void				UH_DisableIronsight( void );	// force off (no debounce/sound) — weapon switch / drop
-
-	// CBasePlayer::IsIronSighted override (server-authoritative flag).
-	virtual bool		IsIronSighted() { return m_bIronSighted; }
 
 	//-----------------------------------------------------------------------------
 	// Underhell glowstick. The lit glowstick prop is parented to the player and

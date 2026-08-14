@@ -35,10 +35,12 @@ CBaseViewModel::CBaseViewModel()
 #endif
 	SetRenderColor( 255, 255, 255, 255 );
 
-	// Underhell ironsight interpolation (VDC "Adding Ironsights"). Declared
-	// unconditionally so the class layout matches the server; only the client
-	// reads it.
+	// Underhell ironsight interpolation (VDC "Adding Ironsights"). m_expFactor
+	// is declared unconditionally so the class layout matches the server; only
+	// the client reads it. m_bExpSighted is the networked target state the
+	// server toggles.
 	m_expFactor = 0.0f;
+	m_bExpSighted = false;
 
 	// View model of this weapon
 	m_sVMName			= NULL_STRING;		
@@ -82,6 +84,7 @@ void CBaseViewModel::Spawn( void )
 
 	// Underhell: reset ironsight interpolation on spawn (VDC "Adding Ironsights").
 	m_expFactor = 0.0f;
+	m_bExpSighted = false;
 }
 
 
@@ -448,14 +451,13 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 
 	// Underhell ironsight: slide the viewmodel up to the eye by the weapon's
 	// ExpOffset, interpolated over ~0.1 s (VDC "Adding Ironsights"). The target
-	// state comes from the player's authoritative IsIronSighted() (the
-	// networked m_bIronSighted), not a locally-toggled flag — a single source
-	// of truth so the viewmodel can never desync from the server.
+	// state is the networked m_bExpSighted (toggled by the server), so the
+	// viewmodel stays in sync with the authoritative player flag.
 #if defined( CLIENT_DLL )
 	UH_CalcExpWpnOffsets( owner, vmorigin, vmangles );
 
 	// Interpolate m_expFactor toward the target (1 = sighted, 0 = hip).
-	float flTarget = owner->IsIronSighted() ? 1.0f : 0.0f;
+	float flTarget = m_bExpSighted ? 1.0f : 0.0f;
 	float flSpeed = 10.0f;	// 1 / gMoveTime(0.1)
 	if ( m_expFactor < flTarget )
 		m_expFactor = min( flTarget, m_expFactor + flSpeed * gpGlobals->frametime );
@@ -572,6 +574,7 @@ IMPLEMENT_NETWORKCLASS_ALIASED( BaseViewModel, DT_BaseViewModel )
 BEGIN_NETWORK_TABLE_NOBASE(CBaseViewModel, DT_BaseViewModel)
 #if !defined( CLIENT_DLL )
 	SendPropModelIndex(SENDINFO(m_nModelIndex)),
+	SendPropBool	(SENDINFO(m_bExpSighted)),
 	SendPropInt		(SENDINFO(m_nBody), 8),
 	SendPropInt		(SENDINFO(m_nSkin), 10),
 	SendPropInt		(SENDINFO(m_nSequence),	8, SPROP_UNSIGNED),
@@ -590,6 +593,7 @@ BEGIN_NETWORK_TABLE_NOBASE(CBaseViewModel, DT_BaseViewModel)
 	SendPropArray	(SendPropFloat(SENDINFO_ARRAY(m_flPoseParameter),	8, 0, 0.0f, 1.0f), m_flPoseParameter),
 #endif
 #else
+	RecvPropBool	(RECVINFO(m_bExpSighted)),
 	RecvPropInt		(RECVINFO(m_nModelIndex)),
 	RecvPropInt		(RECVINFO(m_nSkin)),
 	RecvPropInt		(RECVINFO(m_nBody)),
@@ -616,6 +620,7 @@ END_NETWORK_TABLE()
 BEGIN_PREDICTION_DATA( CBaseViewModel )
 
 	// Networked
+	DEFINE_PRED_FIELD( m_bExpSighted, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_nModelIndex, FIELD_SHORT, FTYPEDESC_INSENDTABLE | FTYPEDESC_MODELINDEX ),
 	DEFINE_PRED_FIELD( m_nSkin, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_nBody, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),

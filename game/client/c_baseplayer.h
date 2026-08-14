@@ -99,11 +99,6 @@ public:
 	virtual void		CalcView( Vector &eyeOrigin, QAngle &eyeAngles, float &zNear, float &zFar, float &fov );
 	virtual void		CalcViewModelView( const Vector& eyeOrigin, const QAngle& eyeAngles);
 
-	// Underhell: ironsight state (mirrors the networked m_bIronSighted).
-	// C_BaseHLPlayer overrides; base players are never ironsighted.
-	virtual bool		IsIronSighted() { return false; }
-	
-
 	// Handle view smoothing when going up stairs
 	void				SmoothViewOnStairs( Vector& eyeOrigin );
 	virtual float		CalcRoll (const QAngle& angles, const Vector& velocity, float rollangle, float rollspeed);
