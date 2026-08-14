@@ -1882,6 +1882,7 @@ public:
 
 	// Gib/dismemberment runtime state (per-hitgroup accumulated damage).
 	float					m_flGibDamage[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
+	float					m_flHelmetDamage;			// accumulated damage to the helmet (shot off at uh_helmethealth)
 	float					m_flNextSpotBodiesTime;		// throttle the spot-bodies scan
 	float					m_flNextTempSquadTime;		// throttle the temp-squad scan
 
@@ -1889,6 +1890,7 @@ public:
 	void					UH_ApplySpawnSettings( void );	// bodygroup string + FOV/view distance
 	void					UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, const Vector &vecDir );
 	bool					UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &vecPosition, const Vector &vecDir );
+	void					UH_ShootOffHelmet( const Vector &vecPosition, const Vector &vecDir );
 	void					UH_SpotBodiesThink( void );
 	void					UH_TempSquadUpdate( void );
 

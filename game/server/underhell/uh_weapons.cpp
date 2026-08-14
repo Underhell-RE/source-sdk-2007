@@ -169,22 +169,21 @@ void CUHGunWeapon::PrimaryAttack( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: NPC fire path. PrimaryAttack() is player-only (it pulls the eye
-// origin / view vectors off CBasePlayer); NPCs fire through the AE_NPC_WEAPON_FIRE
-// anim event -> Operator_HandleAnimEvent -> here. Mirrors the vanilla machine
-// gun's Operator_ForceNPCFire (weapon_ar2.cpp), but uses the per-weapon
-// sk_plr_dmg_<weapon> convar for damage.
+// Purpose: NPC fire. PrimaryAttack() is player-only (it pulls the eye origin /
+// view vectors off CBasePlayer). Uses the operator's shoot position + the AI's
+// actual shoot trajectory (NOT the weapon's "muzzle" attachment, which the
+// Underhell worldmodels don't reliably carry — a missing attachment made the
+// bullets fire from a garbage position/direction). Damage is the per-weapon
+// sk_plr_dmg_<weapon> value.
 //-----------------------------------------------------------------------------
-void CUHGunWeapon::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary )
+void CUHGunWeapon::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator )
 {
 	CAI_BaseNPC *pNPC = pOperator->MyNPCPointer();
 	if ( !pNPC )
 		return;
 
-	Vector vecShootOrigin, vecShootDir;
-	QAngle angShootDir;
-	GetAttachment( LookupAttachment( "muzzle" ), vecShootOrigin, angShootDir );
-	AngleVectors( angShootDir, &vecShootDir );
+	Vector vecShootOrigin = pOperator->Weapon_ShootPosition();
+	Vector vecShootDir = pNPC->GetActualShootTrajectory( vecShootOrigin );
 
 	WeaponSound( SINGLE_NPC );
 
@@ -196,7 +195,48 @@ void CUHGunWeapon::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool 
 	pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, VECTOR_CONE_PRECALCULATED,
 		MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, (int)GetDamage(), NULL, false );
 
-	m_iClip1 = m_iClip1 - 1;
+	if ( m_iClip1 > 0 )
+		m_iClip1--;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: NPC fire via the new AE_NPC_WEAPON_FIRE anim event (handled by the
+// base Operator_HandleAnimEvent).
+//-----------------------------------------------------------------------------
+void CUHGunWeapon::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary )
+{
+	FireNPCPrimaryAttack( pOperator );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: NPC fire via the old EVENT_WEAPON_* anim events. The combine
+// soldier model's attack sequences fire EVENT_WEAPON_AR2 / EVENT_WEAPON_SMG1 /
+// EVENT_WEAPON_SHOTGUN_FIRE etc.; the base Operator_HandleAnimEvent only knows
+// the new AE_NPC_WEAPON_FIRE event, so without this override the NPC aims (and
+// shows the muzzle flash) but never fires a bullet. All ranged-fire events are
+// funneled into FireNPCPrimaryAttack().
+//-----------------------------------------------------------------------------
+void CUHGunWeapon::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
+{
+	switch ( pEvent->event )
+	{
+	case EVENT_WEAPON_AR1:
+	case EVENT_WEAPON_AR2:
+	case EVENT_WEAPON_SMG1:
+	case EVENT_WEAPON_SMG2:
+	case EVENT_WEAPON_HMG1:
+	case EVENT_WEAPON_SHOTGUN_FIRE:
+	case EVENT_WEAPON_PISTOL_FIRE:
+	case EVENT_WEAPON_SNIPER_RIFLE_FIRE:
+	case EVENT_WEAPON_SMG1_BURST1:
+	case EVENT_WEAPON_SMG1_BURSTN:
+		FireNPCPrimaryAttack( pOperator );
+		break;
+
+	default:
+		BaseClass::Operator_HandleAnimEvent( pEvent, pOperator );
+		break;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -353,18 +393,18 @@ UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	sk_plr_dmg
 // Pistols — semi-auto, shared fire routine (0.2 s).
 // Weapon type 1 = pistol (silencer-gated on m_bHavePistolSilencer).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1, ACT_RANGE_ATTACK_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1, ACT_RANGE_ATTACK_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1, ACT_RANGE_ATTACK_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1, ACT_RANGE_ATTACK_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1, ACT_RANGE_ATTACK_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1, ACT_RANGE_ATTACK_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1, ACT_RANGE_ATTACK_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1, ACT_RANGE_ATTACK_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1, ACT_RANGE_ATTACK_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1, ACT_RANGE_ATTACK_AR2 )
 
 //-----------------------------------------------------------------------------
 // SMGs — full auto, 0.075 s (exact, GetFireRate).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, sk_plr_dmg_smg_mp5, 0, ACT_RANGE_ATTACK_SMG2 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, sk_plr_dmg_smg_mp5_eod, 0, ACT_RANGE_ATTACK_SMG2 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0, ACT_RANGE_ATTACK_SMG2 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, sk_plr_dmg_smg_mp5, 0, ACT_RANGE_ATTACK_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, sk_plr_dmg_smg_mp5_eod, 0, ACT_RANGE_ATTACK_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0, ACT_RANGE_ATTACK_AR2 )
 
 //-----------------------------------------------------------------------------
 // Shotguns — pump-action. All four share one fire/pump routine (sub_1027E0A0 +
@@ -388,7 +428,7 @@ UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.0f, s
 // launcher (custom fire path, ~1.0 s — TODO exact).
 //-----------------------------------------------------------------------------
 UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, sk_plr_dmg_bfg_mgl, 0, ACT_RANGE_ATTACK_SHOTGUN )
-UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, sk_plr_dmg_bfg_minigun, 0, ACT_RANGE_ATTACK_SMG2 )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, sk_plr_dmg_bfg_minigun, 0, ACT_RANGE_ATTACK_AR2 )
 
 //-----------------------------------------------------------------------------
 // Purpose: The original impulse-101 loadout (decode sub_101EC700 case 101):

@@ -63,8 +63,8 @@ struct UHGibFolder_t
 
 static const UHGibFolder_t s_GibFolders[] =
 {
-	{ "combine_soldier_prisonguard",	"models/gibs/bodyparts/soldier_prisonguard" },
-	{ "combine_soldier",				"models/gibs/bodyparts/soldier" },
+	{ "combine_soldier_prisonguard",	"models/Gibs/BodyParts/Soldier_PrisonGuard" },
+	{ "combine_soldier",				"models/Gibs/BodyParts/Soldier" },
 };
 
 static const char *UH_GibModelFor( const char *pszNPC, const char *pszLimb )
@@ -162,8 +162,51 @@ void CAI_BaseNPC::UH_ApplySpawnSettings( void )
 }
 
 //-----------------------------------------------------------------------------
+// Spawn a severed part / dropped item as a pickable physics prop.
+//-----------------------------------------------------------------------------
+static void UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, const Vector &vecDir, CBaseEntity *pOwner )
+{
+	CBaseEntity *pProp = CreateEntityByName( "prop_physics" );
+	if ( !pProp )
+		return;
+
+	pProp->SetModel( pszModel );
+	pProp->SetAbsOrigin( vecPosition );
+	DispatchSpawn( pProp );
+
+	IPhysicsObject *pPhys = pProp->VPhysicsGetObject();
+	if ( pPhys )
+	{
+		AngularImpulse angImpulse( random->RandomFloat(-200,200), random->RandomFloat(-200,200), random->RandomFloat(-200,200) );
+		pPhys->SetVelocity( &vecDir, &angImpulse );
+	}
+
+	pProp->SetOwnerEntity( pOwner );
+}
+
+//-----------------------------------------------------------------------------
+// Shoot the helmet off: HELMET bodygroup -> 0 and drop the helmet model. The
+// model depends on the NPC ("combine_soldier" drops helmet_visor, the prison
+// guard drops the plain helmet), per the tutorial.
+//-----------------------------------------------------------------------------
+void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &vecDir )
+{
+	int iGroup = FindBodygroupByName( "HELMET" );
+	if ( iGroup < 0 || GetBodygroup( iGroup ) < 1 )
+		return;	// no helmet worn
+
+	SetBodygroup( iGroup, 0 );
+
+	const char *pszModel = V_stristr( STRING( GetModelName() ), "prisonguard" )
+		? "models/items/helmet.mdl"
+		: "models/items/helmet_visor.mdl";
+
+	UH_SpawnGibProp( pszModel, vecPosition, vecDir, this );
+}
+
+//-----------------------------------------------------------------------------
 // Gib a body part: change the bodygroup to remove the limb and spawn a severed
-// gib model at the hit position. Returns true if something was gibbed.
+// gib model at the hit position.
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, const Vector &vecDir )
 {
@@ -183,9 +226,9 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 		break;
 	}
 
-	// Spawn the severed gib (a physics prop) at the hit position. The head is
-	// "destroyed" via bodygroup only (no severed-head gib), matching the
-	// tutorial's gib list (arms + legs only).
+	// Spawn the severed gib (a pickable physics prop) at the hit position. The
+	// head is "destroyed" via bodygroup only (no severed-head gib), matching
+	// the tutorial's gib list (arms + legs only).
 	const char *pszLimb = NULL;
 	switch ( iHitGroup )
 	{
@@ -200,21 +243,7 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 		const char *pszModel = UH_GibModelFor( STRING( GetModelName() ), pszLimb );
 		if ( pszModel )
 		{
-			CBaseEntity *pGib = CreateEntityByName( "prop_physics" );
-			if ( pGib )
-			{
-				pGib->SetModel( pszModel );
-				pGib->SetAbsOrigin( vecPosition );
-				DispatchSpawn( pGib );
-
-				IPhysicsObject *pPhys = pGib->VPhysicsGetObject();
-				if ( pPhys )
-				{
-					pPhys->SetVelocity( &vecDir, NULL );
-				}
-
-				pGib->SetOwnerEntity( this );
-			}
+			UH_SpawnGibProp( pszModel, vecPosition, vecDir, this );
 		}
 	}
 
@@ -227,11 +256,11 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 
 //-----------------------------------------------------------------------------
 // Accumulate damage per hitgroup and gib a limb once its threshold is crossed.
-// Returns true if a body part was gibbed this hit.
+// A worn helmet absorbs head damage and is shot off (uh_helmethealth) before
+// the head itself can be destroyed (uh_headhealth).
 //-----------------------------------------------------------------------------
 bool CAI_BaseNPC::UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &vecPosition, const Vector &vecDir )
 {
-	// Only track the five gib-able groups.
 	int idx = -1;
 	switch ( iHitGroup )
 	{
@@ -243,6 +272,22 @@ bool CAI_BaseNPC::UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &v
 	}
 	if ( idx < 0 )
 		return false;
+
+	// Head: a worn helmet absorbs the damage until it is shot off.
+	if ( iHitGroup == HITGROUP_HEAD )
+	{
+		int iHelmet = FindBodygroupByName( "HELMET" );
+		if ( iHelmet >= 0 && GetBodygroup( iHelmet ) >= 1 )
+		{
+			m_flHelmetDamage += flDamage;
+			if ( m_flHelmetDamage >= uh_helmethealth.GetFloat() )
+			{
+				UH_ShootOffHelmet( vecPosition, vecDir );
+				m_flHelmetDamage = 0.0f;
+			}
+			return true;	// helmet absorbed the hit
+		}
+	}
 
 	// Dead NPCs gib freely; the threshold only gates living NPCs.
 	if ( IsAlive() )
@@ -440,8 +485,6 @@ public:
 		// Keep the LRU cap in sync (convar may change at runtime).
 		s_RagdollLRU.SetMaxRagdollCount( uh_maxseragdolls.GetInt() );
 
-		int iCollision = uh_ragdollcollisiontype.GetInt();
-
 		CBaseEntity *pEnt = gEntList.FirstEnt();
 		while ( pEnt )
 		{
@@ -453,13 +496,11 @@ public:
 				// prop_ragdolls have no owner and are excluded, per the tutorial.
 				if ( pRagdoll->GetOwnerEntity() )
 				{
-					// Collision group from the convar.
-					if ( iCollision >= 0 && pRagdoll->GetCollisionGroup() != iCollision )
-					{
-						pRagdoll->SetCollisionGroup( iCollision );
-					}
-
-					// Blood trail while dragged.
+					// Blood trail while dragged. (The ragdoll itself stays
+					// COLLISION_GROUP_INTERACTIVE_DEBRIS so it is pickable by the
+					// physcannon; uh_ragdollcollisiontype is registered but not
+					// force-applied, since overriding it to a debris group made
+					// bodies un-pickable.)
 					IPhysicsObject *pPhys = pRagdoll->VPhysicsGetObject();
 					if ( pPhys && ( pPhys->GetGameFlags() & FVPHYSICS_PLAYER_HELD ) )
 					{

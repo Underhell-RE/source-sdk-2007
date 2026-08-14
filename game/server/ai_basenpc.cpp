@@ -1219,7 +1219,10 @@ void CAI_BaseNPC::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 	}
 
 	// Underhell dismemberment: gib the struck limb once its threshold is met.
-	UH_ConsiderGib( ptr->hitgroup, subInfo.GetDamage(), ptr->endpos, vecDir );
+	// Use the RAW damage (info.GetDamage()) — the uh_gibhealth / uh_headhealth
+	// values are "how much damage to inflict", compared against the weapon's
+	// damage before the per-hitgroup multiplier is applied.
+	UH_ConsiderGib( ptr->hitgroup, info.GetDamage(), ptr->endpos, vecDir );
 
 	AddMultiDamage( subInfo, this );
 }
@@ -10688,6 +10691,7 @@ BEGIN_DATADESC( CAI_BaseNPC )
 	DEFINE_KEYFIELD( m_bUhSquadTemp,			FIELD_BOOLEAN, "squadtemp" ),
 	DEFINE_KEYFIELD( m_bUhSpotBodies,			FIELD_BOOLEAN, "uh_spotbodies" ),
 	DEFINE_ARRAY( m_flGibDamage,				FIELD_FLOAT, 5 ),
+	DEFINE_FIELD( m_flHelmetDamage,				FIELD_FLOAT ),
 	DEFINE_FIELD( m_flNextSpotBodiesTime,		FIELD_TIME ),
 	DEFINE_FIELD( m_flNextTempSquadTime,		FIELD_TIME ),
   	DEFINE_FIELD( m_hStoredPathTarget,			FIELD_EHANDLE ),
@@ -11392,6 +11396,7 @@ CAI_BaseNPC::CAI_BaseNPC(void)
 	m_bUhSpotBodies				= false;
 	for ( int i = 0; i < 5; i++ )
 		m_flGibDamage[i]		= 0.0f;
+	m_flHelmetDamage			= 0.0f;
 	m_flNextSpotBodiesTime		= 0.0f;
 	m_flNextTempSquadTime		= 0.0f;
 	m_flEyeIntegRate			= 0.95;

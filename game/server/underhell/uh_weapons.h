@@ -76,9 +76,16 @@ public:
 	// combine soldier holding the gun never attempts to shoot.
 	virtual int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 
-	// NPC fire path: the AE_NPC_WEAPON_FIRE anim event routes here (via
-	// Operator_HandleAnimEvent) instead of PrimaryAttack, which is player-only.
+	// NPC fire path. PrimaryAttack() is player-only; NPCs fire through anim
+	// events. Two entry points, both routing to FireNPCPrimaryAttack():
+	//   - Operator_ForceNPCFire()  — the new AE_NPC_WEAPON_FIRE event.
+	//   - Operator_HandleAnimEvent() — the old EVENT_WEAPON_* events (EVENT_WEAPON_AR2,
+	//     EVENT_WEAPON_SMG1, EVENT_WEAPON_SHOTGUN_FIRE, ...) the combine model's
+	//     attack sequences actually fire. Without this the NPC aims (muzzle flash)
+	//     but never fires a bullet.
 	virtual void	Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary );
+	virtual void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
+	void			FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator );
 
 	// Underhell silencer. "silencer_toggle" gates pistols (type 1) and rifles
 	// (type 4) on the player carrying the matching silencer (m_bHavePistol/
@@ -131,24 +138,24 @@ UH_DECLARE_MELEE( CWeaponWrench,	WeaponWrench )
 UH_DECLARE_MELEE( CWeaponCleaver,	WeaponCleaver )
 
 //-----------------------------------------------------------------------------
-// Pistols (anim_prefix "pistol"; python uses "python" but the pistol attack
-// activity is the closest NPC animation)
+// Pistols — combine soldiers have no pistol attack animation, so use the AR2
+// rifle pose (closest held-rifle animation).
 //-----------------------------------------------------------------------------
-UH_DECLARE_WEAPON( CWeaponPistolGlock,		WeaponPistolGlock,		ACT_RANGE_ATTACK_PISTOL )
-UH_DECLARE_WEAPON( CWeaponPistolBeretta,	WeaponPistolBeretta,	ACT_RANGE_ATTACK_PISTOL )
-UH_DECLARE_WEAPON( CWeaponPistolSocom,		WeaponPistolSocom,		ACT_RANGE_ATTACK_PISTOL )
-UH_DECLARE_WEAPON( CWeaponPython,			WeaponPython,			ACT_RANGE_ATTACK_PISTOL )
-UH_DECLARE_WEAPON( CWeaponPistolDualies,	WeaponPistolDualies,	ACT_RANGE_ATTACK_PISTOL )
+UH_DECLARE_WEAPON( CWeaponPistolGlock,		WeaponPistolGlock,		ACT_RANGE_ATTACK_AR2 )
+UH_DECLARE_WEAPON( CWeaponPistolBeretta,	WeaponPistolBeretta,	ACT_RANGE_ATTACK_AR2 )
+UH_DECLARE_WEAPON( CWeaponPistolSocom,		WeaponPistolSocom,		ACT_RANGE_ATTACK_AR2 )
+UH_DECLARE_WEAPON( CWeaponPython,			WeaponPython,			ACT_RANGE_ATTACK_AR2 )
+UH_DECLARE_WEAPON( CWeaponPistolDualies,	WeaponPistolDualies,	ACT_RANGE_ATTACK_AR2 )
 
 //-----------------------------------------------------------------------------
-// SMGs (anim_prefix "smg2")
+// SMGs — combine soldiers have no SMG1/SMG2 animation; use the AR2 pose.
 //-----------------------------------------------------------------------------
-UH_DECLARE_WEAPON( CWeaponSMGMP5,		WeaponSMGMP5,		ACT_RANGE_ATTACK_SMG2 )
-UH_DECLARE_WEAPON( CWeaponSMGMP5EOD,	WeaponSMGMP5EOD,	ACT_RANGE_ATTACK_SMG2 )
-UH_DECLARE_WEAPON( CWeaponSMGMP7,		WeaponSMGMP7,		ACT_RANGE_ATTACK_SMG2 )
+UH_DECLARE_WEAPON( CWeaponSMGMP5,		WeaponSMGMP5,		ACT_RANGE_ATTACK_AR2 )
+UH_DECLARE_WEAPON( CWeaponSMGMP5EOD,	WeaponSMGMP5EOD,	ACT_RANGE_ATTACK_AR2 )
+UH_DECLARE_WEAPON( CWeaponSMGMP7,		WeaponSMGMP7,		ACT_RANGE_ATTACK_AR2 )
 
 //-----------------------------------------------------------------------------
-// Shotguns (anim_prefix "shotgun")
+// Shotguns — combine soldiers have the shotgun attack animation.
 //-----------------------------------------------------------------------------
 UH_DECLARE_WEAPON( CWeaponShotgunM3,		WeaponShotgunM3,		ACT_RANGE_ATTACK_SHOTGUN )
 UH_DECLARE_WEAPON( CWeaponShotgunM5,		WeaponShotgunM5,		ACT_RANGE_ATTACK_SHOTGUN )
@@ -156,16 +163,16 @@ UH_DECLARE_WEAPON( CWeaponShotgunSpas12,	WeaponShotgunSpas12,	ACT_RANGE_ATTACK_S
 UH_DECLARE_WEAPON( CWeaponShotgunXM1014,	WeaponShotgunXM1014,	ACT_RANGE_ATTACK_SHOTGUN )
 
 //-----------------------------------------------------------------------------
-// Rifles (anim_prefix "ar2")
+// Rifles
 //-----------------------------------------------------------------------------
 UH_DECLARE_WEAPON( CWeaponG36K,		WeaponG36K,		ACT_RANGE_ATTACK_AR2 )
 UH_DECLARE_WEAPON( CWeaponSniper,	WeaponSniper,	ACT_RANGE_ATTACK_AR2 )
 
 //-----------------------------------------------------------------------------
-// BFG (mgl = shotgun prefix; minigun = smg2 prefix)
+// BFG — mgl = grenade launcher (shotgun pose); minigun = rifle pose.
 //-----------------------------------------------------------------------------
 UH_DECLARE_WEAPON( CWeaponBfgMgl,		WeaponBfgMgl,		ACT_RANGE_ATTACK_SHOTGUN )
-UH_DECLARE_WEAPON( CWeaponBfgMinigun,	WeaponBfgMinigun,	ACT_RANGE_ATTACK_SMG2 )
+UH_DECLARE_WEAPON( CWeaponBfgMinigun,	WeaponBfgMinigun,	ACT_RANGE_ATTACK_AR2 )
 
 // Helper used by the "give all weapons" cheat (impulse 101).
 void UH_GiveAllWeapons( CBasePlayer *pPlayer );
