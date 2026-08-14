@@ -275,6 +275,12 @@ public:
 	bool	OverridePropdata( void );
 	void	HandleAnimEvent( animevent_t *pEvent );
 
+	// Underhell: prop_dynamic_override responds to +use and fires OnPlayerUse
+	// (the original CDynamicProp has m_OnPlayerUse @1496 + "OnPlayerUse", used
+	// by e.g. the prologue shotgun pickup pd_shotgun).
+	virtual void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	virtual int		ObjectCaps( void );
+
 	// baseentity - watch dynamic hierarchy updates
 	virtual void	SetParent( CBaseEntity* pNewParent, int iAttachment = -1 );
 	bool			TestCollision( const Ray_t &ray, unsigned int mask, trace_t& trace );
@@ -296,6 +302,8 @@ public:
 
 	COutputEvent		m_pOutputAnimBegun;
 	COutputEvent		m_pOutputAnimOver;
+	// Underhell: fires when the player +uses this prop (prop_dynamic_override).
+	COutputEvent		m_OnPlayerUse;
 
 	string_t			m_iszDefaultAnim;
 
