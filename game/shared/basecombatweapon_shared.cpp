@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -885,7 +885,12 @@ void CBaseCombatWeapon::RescindReloadHudHint()
 void CBaseCombatWeapon::SetPickupTouch( void )
 {
 #if !defined( CLIENT_DLL )
-	SetTouch(&CBaseCombatWeapon::DefaultTouch);
+	// Underhell: no auto-pickup. Weapons are NOT grabbed by walking over them;
+	// the player must press +use (CBaseCombatWeapon::Use -> CBasePlayer::BumpWeapon),
+	// exactly like the inventory items (CUHItem::Spawn -> SetTouch(NULL)). The
+	// vanilla auto-pickup touch (DefaultTouch -> BumpWeapon) is intentionally
+	// disabled here, so dropped/hand-placed weapons stay on the ground until used.
+	SetTouch( NULL );
 
 	if ( gpGlobals->maxClients > 1 )
 	{
