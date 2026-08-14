@@ -68,11 +68,6 @@ static const UHInfectedVariant_t s_InfectedVariants[] =
 #define UH_INFECTED_MELEE_DAMAGE 25.0f
 #define UH_INFECTED_MELEE_RANGE 64.0f
 
-enum
-{
-	COND_UH_INFECTED_CLIMB_TOUCH = LAST_SHARED_CONDITION,
-};
-
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 class CNPC_UH_Infected : public CAI_BaseNPC
@@ -121,6 +116,13 @@ private:
 	float		m_flNextAttackSound;
 
 	COutputEvent m_OnSpotInfectedBody;
+
+public:
+	// Required by the custom-AI machinery: declares the schedule-provider
+	// statics (gm_SchedLoadStatus, gm_pszErrorClassName, gm_SquadSlotIdSpace,
+	// CScheduleLoader, LoadSchedules/LoadedSchedules/InitCustomSchedules,
+	// AccessClassScheduleIdSpaceDirect) that AI_BEGIN_CUSTOM_NPC expands into.
+	DEFINE_CUSTOM_AI;
 };
 
 LINK_ENTITY_TO_CLASS( npc_infected, CNPC_UH_Infected );
@@ -369,11 +371,10 @@ int CNPC_UH_Infected::SelectSchedule( void )
 }
 
 //-----------------------------------------------------------------------------
+// The innate claw attack reuses the stock melee schedule (SCHED_MELEE_ATTACK1);
+// the fast lunge lives in HandleAnimEvent (AE_NPC_ATTACK_BROADCAST). No custom
+// schedules/tasks/conditions are declared yet.
+//-----------------------------------------------------------------------------
 AI_BEGIN_CUSTOM_NPC( npc_infected, CNPC_UH_Infected )
-
-	DECLARE_CONDITION( COND_UH_INFECTED_CLIMB_TOUCH )
-
-	// The innate claw attack reuses the stock melee schedule; the fast lunge
-	// lives in HandleAnimEvent (AE_NPC_ATTACK_BROADCAST).
 
 AI_END_CUSTOM_NPC()
