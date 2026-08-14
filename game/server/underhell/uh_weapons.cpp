@@ -61,7 +61,7 @@ void CUHGunWeapon::PrimaryAttack( void )
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_PISTOL, 0.2, pPlayer );
 
-	WeaponSound( SINGLE );
+	WeaponSound( m_bSilenced ? SINGLE_SILENCED : SINGLE );
 	pPlayer->DoMuzzleFlash();
 	SendWeaponAnim( GetPrimaryAttackActivity() );
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
@@ -191,12 +191,12 @@ void CUHGunWeapon::AddViewKick( void )
 // The remaining fire rates are close estimates (the original hardcodes each in
 // its own fire function) — TODO: recover the exact values.
 //-----------------------------------------------------------------------------
-#define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damage ) \
+#define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damage, _weaponType ) \
 	IMPLEMENT_SERVERCLASS_ST( _className, DT_##_shortName ) \
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flFireRate = _fireRate; m_iDamage = _damage; m_flAccuracyPenalty = 0.0f; }
+	_className::_className() { m_flFireRate = _fireRate; m_iDamage = _damage; m_iWeaponType = _weaponType; m_bSilenced = false; m_flAccuracyPenalty = 0.0f; }
 
 #define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damage ) \
 	IMPLEMENT_SERVERCLASS_ST( _className, DT_##_shortName ) \
@@ -216,39 +216,41 @@ UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	50.0f )
 
 //-----------------------------------------------------------------------------
 // Pistols — semi-auto, shared fire routine (0.2 s). Damage from skill.cfg.
+// Weapon type 1 = pistol (silencer-gated on m_bHavePistolSilencer).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, 10 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, 15 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, 20 )
-UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, 120 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, 20 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, 10, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, 15, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, 20, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, 120, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, 20, 1 )
 
 //-----------------------------------------------------------------------------
 // SMGs — full auto. Damage: mp5 12, mp5_eod 10, mp7 8.
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.1f, 12 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.1f, 10 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.1f, 8 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.1f, 12, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.1f, 10, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.1f, 8, 0 )
 
 //-----------------------------------------------------------------------------
 // Shotguns — pump. Damage: m3 12, m5 16, spas12 14, xm1014 12.
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.75f, 12 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.75f, 16 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.6f, 14 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.55f, 12 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.75f, 12, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.75f, 16, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.6f, 14, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.55f, 12, 0 )
 
 //-----------------------------------------------------------------------------
 // Rifles — G36K is select-fire (0.1 s full-auto). Damage: g36k 20, sniper 80.
+// Weapon type 4 = rifle (silencer-gated on m_bHaveRifleSilencer).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, 20 )
-UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.5f, 80 )
+UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, 20, 4 )
+UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.5f, 80, 4 )
 
 //-----------------------------------------------------------------------------
 // BFG — mgl 200, minigun 50.
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, 200 )
-UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.1f, 50 )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, 200, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.1f, 50, 0 )
 
 //-----------------------------------------------------------------------------
 // Purpose: Give every Underhell weapon (used by impulse 101). Each weapon is

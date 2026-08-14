@@ -329,6 +329,9 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
+	DEFINE_FIELD( m_bHavePistolSilencer, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bHaveRifleSilencer, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bLaserToggleState, FIELD_BOOLEAN ),
 
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),
@@ -382,6 +385,11 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_INPUTFUNC( FIELD_VOID, "DisableFlashlight", InputDisableFlashlight ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "EnableFlashlight", InputEnableFlashlight ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "ForceDropPhysObjects", InputForceDropPhysObjects ),
+
+	// Underhell: give/take the pistol & rifle silencer (original datamap inputs
+	// "SetPistolSilencer" / "SetRifleSilencer", decode sub_101F2D30).
+	DEFINE_INPUTFUNC( FIELD_VOID, "SetPistolSilencer", InputSetPistolSilencer ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "SetRifleSilencer", InputSetRifleSilencer ),
 
 	DEFINE_SOUNDPATCH( m_sndLeeches ),
 	DEFINE_SOUNDPATCH( m_sndWaterSplashes ),
@@ -454,6 +462,9 @@ IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropFloat( SENDINFO(m_flUHBatteryCharge), 0, SPROP_NOSCALE ),
 	SendPropBool( SENDINFO(m_bIronSighted) ),
 	SendPropFloat( SENDINFO(m_fIronsightedTime), 0, SPROP_NOSCALE ),
+	SendPropBool( SENDINFO(m_bHavePistolSilencer) ),
+	SendPropBool( SENDINFO(m_bHaveRifleSilencer) ),
+	SendPropBool( SENDINFO(m_bLaserToggleState) ),
 END_SEND_TABLE()
 
 
@@ -2852,6 +2863,22 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	if ( !Q_stricmp( args[0], "ironsight_toggle" ) )
 	{
 		UH_ToggleIronsight();
+		return true;
+	}
+
+	// Underhell silencer toggle (original sub_101F11D0 -> sub_101E2F50).
+	if ( !Q_stricmp( args[0], "silencer_toggle" ) )
+	{
+		UH_ToggleSilencer();
+		return true;
+	}
+
+	// Underhell laser-sight toggle (state only; the original toggles
+	// m_bLaserToggleState — the exact command name is unknown, this is a
+	// reasonable stand-in; TODO: recover the original binding).
+	if ( !Q_stricmp( args[0], "laser_toggle" ) )
+	{
+		UH_ToggleLaser();
 		return true;
 	}
 

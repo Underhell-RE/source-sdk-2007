@@ -25,6 +25,7 @@
 #include "cbase.h"
 #include "hl2_player.h"
 #include "baseviewmodel_shared.h"
+#include "uh_weapons.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -174,4 +175,54 @@ void CHL2_Player::UH_DisableIronsight( void )
 		SetMaxSpeed( hl2_walkspeed.GetFloat() );
 
 	m_fIronsightedTime = gpGlobals->curtime;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Toggle the active weapon's silencer (called from the
+// "silencer_toggle" client command). Decoded from sub_101E2F50:
+//   - pistols (GetWeaponType() == 1) require m_bHavePistolSilencer,
+//   - rifles (GetWeaponType() == 4) require m_bHaveRifleSilencer,
+//   - everything else (SMG / shotgun / BFG) toggles freely.
+// TODO: the original also skips when the weapon is lowered/holstered
+// (weapon flags @1144/@1145) and plays the ATTACH/DETACH_SILENCER activity.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_ToggleSilencer( void )
+{
+	CUHGunWeapon *pWeapon = dynamic_cast<CUHGunWeapon *>( GetActiveWeapon() );
+	if ( !pWeapon )
+		return;
+
+	int iType = pWeapon->GetWeaponType();
+	if ( ( iType == 1 && !m_bHavePistolSilencer ) ||
+		 ( iType == 4 && !m_bHaveRifleSilencer ) )
+	{
+		return;
+	}
+
+	pWeapon->SetSilenced( !pWeapon->IsSilenced() );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Toggle the laser sight. The original toggles m_bLaserToggleState
+// (a networked bool) and the client draws a beam + impact dot (laserbeam /
+// laserpointer / laserdot sprites). TODO: client-side beam rendering.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_ToggleLaser( void )
+{
+	m_bLaserToggleState = !m_bLaserToggleState;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Give the pistol / rifle silencer (entity inputs "SetPistolSilencer" /
+// "SetRifleSilencer", original datamap sub_101F2D30). Once owned, the matching
+// weapon's "silencer_toggle" is allowed.
+//-----------------------------------------------------------------------------
+void CHL2_Player::InputSetPistolSilencer( inputdata_t &inputdata )
+{
+	m_bHavePistolSilencer = true;
+}
+
+void CHL2_Player::InputSetRifleSilencer( inputdata_t &inputdata )
+{
+	m_bHaveRifleSilencer = true;
 }

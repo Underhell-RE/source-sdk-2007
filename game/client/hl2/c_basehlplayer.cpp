@@ -50,6 +50,9 @@ IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropFloat( RECVINFO( m_flUHBatteryCharge ) ),
 	RecvPropBool( RECVINFO( m_bIronSighted ) ),
 	RecvPropFloat( RECVINFO( m_fIronsightedTime ) ),
+	RecvPropBool( RECVINFO( m_bHavePistolSilencer ) ),
+	RecvPropBool( RECVINFO( m_bHaveRifleSilencer ) ),
+	RecvPropBool( RECVINFO( m_bLaserToggleState ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )

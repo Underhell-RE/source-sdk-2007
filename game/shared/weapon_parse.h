@@ -25,6 +25,7 @@ typedef unsigned short WEAPON_FILE_INFO_HANDLE;
 typedef enum {
 	EMPTY,
 	SINGLE,
+	SINGLE_SILENCED,	// Underhell: silenced variant (matches the original's SoundData order)
 	SINGLE_NPC,
 	WPN_DOUBLE, // Can't be "DOUBLE" because windows.h uses it.
 	DOUBLE_NPC,

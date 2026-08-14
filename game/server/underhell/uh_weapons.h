@@ -66,8 +66,17 @@ public:
 	virtual const Vector &GetBulletSpread( void );
 	virtual void	AddViewKick( void );
 
+	// Underhell silencer. "silencer_toggle" gates pistols (type 1) and rifles
+	// (type 4) on the player carrying the matching silencer (m_bHavePistol/
+	// RifleSilencer); everything else toggles freely (decode sub_101E2F50).
+	virtual int		GetWeaponType( void ) { return m_iWeaponType; }
+	bool			IsSilenced( void ) const { return m_bSilenced; }
+	void			SetSilenced( bool bSilenced ) { m_bSilenced = bSilenced; }
+
 	float			m_flFireRate;			// seconds between shots
 	int				m_iDamage;				// per-shot damage (skill.cfg sk_plr_dmg_*)
+	int				m_iWeaponType;			// 1 = pistol, 4 = rifle, 0 = other (silencer gating)
+	bool			m_bSilenced;			// silencer fitted (server-only; sound switches)
 	float			m_flAccuracyPenalty;	// grows per shot, decays over time
 };
 

@@ -212,6 +212,10 @@ public:
 	void				InputEnableFlashlight( inputdata_t &inputdata );
 	void				InputDisableFlashlight( inputdata_t &inputdata );
 
+	// Underhell gear inputs (give the pistol / rifle silencer).
+	void				InputSetPistolSilencer( inputdata_t &inputdata );
+	void				InputSetRifleSilencer( inputdata_t &inputdata );
+
 	const impactdamagetable_t &GetPhysicsImpactDamageTable();
 	virtual int			OnTakeDamage( const CTakeDamageInfo &info );
 	virtual int			OnTakeDamage_Alive( const CTakeDamageInfo &info );
@@ -398,6 +402,10 @@ public:
 	void				UH_ToggleIronsight( void );
 	void				UH_DisableIronsight( void );	// force off (no debounce/sound) — weapon switch / drop
 
+	// Underhell gear toggles (client commands, decode sub_101F11D0).
+	void				UH_ToggleSilencer( void );
+	void				UH_ToggleLaser( void );
+
 	//-----------------------------------------------------------------------------
 	// Underhell glowstick. The lit glowstick prop is parented to the player and
 	// tracked here (original m_hActiveGlowStick @2164) so it can be removed when
@@ -453,6 +461,14 @@ private:
 	CNetworkVar( float, m_flUHBatteryCharge );	// 0..100 charge of the current flashlight battery
 	CNetworkVar( bool, m_bIronSighted );		// ironsight active (accuracy + FOV zoom)
 	CNetworkVar( float, m_fIronsightedTime );	// last ironsight toggle time
+
+	// Underhell gear (original CBasePlayer members: m_bHavePistolSilencer @3371,
+	// m_bHaveRifleSilencer @3372, m_bLaserToggleState — networked for the HUD /
+	// client laser). Silencer ownership gates "silencer_toggle" for pistols and
+	// rifles; the laser toggle drives the client laser-sight beam.
+	CNetworkVar( bool, m_bHavePistolSilencer );
+	CNetworkVar( bool, m_bHaveRifleSilencer );
+	CNetworkVar( bool, m_bLaserToggleState );
 
 	// Server-only runtime accumulators (mirror the original binary's members;
 	// not networked, saved for parity).
