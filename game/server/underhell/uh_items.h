@@ -189,6 +189,19 @@ UH_DECLARE_ITEM( CItemFlashlight,		UH_ITEM_UNKNOWN )	// TODO: flashlight system
 UH_DECLARE_ITEM( CItemNightVision,		UH_ITEM_UNKNOWN )	// TODO: gear system
 UH_DECLARE_ITEM( CItemGasMask,			UH_ITEM_UNKNOWN )	// TODO: gear system
 
+// Armour auto-applies on pickup (original sub_10171F60: only while armour
+// is below full). TODO: verify the amount granted.
+class CItemArmor : public CUHItem
+{
+public:
+	DECLARE_CLASS( CItemArmor, CUHItem );
+
+	virtual void Spawn( void );
+	virtual void Precache( void );
+	virtual bool MyTouch( CBasePlayer *pPlayer );
+	virtual int	 GetInventoryItemType() const { return UH_ITEM_UNKNOWN; }
+};
+
 //-----------------------------------------------------------------------------
 // Helmets / respirator / gasmask dropped by dead NPCs. They are armour items:
 // the original derives them from CItemArmor (vtable identical apart from
@@ -214,19 +227,6 @@ UH_DECLARE_ARMOR_ITEM( CItemGasmaskGuard )
 UH_DECLARE_ITEM( CItemFlarePack,		UH_ITEM_FLARE_PACK )
 UH_DECLARE_ITEM( CItemFMRadio,			UH_ITEM_FM_RADIO )
 UH_DECLARE_ITEM( CItemRadioCracker,		UH_ITEM_RADIO_CRACKER )
-
-// Armour auto-applies on pickup (original sub_10171F60: only while armour
-// is below full). TODO: verify the amount granted.
-class CItemArmor : public CUHItem
-{
-public:
-	DECLARE_CLASS( CItemArmor, CUHItem );
-
-	virtual void Spawn( void );
-	virtual void Precache( void );
-	virtual bool MyTouch( CBasePlayer *pPlayer );
-	virtual int	 GetInventoryItemType() const { return UH_ITEM_UNKNOWN; }
-};
 
 UH_DECLARE_ITEM( CItemHeavyArmor,		UH_ITEM_UNKNOWN )	// TODO: heavy armour pickup
 

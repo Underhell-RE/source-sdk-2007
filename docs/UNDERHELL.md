@@ -497,6 +497,27 @@ weapon (pistols, melee) is equipped, the left hand holds the flashlight (or a
 player precache (sub_101E25F0) also pulls `v_kick_jake_*.mdl` — the kick
 attack viewmodels (distinct from weapons).
 
+### First-person hand/glove skin (map-driven, not a cvar)
+
+The hands on the viewmodel (`models/weapons/v_hands.mdl`) change texture via
+**entity inputs fired at `!player`**, not a convar:
+
+- `ViewModelSkin <int>` (input func sub_101EEE40) — sets `m_nSkin` (offset 848)
+  on the player's two viewmodels; this is what changes the hand/glove texture.
+- `SetPlayerSkin <int>` — sets the player model skin.
+- `SetPlayerModel <model>` — swaps the player model (default
+  `models/player/jake_casual.mdl`; guard/PMC variants exist).
+- `SetPlayerKickModel <model>` — swaps the kick-attack viewmodel
+  (`models/weapons/v_kick_jake_*.mdl`).
+
+Example from `uh_prologue_2_d.vmf` (PMC): `OnNewGame` fires
+`!player,SetPlayerModel,models/player/jake_pmc.mdl` +
+`setplayerkickmodel,models/weapons/v_kick_jake_pmc.mdl` +
+`Viewmodelskin,3`. In `Uh_House_1_d.vmf` a trigger fires
+`!player,setplayerskin,1` and `!player,ViewmodelSkin,0`. There is **no**
+`uh_hand*` cheat convar in the original binaries — the player inputs above are
+the whole mechanism (the closest cheat is `ent_fire !player viewmodelskin N`).
+
 ### Silencer / laser sight (from the string table)
 
 - **Silencer**: player flags `m_bHavePistolSilencer` @3371 /
