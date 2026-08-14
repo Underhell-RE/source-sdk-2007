@@ -60,12 +60,22 @@ struct UHGibFolder_t
 {
 	const char *pszModelSubstring;	// match against GetModelName()
 	const char *pszFolder;			// "models/gibs/bodyparts/..." prefix
+	const char *pszLimbPrefix;		// "" or a prefix like "pmc_" / "inmate_"
 };
 
 static const UHGibFolder_t s_GibFolders[] =
 {
-	{ "combine_soldier_prisonguard",	"models/Gibs/BodyParts/Soldier_PrisonGuard" },
-	{ "combine_soldier",				"models/Gibs/BodyParts/Soldier" },
+	{ "combine_soldier_prisonguard",	"models/gibs/bodyparts/soldier_prisonguard",	"" },
+	{ "combine_soldier",				"models/gibs/bodyparts/soldier",				"" },
+	{ "infected_inmate",				"models/gibs/bodyparts/infected",				"inmate_" },
+	{ "infected_guard",					"models/gibs/bodyparts/infected",				"guard_" },
+	{ "infected_worker",				"models/gibs/bodyparts/infected",				"worker_" },
+	{ "infected_rural",					"models/gibs/bodyparts/infected",				"rural_" },
+	{ "infected_doctor",				"models/gibs/bodyparts/infected",				"doctor_" },
+	{ "infected_uniform",				"models/gibs/bodyparts/infected",				"uniform_" },
+	{ "infected_office",				"models/gibs/bodyparts/infected",				"office_" },
+	{ "infected_urban",					"models/gibs/bodyparts/infected",				"urban_" },
+	{ "pmc",							"models/gibs/bodyparts/pmc",					"pmc_" },
 };
 
 static const char *UH_GibModelFor( const char *pszNPC, const char *pszLimb )
@@ -74,7 +84,7 @@ static const char *UH_GibModelFor( const char *pszNPC, const char *pszLimb )
 	{
 		if ( V_stristr( pszNPC, s_GibFolders[i].pszModelSubstring ) )
 		{
-			return UTIL_VarArgs( "%s/%s.mdl", s_GibFolders[i].pszFolder, pszLimb );
+			return UTIL_VarArgs( "%s/%s%s.mdl", s_GibFolders[i].pszFolder, s_GibFolders[i].pszLimbPrefix, pszLimb );
 		}
 	}
 	return NULL;
@@ -200,27 +210,32 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 {
 	const char *pszModel = STRING( GetModelName() );
 
-	// Severed limbs (arms + legs).
-	const char *pszFolder = NULL;
+	// Severed limbs (arms + legs) — lowercase paths, matching serveror.dll.
 	if ( V_stristr( pszModel, "combine_soldier_prisonguard" ) )
-		pszFolder = "models/Gibs/BodyParts/Soldier_PrisonGuard";
-	else if ( V_stristr( pszModel, "combine_soldier" ) )
-		pszFolder = "models/Gibs/BodyParts/Soldier";
-
-	if ( pszFolder )
 	{
-		PrecacheModel( UTIL_VarArgs( "%s/leftarm.mdl", pszFolder ) );
-		PrecacheModel( UTIL_VarArgs( "%s/rightarm.mdl", pszFolder ) );
-		PrecacheModel( UTIL_VarArgs( "%s/leftleg.mdl", pszFolder ) );
-		PrecacheModel( UTIL_VarArgs( "%s/rightleg.mdl", pszFolder ) );
+		PrecacheModel( "models/gibs/bodyparts/soldier_prisonguard/leftarm.mdl" );
+		PrecacheModel( "models/gibs/bodyparts/soldier_prisonguard/rightarm.mdl" );
+		PrecacheModel( "models/gibs/bodyparts/soldier_prisonguard/leftleg.mdl" );
+		PrecacheModel( "models/gibs/bodyparts/soldier_prisonguard/rightleg.mdl" );
+	}
+	else if ( V_stristr( pszModel, "combine_soldier" ) )
+	{
+		PrecacheModel( "models/gibs/bodyparts/soldier/leftarm.mdl" );
+		PrecacheModel( "models/gibs/bodyparts/soldier/rightarm.mdl" );
+		PrecacheModel( "models/gibs/bodyparts/soldier/leftleg.mdl" );
+		PrecacheModel( "models/gibs/bodyparts/soldier/rightleg.mdl" );
+		PrecacheModel( "models/gibs/bodyparts/soldier/leftleg2.mdl" );
+		PrecacheModel( "models/gibs/bodyparts/soldier/rightleg2.mdl" );
 	}
 
-	// Helmet drops (prison guard has a plain helmet; the regular soldier has
-	// the visored helmet).
+	// Helmet drops (the original spawns item_helmet_* entities, which precache
+	// their own models) + the knock-off sound.
 	if ( V_stristr( pszModel, "prisonguard" ) )
 		PrecacheModel( "models/items/helmet.mdl" );
 	else if ( V_stristr( pszModel, "combine_soldier" ) )
 		PrecacheModel( "models/items/helmet_visor.mdl" );
+
+	PrecacheScriptSound( "Player.Helmet" );
 }
 
 //-----------------------------------------------------------------------------
@@ -258,17 +273,40 @@ static void UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, co
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &vecDir )
 {
-	int iGroup = FindBodygroupByName( "HELMET" );
+	int iGroup = FindBodygroupByName( "helmet" );
 	if ( iGroup < 0 || GetBodygroup( iGroup ) < 1 )
 		return;	// no helmet worn
 
 	SetBodygroup( iGroup, 0 );
 
-	const char *pszModel = V_stristr( STRING( GetModelName() ), "prisonguard" )
-		? "models/items/helmet.mdl"
-		: "models/items/helmet_visor.mdl";
+	// The original spawns an item_helmet_* entity (pickable as armor), chosen
+	// by the NPC's body: prison guard -> plain helmet, soldier -> visored
+	// helmet, worker -> worker helmet, pmc -> pmc helmet.
+	const char *pszItem;
+	if ( V_stristr( STRING( GetModelName() ), "prisonguard" ) )
+		pszItem = "item_helmet_prison";
+	else if ( V_stristr( STRING( GetModelName() ), "worker" ) )
+		pszItem = "item_helmet_worker";
+	else if ( V_stristr( STRING( GetModelName() ), "pmc" ) )
+		pszItem = "item_helmet_pmc";
+	else
+		pszItem = "item_helmet_guard";
 
-	UH_SpawnGibProp( pszModel, vecPosition, vecDir, this );
+	CBaseEntity *pHelmet = CreateEntityByName( pszItem );
+	if ( pHelmet )
+	{
+		pHelmet->SetAbsOrigin( vecPosition );
+		pHelmet->SetAbsAngles( vec3_angle );
+		DispatchSpawn( pHelmet );
+
+		IPhysicsObject *pPhys = pHelmet->VPhysicsGetObject();
+		if ( pPhys )
+		{
+			pPhys->SetVelocity( &vecDir, NULL );
+		}
+	}
+
+	EmitSound( "Player.Helmet" );
 }
 
 //-----------------------------------------------------------------------------
@@ -280,13 +318,13 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 	// Update the model's bodygroup so the limb is visually removed.
 	switch ( iHitGroup )
 	{
-	case HITGROUP_LEFTARM:	UH_RemoveBodygroupSide( this, "ARMS", 0 ); break;
-	case HITGROUP_RIGHTARM:	UH_RemoveBodygroupSide( this, "ARMS", 1 ); break;
+	case HITGROUP_LEFTARM:	UH_RemoveBodygroupSide( this, "arms", 0 ); break;
+	case HITGROUP_RIGHTARM:	UH_RemoveBodygroupSide( this, "arms", 1 ); break;
 	case HITGROUP_LEFTLEG:	UH_RemoveBodygroupSide( this, "Legs", 0 ); break;
 	case HITGROUP_RIGHTLEG:	UH_RemoveBodygroupSide( this, "Legs", 1 ); break;
 	case HITGROUP_HEAD:
 		{
-			int iGroup = FindBodygroupByName( "Head" );
+			int iGroup = FindBodygroupByName( "head" );
 			if ( iGroup >= 0 )
 				SetBodygroup( iGroup, 1 );	// "Destroyed Head"
 		}
@@ -343,7 +381,7 @@ bool CAI_BaseNPC::UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &v
 	// Head: a worn helmet absorbs the damage until it is shot off.
 	if ( iHitGroup == HITGROUP_HEAD )
 	{
-		int iHelmet = FindBodygroupByName( "HELMET" );
+		int iHelmet = FindBodygroupByName( "helmet" );
 		if ( iHelmet >= 0 && GetBodygroup( iHelmet ) >= 1 )
 		{
 			m_flHelmetDamage += flDamage;
@@ -616,6 +654,36 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 	if ( !pRagdoll )
 		return;
 
+	// Helmet knock-off (head hit while the corpse still wears a helmet):
+	// accumulate helmet damage, and once past uh_helmethealth, remove the
+	// HELMET bodygroup + drop the helmet item + play the sound. Mirrors the
+	// living-NPC path in sub_10031BF0.
+	if ( iHitGroup == HITGROUP_HEAD )
+	{
+		int iHelmet = pRagdoll->FindBodygroupByName( "helmet" );
+		if ( iHelmet >= 0 && pRagdoll->GetBodygroup( iHelmet ) >= 1 )
+		{
+			pRagdoll->m_flGibDamage[0] += flDamage;
+			if ( pRagdoll->m_flGibDamage[0] >= uh_helmethealth.GetFloat() )
+			{
+				pRagdoll->m_flGibDamage[0] = 0.0f;
+				pRagdoll->SetBodygroup( iHelmet, 0 );
+
+				const char *pszItem = V_stristr( STRING( pRagdoll->GetModelName() ), "prisonguard" )
+					? "item_helmet_prison" : "item_helmet_guard";
+				CBaseEntity *pHelmet = CreateEntityByName( pszItem );
+				if ( pHelmet )
+				{
+					pHelmet->SetAbsOrigin( pos );
+					pHelmet->SetAbsAngles( vec3_angle );
+					DispatchSpawn( pHelmet );
+				}
+				pRagdoll->EmitSound( "Player.Helmet" );
+			}
+			return;	// helmet absorbed the hit
+		}
+	}
+
 	int idx = -1;
 	const char *pszLimb = NULL;
 	switch ( iHitGroup )
@@ -643,6 +711,23 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 		return;
 
 	pRagdoll->m_flGibDamage[idx] = 0.0f;	// reset so the limb can be re-hit
+
+	// Visually remove the limb (bodygroup) so the severed bone doesn't leave a
+	// "ghost" limb on the corpse model.
+	switch ( iHitGroup )
+	{
+	case HITGROUP_LEFTARM:	UH_RemoveBodygroupSide( pRagdoll, "arms", 0 ); break;
+	case HITGROUP_RIGHTARM:	UH_RemoveBodygroupSide( pRagdoll, "arms", 1 ); break;
+	case HITGROUP_LEFTLEG:	UH_RemoveBodygroupSide( pRagdoll, "Legs", 0 ); break;
+	case HITGROUP_RIGHTLEG:	UH_RemoveBodygroupSide( pRagdoll, "Legs", 1 ); break;
+	case HITGROUP_HEAD:
+		{
+			int iGroup = pRagdoll->FindBodygroupByName( "head" );
+			if ( iGroup >= 0 )
+				pRagdoll->SetBodygroup( iGroup, 1 );
+		}
+		break;
+	}
 
 	// Sever the bone (falls free from the rest of the body).
 	pRagdoll->UH_SeverLimb( iPhysicsBone );
