@@ -138,21 +138,23 @@ UH_DECLARE_MELEE( CWeaponWrench,	WeaponWrench )
 UH_DECLARE_MELEE( CWeaponCleaver,	WeaponCleaver )
 
 //-----------------------------------------------------------------------------
-// Pistols — combine soldiers have no pistol attack animation, so use the AR2
-// rifle pose (closest held-rifle animation).
+// Pistols — ACT_RANGE_ATTACK_PISTOL (1:1 with the original acttables; the
+// vanilla pistol / 357 map here too). Citizens / cops use this activity, so
+// mapping to AR2 left them with no fire animation (T-pose + no shooting).
 //-----------------------------------------------------------------------------
-UH_DECLARE_WEAPON( CWeaponPistolGlock,		WeaponPistolGlock,		ACT_RANGE_ATTACK_AR2 )
-UH_DECLARE_WEAPON( CWeaponPistolBeretta,	WeaponPistolBeretta,	ACT_RANGE_ATTACK_AR2 )
-UH_DECLARE_WEAPON( CWeaponPistolSocom,		WeaponPistolSocom,		ACT_RANGE_ATTACK_AR2 )
-UH_DECLARE_WEAPON( CWeaponPython,			WeaponPython,			ACT_RANGE_ATTACK_AR2 )
-UH_DECLARE_WEAPON( CWeaponPistolDualies,	WeaponPistolDualies,	ACT_RANGE_ATTACK_AR2 )
+UH_DECLARE_WEAPON( CWeaponPistolGlock,		WeaponPistolGlock,		ACT_RANGE_ATTACK_PISTOL )
+UH_DECLARE_WEAPON( CWeaponPistolBeretta,	WeaponPistolBeretta,	ACT_RANGE_ATTACK_PISTOL )
+UH_DECLARE_WEAPON( CWeaponPistolSocom,		WeaponPistolSocom,		ACT_RANGE_ATTACK_PISTOL )
+UH_DECLARE_WEAPON( CWeaponPython,			WeaponPython,			ACT_RANGE_ATTACK_PISTOL )
+UH_DECLARE_WEAPON( CWeaponPistolDualies,	WeaponPistolDualies,	ACT_RANGE_ATTACK_PISTOL )
 
 //-----------------------------------------------------------------------------
-// SMGs — combine soldiers have no SMG1/SMG2 animation; use the AR2 pose.
+// SMGs — ACT_RANGE_ATTACK_SMG1 (combine_soldier.mdl has this pose, like the
+// vanilla weapon_smg1). AR2 was a wrong fallback.
 //-----------------------------------------------------------------------------
-UH_DECLARE_WEAPON( CWeaponSMGMP5,		WeaponSMGMP5,		ACT_RANGE_ATTACK_AR2 )
-UH_DECLARE_WEAPON( CWeaponSMGMP5EOD,	WeaponSMGMP5EOD,	ACT_RANGE_ATTACK_AR2 )
-UH_DECLARE_WEAPON( CWeaponSMGMP7,		WeaponSMGMP7,		ACT_RANGE_ATTACK_AR2 )
+UH_DECLARE_WEAPON( CWeaponSMGMP5,		WeaponSMGMP5,		ACT_RANGE_ATTACK_SMG1 )
+UH_DECLARE_WEAPON( CWeaponSMGMP5EOD,	WeaponSMGMP5EOD,	ACT_RANGE_ATTACK_SMG1 )
+UH_DECLARE_WEAPON( CWeaponSMGMP7,		WeaponSMGMP7,		ACT_RANGE_ATTACK_SMG1 )
 
 //-----------------------------------------------------------------------------
 // Shotguns — combine soldiers have the shotgun attack animation.
