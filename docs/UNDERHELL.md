@@ -902,3 +902,24 @@ handlers sub_101F2990 / sub_101F0050 / sub_101E5A60. Fully ported:
 
 TODO (NPC-kick direction): `m_flViewkick` / `m_hLastNPCToKickMe` — the reverse
 case where an NPC kicks the player (sk_combine_s_kick etc.), not yet ported.
+
+## Weapon pickup + shotgun fire fixes (decoded from DefaultTouch/BumpWeapon)
+
+The original `CBaseCombatWeapon::DefaultTouch` (sub_100D02C0) auto-picks weapons
+on touch — the earlier "no auto pickup" change was wrong. Corrected 1:1:
+
+- `SetPickupTouch` restored to `SetTouch(DefaultTouch)` (walk-over pickup).
+- `CHL2_Player::BumpWeapon`:
+  - `weapon_frag` is an ammo pickup (give 1 grenade, max 4, remove the frag) and
+    never replaces another weapon (fixes the BFG being dropped when grabbing a
+    frag in the same bucket 5).
+  - one weapon per bucket: throws the current same-bucket weapon forward
+    (Weapon_Drop with forward * 300, decode sub_100D02C0) before equipping the
+    new one; impulse 101 silently strips it instead.
+- Shotguns fire `sk_plr_num_shotgun_pellets` (7) pellets with a 10-degree cone
+  (m_iShotsPerFire + wide spread), instead of a single bullet; NPC fire uses
+  the same pellet count.
+
+TODO: sk_plr_num_shotgun_pellets is hardcoded to 7 (its default) rather than
+read from the convar; shotgun pump animation delay (m_bNeedPump / SequenceDuration)
+is approximated by the 0.8 s fire rate.

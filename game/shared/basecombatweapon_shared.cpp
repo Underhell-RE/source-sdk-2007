@@ -1,4 +1,4 @@
-//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -885,12 +885,10 @@ void CBaseCombatWeapon::RescindReloadHudHint()
 void CBaseCombatWeapon::SetPickupTouch( void )
 {
 #if !defined( CLIENT_DLL )
-	// Underhell: no auto-pickup. Weapons are NOT grabbed by walking over them;
-	// the player must press +use (CBaseCombatWeapon::Use -> CBasePlayer::BumpWeapon),
-	// exactly like the inventory items (CUHItem::Spawn -> SetTouch(NULL)). The
-	// vanilla auto-pickup touch (DefaultTouch -> BumpWeapon) is intentionally
-	// disabled here, so dropped/hand-placed weapons stay on the ground until used.
-	SetTouch( NULL );
+	// Underhell keeps the vanilla auto-pickup (DefaultTouch -> BumpWeapon).
+	// Walking over a weapon picks it up (or gives ammo if already owned);
+	// the "one weapon per bucket" replace happens in CHL2_Player::BumpWeapon.
+	SetTouch( &CBaseCombatWeapon::DefaultTouch );
 
 	if ( gpGlobals->maxClients > 1 )
 	{

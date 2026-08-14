@@ -97,6 +97,7 @@ public:
 	float			m_flFireRate;			// seconds between shots
 	ConVar			*m_pDamage;				// sk_plr_dmg_<weapon> (skill.cfg)
 	int				m_iWeaponType;			// 1 = pistol, 4 = rifle, 0 = other (silencer gating)
+	int				m_iShotsPerFire;		// pellets per shot (shotguns = sk_plr_num_shotgun_pellets, 7)
 	float			m_flAccuracyPenalty;	// grows per shot, decays over time
 };
 

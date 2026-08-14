@@ -135,7 +135,7 @@ void CUHGunWeapon::PrimaryAttack( void )
 	info.m_flDistance		= MAX_TRACE_LENGTH;
 	info.m_iAmmoType		= m_iPrimaryAmmoType;
 	info.m_iTracerFreq		= 2;
-	info.m_iShots			= 1;
+	info.m_iShots			= m_iShotsPerFire;
 	info.m_iDamage			= (int)GetDamage();
 	info.m_iPlayerDamage	= (int)GetDamage();
 
@@ -191,8 +191,9 @@ void CUHGunWeapon::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator )
 		SOUNDENT_VOLUME_MACHINEGUN, 0.2, pOperator, SOUNDENT_CHANNEL_WEAPON, pOperator->GetEnemy() );
 
 	// Explicit per-weapon damage (the vanilla ammo def would give the generic
-	// sk_plr_dmg_<ammotype> value, not the Underhell per-weapon value).
-	pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, VECTOR_CONE_PRECALCULATED,
+	// sk_plr_dmg_<ammotype> value, not the Underhell per-weapon value). Shotguns
+	// fire a spread of pellets (m_iShotsPerFire), like the vanilla shotgun.
+	pOperator->FireBullets( m_iShotsPerFire, vecShootOrigin, vecShootDir, VECTOR_CONE_PRECALCULATED,
 		MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, (int)GetDamage(), NULL, false );
 
 	if ( m_iClip1 > 0 )
@@ -247,19 +248,28 @@ const Vector &CUHGunWeapon::GetBulletSpread( void )
 {
 	static Vector cone;
 	static Vector baseCone = VECTOR_CONE_4DEGREES;
+	// Shotguns (multi-pellet) use the vanilla shotgun's wide cone.
+	static Vector shotgunCone = VECTOR_CONE_10DEGREES;
 
 	// NPCs ignore the player tuning.
 	if ( GetOwner() && GetOwner()->IsNPC() )
 	{
-		cone = baseCone;
+		cone = ( m_iShotsPerFire > 1 ) ? shotgunCone : baseCone;
 		return cone;
 	}
 
 	const FileWeaponInfo_t &info = GetWpnData();
 
-	// Spam penalty ramps the cone from ~1 to ~6 degrees.
-	float ramp = RemapValClamped( m_flAccuracyPenalty, 0.0f, 1.0f, 0.0f, 1.0f );
-	VectorLerp( VECTOR_CONE_1DEGREES, VECTOR_CONE_6DEGREES, ramp, cone );
+	if ( m_iShotsPerFire > 1 )
+	{
+		cone = shotgunCone;
+	}
+	else
+	{
+		// Spam penalty ramps the cone from ~1 to ~6 degrees.
+		float ramp = RemapValClamped( m_flAccuracyPenalty, 0.0f, 1.0f, 0.0f, 1.0f );
+		VectorLerp( VECTOR_CONE_1DEGREES, VECTOR_CONE_6DEGREES, ramp, cone );
+	}
 
 	// Crouching is more accurate (lower value = tighter cone).
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
@@ -435,7 +445,7 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	{ ACT_RELOAD_LOW,			ACT_RELOAD_SMG1_LOW,			false }, \
 	{ ACT_GESTURE_RELOAD,		ACT_GESTURE_RELOAD_SMG1,		false },
 
-#define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damageConVar, _weaponType, _acttable ) \
+#define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damageConVar, _weaponType, _acttable, _shotsPerFire ) \
 	acttable_t _className::m_acttable[] = \
 	{ \
 		_acttable \
@@ -445,7 +455,7 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_flAccuracyPenalty = 0.0f; }
+	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; }
 
 #define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
 	acttable_t _className::m_acttable[] = \
@@ -472,42 +482,42 @@ UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	sk_plr_dmg
 // Pistols — semi-auto, shared fire routine (0.2 s).
 // Weapon type 1 = pistol (silencer-gated on m_bHavePistolSilencer).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1, UH_ACTTABLE_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1, UH_ACTTABLE_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1, UH_ACTTABLE_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1, UH_ACTTABLE_PISTOL )
-UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1, UH_ACTTABLE_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1, UH_ACTTABLE_PISTOL, 1 )
 
 //-----------------------------------------------------------------------------
 // SMGs — full auto, 0.075 s (exact, GetFireRate).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, sk_plr_dmg_smg_mp5, 0, UH_ACTTABLE_SMG1 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, sk_plr_dmg_smg_mp5_eod, 0, UH_ACTTABLE_SMG1 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0, UH_ACTTABLE_SMG1 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, sk_plr_dmg_smg_mp5, 0, UH_ACTTABLE_SMG1, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, sk_plr_dmg_smg_mp5_eod, 0, UH_ACTTABLE_SMG1, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0, UH_ACTTABLE_SMG1, 1 )
 
 //-----------------------------------------------------------------------------
 // Shotguns — pump-action. All four share one fire/pump routine (sub_1027E0A0 +
 // sub_1027F4E0); the pump cycle constant in the DLL is 0.8 s (0x10487878).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0, UH_ACTTABLE_SHOTGUN )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0, UH_ACTTABLE_SHOTGUN )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0, UH_ACTTABLE_SHOTGUN )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0, UH_ACTTABLE_SHOTGUN )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0, UH_ACTTABLE_SHOTGUN, 7 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0, UH_ACTTABLE_SHOTGUN, 7 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0, UH_ACTTABLE_SHOTGUN, 7 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0, UH_ACTTABLE_SHOTGUN, 7 )
 
 //-----------------------------------------------------------------------------
 // Rifles — G36K is select-fire (0.1 s full-auto). Weapon type 4 = rifle.
 // The sniper is bolt-action: refire is gated on the bolt sequence duration
 // (like the vanilla sniper), so 1.0 s.
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, sk_plr_dmg_rifle_g36k, 4, UH_ACTTABLE_AR2 )
-UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.0f, sk_plr_dmg_rifle_sniper, 4, UH_ACTTABLE_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, sk_plr_dmg_rifle_g36k, 4, UH_ACTTABLE_AR2, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.0f, sk_plr_dmg_rifle_sniper, 4, UH_ACTTABLE_AR2, 1 )
 
 //-----------------------------------------------------------------------------
 // BFG — minigun is 0.075 s (exact, GetFireRate); MGL is a single-shot grenade
 // launcher (custom fire path, ~1.0 s — TODO exact).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, sk_plr_dmg_bfg_mgl, 0, UH_ACTTABLE_SHOTGUN )
-UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,	weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, sk_plr_dmg_bfg_minigun, 0, UH_ACTTABLE_SMG1 )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, sk_plr_dmg_bfg_mgl, 0, UH_ACTTABLE_SHOTGUN, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,	weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, sk_plr_dmg_bfg_minigun, 0, UH_ACTTABLE_SMG1, 1 )
 
 //-----------------------------------------------------------------------------
 // Purpose: The original impulse-101 loadout (decode sub_101EC700 case 101):

@@ -2789,32 +2789,47 @@ void CHL2_Player::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 {
-	// Underhell: one weapon per bucket/slot. Picking up a weapon of a class the
-	// player already carries replaces it — the current weapon(s) in that slot
-	// are thrown out (silently removed during the impulse-101 cheat) and the
-	// new weapon takes their place. Decoded from the original pickup flow
-	// (GiveNamedItem -> Use -> BumpWeapon) and the "one weapon per class"
-	// behaviour described in the Underhell docs.
+	// Underhell: grenades (weapon_frag) are ammo pickups, not weapons — give a
+	// grenade (max 4) and remove the frag, without touching the BFG / other
+	// slot-5 weapon (decode sub_100D02C0).
+	if ( FClassnameIs( pWeapon, "weapon_frag" ) )
+	{
+		int nGrenades = GetAmmoCount( GetAmmoDef()->Index( "grenade" ) );
+		if ( nGrenades < 4 )
+		{
+			GiveAmmo( 1, "grenade" );
+			if ( nGrenades <= 0 )
+				UTIL_HudHintText( this, "#Valve_Hint_Frag" );
+			UTIL_Remove( pWeapon );
+		}
+		return true;
+	}
+
+	// Underhell: one weapon per bucket. Picking up a weapon whose bucket is
+	// already occupied throws the current weapon in that bucket forward
+	// (decode sub_100D02C0: Weapon_Drop with forward * 300) before equipping the
+	// new one. During impulse 101 the old weapon is silently removed instead.
 	if ( !Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
 	{
 		int slot = pWeapon->GetSlot();
-		if ( Weapon_GetSlot( slot ) != NULL )
+		CBaseCombatWeapon *pOld = Weapon_GetSlot( slot );
+		if ( pOld != NULL )
 		{
 			if ( gEvilImpulse101 )
 			{
-				// Silently strip the old slot occupant(s) during the cheat so
-				// impulse 101 leaves exactly one weapon per slot (the last given).
 				for ( int i = 0; i < MAX_WEAPONS; i++ )
 				{
-					CBaseCombatWeapon *pOld = GetWeapon( i );
-					if ( pOld && pOld->GetSlot() == slot )
-						UTIL_Remove( pOld );
+					CBaseCombatWeapon *pW = GetWeapon( i );
+					if ( pW && pW->GetSlot() == slot )
+						UTIL_Remove( pW );
 				}
 			}
 			else
 			{
-				// Real pickup: throw the current weapon(s) in this slot on the ground.
-				Weapon_DropSlot( slot );
+				Vector vecForward;
+				AngleVectors( EyeAngles(), &vecForward );
+				Vector vecVel = vecForward * 300.0f;
+				Weapon_Drop( pOld, NULL, &vecVel );
 			}
 		}
 	}
