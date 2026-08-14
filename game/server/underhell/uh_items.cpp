@@ -167,6 +167,27 @@ void CItemUHSoda::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE u
 	}
 
 //-----------------------------------------------------------------------------
+// Armour items (helmets / respirator / gasmask). They inherit CItemArmor (so
+// MyTouch grants 10 armour), but must NOT run CItemArmor::Spawn (it re-sets the
+// model to kevlar.mdl) — Spawn sets its own model and falls straight through to
+// CUHItem::Spawn for the vphysics setup.
+//-----------------------------------------------------------------------------
+#define UH_DEFINE_ARMOR_ITEM( _className, _entityName, _modelName )	\
+	LINK_ENTITY_TO_CLASS( _entityName, _className );					\
+	void _className::Precache( void )									\
+	{																	\
+		BaseClass::Precache();											\
+		PrecacheModel( _modelName );									\
+		UH_PrecacheItemSounds();										\
+	}																	\
+	void _className::Spawn( void )										\
+	{																	\
+		Precache();														\
+		SetModel( _modelName );											\
+		CUHItem::Spawn();												\
+	}
+
+//-----------------------------------------------------------------------------
 // Food
 //-----------------------------------------------------------------------------
 UH_DEFINE_ITEM( CItemOrange,		item_orange,		"models/props_junk/orange.mdl" )
@@ -420,10 +441,10 @@ UH_DEFINE_ITEM( CItemHeavyArmor,	item_heavyarmor,	"models/items/kevlar.mdl" )
 UH_DEFINE_ITEM( CItemFlashlight,	item_flashlight,	"models/pg_props/pg_obj/pg_flashlight.mdl" )
 UH_DEFINE_ITEM( CItemNightVision,	item_nightvision,	"models/items/nightvision.mdl" )
 UH_DEFINE_ITEM( CItemGasMask,		item_gasmask,		"models/items/gasmask.mdl" )
-UH_DEFINE_ITEM( CItemHelmetGuard,	item_helmet_guard,	"models/items/helmet_visor.mdl" )
-UH_DEFINE_ITEM( CItemHelmetPrison,	item_helmet_prison,	"models/items/helmet.mdl" )
-UH_DEFINE_ITEM( CItemHelmetPMC,		item_helmet_pmc,	"models/items/pmc_helmet.mdl" )
-UH_DEFINE_ITEM( CItemHelmetWorker,	item_helmet_worker,	"models/items/worker_helmet.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemHelmetGuard,	item_helmet_guard,	"models/items/helmet_visor.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemHelmetPrison,	item_helmet_prison,	"models/items/helmet.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemHelmetPMC,		item_helmet_pmc,	"models/items/pmc_helmet.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemHelmetWorker,	item_helmet_worker,	"models/items/worker_helmet.mdl" )
 UH_DEFINE_ITEM( CItemFlarePack,		item_flarepack,		"models/pg_props/pg_obj/pg_flare_pack.mdl" )
 UH_DEFINE_ITEM( CItemFMRadio,		item_fmradio,		"models/items/fmradio.mdl" )
 UH_DEFINE_ITEM( CItemRadioCracker,	item_radiocracker,	"models/items/fmradio.mdl" )
@@ -601,8 +622,8 @@ UH_DEFINE_ITEM( CItemShield,			item_shield,			"models/error.mdl" )	// TODO: mode
 UH_DEFINE_ITEM( CItemShoulderFlashlight, item_shoulderflashlight, "models/error.mdl" )	// TODO: model
 UH_DEFINE_ITEM( CItemCapPMC,			item_cap_pmc,			"models/error.mdl" )	// TODO: model
 UH_DEFINE_ITEM( CItemHeadsetPMC,		item_headset_pmc,		"models/error.mdl" )	// TODO: model
-UH_DEFINE_ITEM( CItemRespiratorGuard,	item_respirator_guard,	"models/error.mdl" )	// TODO: model
-UH_DEFINE_ITEM( CItemGasmaskGuard,		item_gasmask_guard,		"models/error.mdl" )	// TODO: model
+UH_DEFINE_ARMOR_ITEM( CItemRespiratorGuard,	item_respirator_guard,	"models/items/respirator.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemGasmaskGuard,		item_gasmask_guard,		"models/items/gasmask.mdl" )
 
 //-----------------------------------------------------------------------------
 // item_random

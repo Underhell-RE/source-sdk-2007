@@ -188,10 +188,29 @@ public:
 UH_DECLARE_ITEM( CItemFlashlight,		UH_ITEM_UNKNOWN )	// TODO: flashlight system
 UH_DECLARE_ITEM( CItemNightVision,		UH_ITEM_UNKNOWN )	// TODO: gear system
 UH_DECLARE_ITEM( CItemGasMask,			UH_ITEM_UNKNOWN )	// TODO: gear system
-UH_DECLARE_ITEM( CItemHelmetGuard,		UH_ITEM_UNKNOWN )	// TODO: gear system
-UH_DECLARE_ITEM( CItemHelmetPrison,		UH_ITEM_UNKNOWN )	// TODO: gear system
-UH_DECLARE_ITEM( CItemHelmetPMC,		UH_ITEM_UNKNOWN )	// TODO: gear system
-UH_DECLARE_ITEM( CItemHelmetWorker,		UH_ITEM_UNKNOWN )	// TODO: gear system
+
+//-----------------------------------------------------------------------------
+// Helmets / respirator / gasmask dropped by dead NPCs. They are armour items:
+// the original derives them from CItemArmor (vtable identical apart from
+// Spawn/Precache), whose MyTouch grants 10 armour (sub_10171F60 ->
+// IncrementArmorValue(10, 100)).
+//-----------------------------------------------------------------------------
+#define UH_DECLARE_ARMOR_ITEM( _className ) \
+	class _className : public CItemArmor \
+	{ \
+	public: \
+		DECLARE_CLASS( _className, CItemArmor ); \
+		virtual void Spawn( void ); \
+		virtual void Precache( void ); \
+	};
+
+UH_DECLARE_ARMOR_ITEM( CItemHelmetGuard )
+UH_DECLARE_ARMOR_ITEM( CItemHelmetPrison )
+UH_DECLARE_ARMOR_ITEM( CItemHelmetPMC )
+UH_DECLARE_ARMOR_ITEM( CItemHelmetWorker )
+UH_DECLARE_ARMOR_ITEM( CItemRespiratorGuard )
+UH_DECLARE_ARMOR_ITEM( CItemGasmaskGuard )
+
 UH_DECLARE_ITEM( CItemFlarePack,		UH_ITEM_FLARE_PACK )
 UH_DECLARE_ITEM( CItemFMRadio,			UH_ITEM_FM_RADIO )
 UH_DECLARE_ITEM( CItemRadioCracker,		UH_ITEM_RADIO_CRACKER )
@@ -266,8 +285,7 @@ UH_DECLARE_ITEM( CItemShield,			UH_ITEM_UNKNOWN )	// item_shield — TODO: id, m
 UH_DECLARE_ITEM( CItemShoulderFlashlight, UH_ITEM_UNKNOWN )	// item_shoulderflashlight — TODO
 UH_DECLARE_ITEM( CItemCapPMC,			UH_ITEM_UNKNOWN )	// item_cap_pmc — TODO
 UH_DECLARE_ITEM( CItemHeadsetPMC,		UH_ITEM_UNKNOWN )	// item_headset_pmc — TODO
-UH_DECLARE_ITEM( CItemRespiratorGuard,	UH_ITEM_UNKNOWN )	// item_respirator_guard — TODO
-UH_DECLARE_ITEM( CItemGasmaskGuard,		UH_ITEM_UNKNOWN )	// item_gasmask_guard — TODO
+
 
 // TODO: item_bandagespack, item_syringepack, item_flags, item_health — class
 // names unknown (no RTTI entries found for them).

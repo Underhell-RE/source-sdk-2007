@@ -229,12 +229,18 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 		PrecacheModel( "models/gibs/bodyparts/soldier/rightleg2.mdl" );
 	}
 
-	// Helmet drops (the original spawns item_helmet_* entities, which precache
-	// their own models) + the knock-off sound.
+	// Helmet / respirator / gasmask drops (the original spawns item_* entities,
+	// which precache their own models) + the knock-off sound.
 	if ( V_stristr( pszModel, "prisonguard" ) )
+	{
 		PrecacheModel( "models/items/helmet.mdl" );
+		PrecacheModel( "models/items/gasmask.mdl" );
+	}
 	else if ( V_stristr( pszModel, "combine_soldier" ) )
+	{
 		PrecacheModel( "models/items/helmet_visor.mdl" );
+		PrecacheModel( "models/items/respirator.mdl" );
+	}
 
 	// Dismemberment blood sprays + sounds (1:1 with sub_10021D80 precache).
 	PrecacheParticleSystem( "blood_zombie_split_spray" );
@@ -382,6 +388,34 @@ void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &ve
 }
 
 //-----------------------------------------------------------------------------
+// Remove a worn gear bodygroup and drop the matching item (1:1 with
+// sub_10031BF0, which spawns item_respirator_guard / item_gasmask_guard when
+// a head is destroyed while a respirator / gasmask is worn).
+//-----------------------------------------------------------------------------
+static void UH_DropGearItem( CBaseAnimating *pNPC, const char *pszBodygroup, const char *pszItem, const Vector &vecPosition, const Vector &vecDir )
+{
+	int iGroup = pNPC->FindBodygroupByName( pszBodygroup );
+	if ( iGroup < 0 || pNPC->GetBodygroup( iGroup ) < 1 )
+		return;	// not worn
+
+	pNPC->SetBodygroup( iGroup, 0 );
+
+	CBaseEntity *pItem = CreateEntityByName( pszItem );
+	if ( !pItem )
+		return;
+
+	pItem->SetAbsOrigin( vecPosition );
+	pItem->SetAbsAngles( vec3_angle );
+	DispatchSpawn( pItem );
+
+	IPhysicsObject *pPhys = pItem->VPhysicsGetObject();
+	if ( pPhys )
+	{
+		pPhys->SetVelocity( &vecDir, NULL );
+	}
+}
+
+//-----------------------------------------------------------------------------
 // Gib a body part: change the bodygroup to remove the limb and spawn a severed
 // gib model at the hit position.
 //-----------------------------------------------------------------------------
@@ -399,6 +433,11 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 			int iGroup = FindBodygroupByName( "head" );
 			if ( iGroup >= 0 )
 				SetBodygroup( iGroup, 1 );	// "Destroyed Head"
+
+			// Destroying the head also knocks off the respirator (combine_s)
+			// or gasmask (prison guard) if worn (sub_10031BF0).
+			UH_DropGearItem( this, "respirator", "item_respirator_guard", vecPosition, vecDir );
+			UH_DropGearItem( this, "gasmask", "item_gasmask_guard", vecPosition, vecDir );
 		}
 		break;
 	}
@@ -842,6 +881,10 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 			int iGroup = pRagdoll->FindBodygroupByName( "head" );
 			if ( iGroup >= 0 )
 				pRagdoll->SetBodygroup( iGroup, 1 );
+
+			// Respirator / gasmask knocked off with the destroyed head.
+			UH_DropGearItem( pRagdoll, "respirator", "item_respirator_guard", pos, dir );
+			UH_DropGearItem( pRagdoll, "gasmask", "item_gasmask_guard", pos, dir );
 		}
 		break;
 	}
