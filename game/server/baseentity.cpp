@@ -1801,6 +1801,9 @@ BEGIN_DATADESC_NO_BASE( CBaseEntity )
 	DEFINE_OUTPUT( m_OnUser3, "OnUser3" ),
 	DEFINE_OUTPUT( m_OnUser4, "OnUser4" ),
 
+	// Underhell: fired when the player kicks this entity (uh_jake_kick).
+	DEFINE_OUTPUT( m_OnKicked, "OnKicked" ),
+
 	// Function Pointers
 	DEFINE_FUNCTION( SUB_Remove ),
 	DEFINE_FUNCTION( SUB_DoNothing ),

@@ -425,6 +425,14 @@ public:
 	void				InputGive( inputdata_t &inputdata );
 	void				InputGiveInv( inputdata_t &inputdata );
 
+	// Underhell kick attack ("uh_jake_kick"). See uh_kick.cpp.
+	void				UH_Kick( void );
+	void				UH_KickThink( void );
+	bool				UH_CanKick( void );
+	void				InputDisableKick( inputdata_t &inputdata );
+	void				InputEnableKick( inputdata_t &inputdata );
+	void				UH_SetKickViewModel( const char *pszModel );	// set + precache viewmodel 2
+
 	//-----------------------------------------------------------------------------
 	// Underhell glowstick. The lit glowstick prop is parented to the player and
 	// tracked here (original m_hActiveGlowStick @2164) so it can be removed when
@@ -537,8 +545,15 @@ private:
 	float				m_flAdmireGlovesAnimTime;
 
 	// Underhell: kick-attack viewmodel set via "SetPlayerKickModel"
-	// (models/weapons/v_kick_jake_*.mdl). TODO: full kick system (uh_jake_kick).
+	// (models/weapons/v_kick_jake_*.mdl).
 	string_t			m_iszKickViewModel;
+
+	// Underhell kick (uh_jake_kick) state. m_bKickMarker is networked so the
+	// kick window is visible to the client; the rest is server-only.
+	CNetworkVar( bool, m_bKickMarker );	// kick in progress (viewmodel raised/striking)
+	bool				m_bKickActive;		// armed: don't re-trigger while kicking
+	bool				m_bKickDisabled;	// "DisableKick" / "EnableKick"
+	COutputEvent		m_OnDisabledKickAttempted;
 
 	float				m_flNextFlashlightCheckTime;
 	float				m_flFlashlightPowerDrainScale;

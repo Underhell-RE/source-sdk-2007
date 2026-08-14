@@ -64,8 +64,8 @@ void CHL2_Player::InputViewModelSkin( inputdata_t &inputdata )
 
 //-----------------------------------------------------------------------------
 // Purpose: Set the kick-attack viewmodel ("SetPlayerKickModel", e.g.
-// models/weapons/v_kick_jake_casual.mdl). TODO: full kick system (uh_jake_kick)
-// — here we only precache and remember the model path.
+// models/weapons/v_kick_jake_casual.mdl). Precaches the model, remembers it and
+// applies it to the kick viewmodel (index 2) immediately.
 //-----------------------------------------------------------------------------
 void CHL2_Player::InputSetPlayerKickModel( inputdata_t &inputdata )
 {
@@ -73,8 +73,7 @@ void CHL2_Player::InputSetPlayerKickModel( inputdata_t &inputdata )
 	if ( !pszModel || !*pszModel )
 		return;
 
-	PrecacheModel( pszModel );
-	m_iszKickViewModel = AllocPooledString( pszModel );
+	UH_SetKickViewModel( pszModel );
 }
 
 //-----------------------------------------------------------------------------

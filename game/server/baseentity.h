@@ -1646,6 +1646,9 @@ public:
 	// Underhell: set the mirror-only rendering flag (CHL2_Player::SetPlayerModel).
 	void	SetMirrorOnly( bool bMirrorOnly ) { m_bIsMirrorOnly = bMirrorOnly; }
 	bool	IsMirrorOnly( void ) const { return m_bIsMirrorOnly; }
+
+	// Underhell: fire the "OnKicked" output (player kick hit this entity).
+	void	FireOnKicked( CBaseEntity *pActivator ) { m_OnKicked.FireOutput( pActivator, pActivator ); }
 private:
 
 	// User outputs. Fired when the "FireInputX" input is triggered.
@@ -1653,6 +1656,9 @@ private:
 	COutputEvent m_OnUser2;
 	COutputEvent m_OnUser3;
 	COutputEvent m_OnUser4;
+
+	// Underhell: fired when the player kicks this entity (uh_jake_kick).
+	COutputEvent m_OnKicked;
 
 	QAngle			m_angAbsRotation;
 

@@ -1,4 +1,4 @@
-//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -81,9 +81,10 @@ public:
 	float							m_flUHBatteryCharge;				// 0..100 current battery charge
 	bool								m_bIronSighted;						// ironsight active
 	float								m_fIronsightedTime;					// last ironsight toggle time
-	bool								m_bHavePistolSilencer;				// silencer gear (client mirror)
-	bool								m_bHaveRifleSilencer;
-	bool								m_bLaserToggleState;
+	bool									m_bHavePistolSilencer;				// silencer gear (client mirror)
+	bool									m_bHaveRifleSilencer;
+	bool									m_bLaserToggleState;
+	bool									m_bKickMarker;						// kick window active
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible

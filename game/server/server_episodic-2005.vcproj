@@ -301,6 +301,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\uh_kick.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\uh_weapons.cpp"
 					>
 				</File>

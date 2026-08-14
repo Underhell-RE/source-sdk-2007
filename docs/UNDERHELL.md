@@ -880,3 +880,25 @@ This is the fix for "special forces allies can't shoot" and the NPC T-pose
 ("Bad sequence (-1 ...) in GetSequenceLinearMotion"): the NPC requested an
 activity its model lacked, SelectWeightedSequence returned -1, and the model
 froze in the reference pose.
+
+## Kick attack (uh_jake_kick) — ported
+
+Decoded from CHL2_Player::ClientCommand sub_101F11D0 + the kick think/impact
+handlers sub_101F2990 / sub_101F0050 / sub_101E5A60. Fully ported:
+
+- `MAX_VIEWMODELS` 2 -> 3: viewmodel index 2 is the kick viewmodel
+  (`models/weapons/v_kick_jake_*.mdl`, set by `SetPlayerKickModel`).
+- ConVars: `uh_kick_damage` (21), `uh_kick_forcemult` (2), `uh_kick_enabled`
+  (1, FCVAR_CHEAT).
+- Command `uh_jake_kick`: gates (alive / not sprinting / not in vehicle /
+  not already kicking / `DisableKick` / `uh_kick_enabled` / suit power >= 20),
+  drains 20 suit power, raises the kick viewmodel, viewpunch (-2,0,0), rumble
+  (4,0,4), swing + exertion voice, schedules the strike +0.35s later.
+- `UH_KickThink`: first pass does a 72-unit forward trace (mask 0x600400B),
+  applies DMG_CLUB damage + force, plays kick_body/kick_wall, fires the
+  `OnKicked` output (added to CBaseEntity) on the victim, then holsters +0.4s.
+- Inputs `DisableKick`/`EnableKick` + output `OnDisabledKickAttempted` (player);
+  `OnKicked` output on CBaseEntity (map: "OnKicked" "door_KillingRoom,EnableMotion").
+
+TODO (NPC-kick direction): `m_flViewkick` / `m_hLastNPCToKickMe` — the reverse
+case where an NPC kicks the player (sk_combine_s_kick etc.), not yet ported.

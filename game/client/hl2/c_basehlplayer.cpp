@@ -1,4 +1,4 @@
-//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -53,6 +53,8 @@ IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropBool( RECVINFO( m_bHavePistolSilencer ) ),
 	RecvPropBool( RECVINFO( m_bHaveRifleSilencer ) ),
 	RecvPropBool( RECVINFO( m_bLaserToggleState ) ),
+	// Underhell kick marker (kick window active).
+	RecvPropBool( RECVINFO( m_bKickMarker ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )

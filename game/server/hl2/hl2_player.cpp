@@ -405,6 +405,14 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_INPUTFUNC( FIELD_STRING, "Give", InputGive ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "GiveInv", InputGiveInv ),
 
+	// Underhell kick (uh_jake_kick).
+	DEFINE_INPUTFUNC( FIELD_VOID, "DisableKick", InputDisableKick ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "EnableKick", InputEnableKick ),
+	DEFINE_FIELD( m_bKickMarker, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bKickActive, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bKickDisabled, FIELD_BOOLEAN ),
+	DEFINE_OUTPUT( m_OnDisabledKickAttempted, "OnDisabledKickAttempted" ),
+
 	DEFINE_SOUNDPATCH( m_sndLeeches ),
 	DEFINE_SOUNDPATCH( m_sndWaterSplashes ),
 
@@ -429,6 +437,11 @@ CHL2_Player::CHL2_Player()
 
 	m_flArmorReductionTime = 0.0f;
 	m_iArmorReductionFrom = 0;
+
+	// Underhell kick defaults.
+	m_bKickMarker = false;
+	m_bKickActive = false;
+	m_bKickDisabled = false;
 
 	UH_InitializeInventory();
 	UH_InitializeEndurance();
@@ -479,6 +492,8 @@ IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropBool( SENDINFO(m_bHavePistolSilencer) ),
 	SendPropBool( SENDINFO(m_bHaveRifleSilencer) ),
 	SendPropBool( SENDINFO(m_bLaserToggleState) ),
+	// Underhell kick marker (kick window active).
+	SendPropBool( SENDINFO(m_bKickMarker) ),
 END_SEND_TABLE()
 
 
@@ -504,6 +519,18 @@ void CHL2_Player::Precache( void )
 	// Underhell ironsight sounds.
 	PrecacheScriptSound( "HL2Player.Ironsighton" );
 	PrecacheScriptSound( "HL2Player.Ironsightoff" );
+
+	// Underhell kick (uh_jake_kick) models + sounds.
+	PrecacheModel( "models/weapons/v_kick_jake_casual.mdl" );
+	PrecacheModel( "models/weapons/v_kick_jake_inmate.mdl" );
+	PrecacheModel( "models/weapons/v_kick_jake_pmc.mdl" );
+	PrecacheModel( "models/weapons/v_kick_jake_guard.mdl" );
+	PrecacheScriptSound( "HL2Player.kick_wall" );
+	PrecacheScriptSound( "HL2Player.kick_body" );
+	PrecacheScriptSound( "HL2Player.kick_fire" );
+	PrecacheScriptSound( "HL2Player.kick_fire_fly" );
+	PrecacheScriptSound( "Player.Voice.Kick" );
+	PrecacheScriptSound( "Player.Voice.Kick.Exhausted" );
 }
 
 //-----------------------------------------------------------------------------
@@ -1208,6 +1235,11 @@ void CHL2_Player::Spawn(void)
 	m_pPlayerAISquad = g_AI_SquadManager.FindCreateSquad(AllocPooledString(PLAYER_SQUADNAME));
 
 	InitSprinting();
+
+	// Underhell: create the kick viewmodel (index 2) and give it the default
+	// model. "SetPlayerKickModel" swaps it per outfit.
+	CreateViewModel( 2 );
+	UH_SetKickViewModel( "models/weapons/v_kick_jake_casual.mdl" );
 
 	// Setup our flashlight values
 #ifdef HL2_EPISODIC
@@ -2860,6 +2892,13 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	if ( !Q_stricmp( args[0], "Throw_Nade" ) )
 	{
 		UH_ThrowNade();
+		return true;
+	}
+
+	// Underhell: kick attack (original "uh_jake_kick" dispatch, sub_101F11D0).
+	if ( !Q_stricmp( args[0], "uh_jake_kick" ) )
+	{
+		UH_Kick();
 		return true;
 	}
 
