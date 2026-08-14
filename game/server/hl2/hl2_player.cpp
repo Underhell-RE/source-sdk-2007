@@ -3415,11 +3415,8 @@ bool CHL2_Player::Weapon_Switch( CBaseCombatWeapon *pWeapon, int viewmodelindex 
 	}
 
 	// Underhell: leaving ironsight when switching weapons (the viewmodel
-	// resets to hip anyway; keep the authoritative flag in sync).
-	if ( m_bIronSighted )
-	{
-		UH_ToggleIronsight();
-	}
+	// resets to hip anyway; keep the authoritative flag + FOV in sync).
+	UH_DisableIronsight();
 
 	return BaseClass::Weapon_Switch( pWeapon, viewmodelindex );
 }

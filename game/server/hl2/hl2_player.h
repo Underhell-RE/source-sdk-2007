@@ -395,6 +395,7 @@ public:
 	//-----------------------------------------------------------------------------
 	bool				UH_IsIronSighted( void ) const { return m_bIronSighted; }
 	void				UH_ToggleIronsight( void );
+	void				UH_DisableIronsight( void );	// force off (no debounce/sound) — weapon switch / drop
 
 	//-----------------------------------------------------------------------------
 	// Underhell glowstick. The lit glowstick prop is parented to the player and
