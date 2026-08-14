@@ -21,6 +21,7 @@
 
 #include "cbase.h"
 #include "ai_basenpc.h"
+#include "ai_senses.h"
 #include "igamesystem.h"
 #include "ragdoll_shared.h"
 #include "physics_prop_ragdoll.h"
