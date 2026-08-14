@@ -32,12 +32,14 @@ CBaseViewModel::CBaseViewModel()
 	// NOTE: We do this here because the color is never transmitted for the view model.
 	m_nOldAnimationParity = 0;
 	m_EntClientFlags |= ENTCLIENTFLAG_ALWAYS_INTERPOLATE;
-
-	// Underhell ironsight defaults (VDC "Adding Ironsights").
-	m_bExpSighted = false;
-	m_expFactor = 0.0f;
 #endif
 	SetRenderColor( 255, 255, 255, 255 );
+
+	// Underhell ironsight defaults (VDC "Adding Ironsights"). Declared
+	// unconditionally so the class layout matches the server; only the client
+	// reads them.
+	m_bExpSighted = false;
+	m_expFactor = 0.0f;
 
 	// View model of this weapon
 	m_sVMName			= NULL_STRING;		
@@ -79,11 +81,9 @@ void CBaseViewModel::Spawn( void )
 	SetSize( Vector( -8, -4, -2), Vector(8, 4, 2) );
 	SetSolid( SOLID_NONE );
 
-#if defined( CLIENT_DLL )
 	// Underhell: reset ironsight state on spawn (VDC "Adding Ironsights").
 	m_bExpSighted = false;
 	m_expFactor = 0.0f;
-#endif
 }
 
 
