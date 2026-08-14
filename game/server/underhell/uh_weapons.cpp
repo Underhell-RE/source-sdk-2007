@@ -159,6 +159,27 @@ const Vector &CUHGunWeapon::GetBulletSpread( void )
 }
 
 //-----------------------------------------------------------------------------
+// Silenced viewmodel activities: the silenced variants live on the viewmodel
+// (ACT_VM_*_SILENCED). SendWeaponAnim maps activity -> sequence on the server
+// and falls back to ACT_VM_IDLE when a model lacks the sequence.
+//-----------------------------------------------------------------------------
+Activity CUHGunWeapon::GetPrimaryAttackActivity( void )
+{
+	if ( m_bSilenced )
+		return ACT_VM_PRIMARYATTACK_SILENCED;
+
+	return BaseClass::GetPrimaryAttackActivity();
+}
+
+Activity CUHGunWeapon::GetDrawActivity( void )
+{
+	if ( m_bSilenced )
+		return ACT_VM_DRAW_SILENCED;
+
+	return BaseClass::GetDrawActivity();
+}
+
+//-----------------------------------------------------------------------------
 // Recoil: PunchPitch/PunchYaw ranges from the weapon script, scaled by
 // CrouchRecoilMult while ducked.
 //-----------------------------------------------------------------------------
@@ -235,23 +256,27 @@ UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.0
 UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, 8, 0 )
 
 //-----------------------------------------------------------------------------
-// Shotguns — pump. Damage: m3 12, m5 16, spas12 14, xm1014 12.
+// Shotguns — pump-action. Damage: m3 12, m5 16, spas12 14, xm1014 12.
+// All four share one fire/pump routine (sub_1027E0A0 + sub_1027F4E0); the
+// pump cycle constant in the DLL is 0.8 s (double at 0x10487878).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.75f, 12, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.75f, 16, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.6f, 14, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.55f, 12, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, 12, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, 16, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, 14, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, 12, 0 )
 
 //-----------------------------------------------------------------------------
 // Rifles — G36K is select-fire (0.1 s full-auto). Damage: g36k 20, sniper 80.
 // Weapon type 4 = rifle (silencer-gated on m_bHaveRifleSilencer).
+// The sniper is bolt-action: the original gates refire on the bolt sequence
+// duration (like the vanilla sniper, GetFireRate 1.0), so 1.0 s.
 //-----------------------------------------------------------------------------
 UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, 20, 4 )
-UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.5f, 80, 4 )
+UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.0f, 80, 4 )
 
 //-----------------------------------------------------------------------------
-// BFG — mgl 200, minigun 50. Minigun is 0.075 s (exact, GetFireRate); MGL is an
-// estimate (custom fire path).
+// BFG — mgl 200, minigun 50. Minigun is 0.075 s (exact, GetFireRate); MGL is a
+// single-shot grenade launcher (custom fire path, ~1.0 s — TODO exact).
 //-----------------------------------------------------------------------------
 UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, 200, 0 )
 UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, 50, 0 )

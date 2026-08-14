@@ -73,6 +73,12 @@ public:
 	bool			IsSilenced( void ) const { return m_bSilenced; }
 	void			SetSilenced( bool bSilenced ) { m_bSilenced = bSilenced; }
 
+	// Silenced viewmodel activities (the viewmodel model carries the
+	// ACT_VM_*_SILENCED sequences; SendWeaponAnim falls back to idle if a
+	// model lacks one).
+	virtual Activity GetPrimaryAttackActivity( void );
+	virtual Activity GetDrawActivity( void );
+
 	float			m_flFireRate;			// seconds between shots
 	int				m_iDamage;				// per-shot damage (skill.cfg sk_plr_dmg_*)
 	int				m_iWeaponType;			// 1 = pistol, 4 = rifle, 0 = other (silencer gating)

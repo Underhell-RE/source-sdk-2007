@@ -199,7 +199,13 @@ void CHL2_Player::UH_ToggleSilencer( void )
 		return;
 	}
 
-	pWeapon->SetSilenced( !pWeapon->IsSilenced() );
+	bool bSilenced = !pWeapon->IsSilenced();
+	pWeapon->SetSilenced( bSilenced );
+
+	// Play the attach / detach animation (ACT_VM_ATTACH_SILENCER /
+	// ACT_VM_DETACH_SILENCER). SendWeaponAnim falls back to idle if the
+	// viewmodel lacks the sequence.
+	pWeapon->SendWeaponAnim( bSilenced ? ACT_VM_ATTACH_SILENCER : ACT_VM_DETACH_SILENCER );
 }
 
 //-----------------------------------------------------------------------------
@@ -246,7 +252,7 @@ void CHL2_Player::UH_DropWeapon( void )
 		UH_ToggleIronsight();
 
 	// Can't drop while in a vehicle.
-	if ( GetVehicle() && GetVehicle() != this )
+	if ( GetVehicle() )
 		return;
 
 	// The original refuses to drop melee weapons (weapon-info MeleeWeapon flag).
