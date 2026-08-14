@@ -470,3 +470,45 @@ port only needed to:
 - Free-aim camera (viewmodel lags the crosshair) + dynamic hand switching
   (OneHanded / BuiltRightHanded / cl_righthand flip).
 - NPC acttables for the melee weapons (player works, NPCs TODO).
+
+## Weapon system origins (notes/ in the hexrays repo)
+
+The mod author (Mxthe) documented his sources in `notes/`:
+
+- **`ironsight.txt`** — the VDC **"Adding Ironsights"** tutorial (jorg40/Cin).
+  The `ExpOffset { x y z xori yori zori accuracy }` block in every weapon
+  script is this system verbatim: `CBaseViewModel::CalcViewModelView` slides
+  the viewmodel up to the eye by `m_expOffset`/`m_expOriOffset`, interpolated
+  by `m_expFactor` over `gMoveTime`. The port parses these into
+  `FileWeaponInfo_t::m_expOffset` / `m_expOriOffset` / `m_flAccuracy`.
+- **`Over the Shoulder View - Valve Developer Community.html`** — the VDC
+  **"Over the Shoulder View"** tutorial. Its "OPTIONAL: Adding free aim"
+  section is the "свободная камера" feature: the mouse moves the crosshair on
+  screen (deadzone + auto-turn past the edge), decoupling the aim point from
+  the view — i.e. the viewmodel no longer tracks the crosshair 1:1.
+
+### One-handed weapons & the flashlight (user-confirmed + decoded)
+
+`OneHanded` exists because Underhell has a **flashlight that is itself a
+viewmodel** (`models/weapons/v_flashlight_pg.mdl`, `FlashlightViewModelThink`,
+`m_bFlashlightHolstered`, convar `uh_flashlight_anim`). While a one-handed
+weapon (pistols, melee) is equipped, the left hand holds the flashlight (or a
+**fake flare** — `models/weapons/v_flare_pg.mdl`, `m_bHoldingFlare`). The
+player precache (sub_101E25F0) also pulls `v_kick_jake_*.mdl` — the kick
+attack viewmodels (distinct from weapons).
+
+### Silencer / laser sight (from the string table)
+
+- **Silencer**: player flags `m_bHavePistolSilencer` @3371 /
+  `m_bHaveRifleSilencer` @3372 (set via `SetPistolSilencer` /
+  `SetRifleSilencer` inputs), client `silencer_toggle` command, viewmodel
+  animations `ACT_VM_ATTACH_SILENCER` / `ACT_VM_DETACH_SILENCER`, and a
+  `single_shot_silenced` sound key in the weapon scripts.
+- **Laser sight**: `sprites/laserpointer.vmt` / `sprites/laserdot.vmt` /
+  `sprites/laserbeam.vmt`, `m_bLaserToggleState`, `Valve_Hint_LaserSight`.
+
+### FireMode
+
+`UH_Weapon_Special` also carries `"FireMode"` (only the G36K sets it, value 1
+= full auto; matches FIREMODE_FULLAUTO in basehlcombatweapon.h). Parsed as
+`FileWeaponInfo_t::m_iFireMode`.

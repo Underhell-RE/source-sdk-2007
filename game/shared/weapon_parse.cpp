@@ -354,9 +354,10 @@ FileWeaponInfo_t::FileWeaponInfo_t()
 	m_flRunAccuracyMult = 1.0f;
 	m_bUHWeaponSpecial = false;
 	m_iPenetration = 0;
+	m_iFireMode = 0;
 	m_bHasExpOffset = false;
-	m_vecExpOffsetX = m_vecExpOffsetY = m_vecExpOffsetZ = 0.0f;
-	m_angExpOffsetX = m_angExpOffsetY = m_angExpOffsetZ = 0.0f;
+	m_expOffset = vec3_origin;
+	m_expOriOffset.Init();
 	m_flAccuracy = 1.0f;
 }
 
@@ -454,18 +455,20 @@ void FileWeaponInfo_t::Parse( KeyValues *pKeyValuesData, const char *szWeaponNam
 	{
 		m_bUHWeaponSpecial = true;
 		m_iPenetration = pSpecial->GetInt( "Penetration", 0 );
+		m_iFireMode = pSpecial->GetInt( "FireMode", 0 );
 	}
 
+	// Ironsight offsets (VDC "Adding Ironsights" tutorial, jorg40/Cin).
 	KeyValues *pExpOffset = pKeyValuesData->FindKey( "ExpOffset" );
 	if ( pExpOffset )
 	{
 		m_bHasExpOffset = true;
-		m_vecExpOffsetX = pExpOffset->GetFloat( "x", 0.0f );
-		m_vecExpOffsetY = pExpOffset->GetFloat( "y", 0.0f );
-		m_vecExpOffsetZ = pExpOffset->GetFloat( "z", 0.0f );
-		m_angExpOffsetX = pExpOffset->GetFloat( "xori", 0.0f );
-		m_angExpOffsetY = pExpOffset->GetFloat( "yori", 0.0f );
-		m_angExpOffsetZ = pExpOffset->GetFloat( "zori", 0.0f );
+		m_expOffset.x = pExpOffset->GetFloat( "x", 0.0f );
+		m_expOffset.y = pExpOffset->GetFloat( "y", 0.0f );
+		m_expOffset.z = pExpOffset->GetFloat( "z", 0.0f );
+		m_expOriOffset.x = pExpOffset->GetFloat( "xori", 0.0f );
+		m_expOriOffset.y = pExpOffset->GetFloat( "yori", 0.0f );
+		m_expOriOffset.z = pExpOffset->GetFloat( "zori", 0.0f );
 		m_flAccuracy = pExpOffset->GetFloat( "accuracy", 1.0f );
 	}
 

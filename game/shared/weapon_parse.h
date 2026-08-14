@@ -135,10 +135,11 @@ public:
 
 	bool						m_bUHWeaponSpecial;		// "UH_Weapon_Special" block present
 	int							m_iPenetration;			// "Penetration" (inside UH_Weapon_Special)
+	int							m_iFireMode;			// "FireMode" (inside UH_Weapon_Special) — matches FIREMODE_* in basehlcombatweapon.h
 
 	bool						m_bHasExpOffset;		// "ExpOffset" ironsight block present
-	float						m_vecExpOffsetX, m_vecExpOffsetY, m_vecExpOffsetZ;		// "x"/"y"/"z"
-	float						m_angExpOffsetX, m_angExpOffsetY, m_angExpOffsetZ;	// "xori"/"yori"/"zori"
+	Vector						m_expOffset;			// "x"/"y"/"z" — viewmodel offset when ironsighted
+	QAngle						m_expOriOffset;			// "xori"/"yori"/"zori" — viewmodel orientation when ironsighted
 	float						m_flAccuracy;			// "accuracy" (inside ExpOffset)
 
 // CLIENT DLL
