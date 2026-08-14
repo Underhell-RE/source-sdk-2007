@@ -841,3 +841,20 @@ Ported: `m_bPlayerAtGun` (server + client send/recv), `ToggleGunMode` input,
 `EnableMountedGun` keyvalue, and the `DriveVehicle` gate. TODO: gunner eye
 attachment (`vehicle_gunner_eyes` vs `vehicle_driver_eyes`, sub_103EA8F0) for
 the correct gun camera, and the mounted-gun tracer (AR2Tracer vs tau cannon).
+
+## Jeep gunner seat — eye + remaining pieces (stage follow-up 2)
+
+The `prop_vehicle_jeep` in Uh_Chapter1_16_d is self-driven (Throttle/HandBrake
+inputs + Bryan the NPC driver), while the player mans a mounted gun on top.
+
+- `SharedVehicleViewSmoothing` now picks `vehicle_gunner_eyes` instead of
+  `vehicle_driver_eyes` when `m_bPlayerAtGun` (decode sub_103EA8F0). This is
+  the camera "on top" fix.
+- TODO: `m_bEnableMountedGun` swaps the driver's tau cannon for an AR2-tracer
+  mounted gun in `FireCannon` (decode sub_103EE570 / sub_103EAB30 gate
+  `(!m_bEnableMountedGun || m_bPlayerAtGun)`).
+- TODO: `EnterVehicleImmediatelyAsDriver` / `EnterVehicleAsDriver` are
+  Underhell-added NPC inputs (Bryan, an npc_citizen, enters the jeep as the
+  visual driver). Not yet ported — Bryan won't appear seated until they are.
+- `r_JeepViewZHeight 10` (map-fired client command) already exists and raises
+  the jeep view for the gunner.
