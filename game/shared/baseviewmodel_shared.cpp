@@ -35,10 +35,9 @@ CBaseViewModel::CBaseViewModel()
 #endif
 	SetRenderColor( 255, 255, 255, 255 );
 
-	// Underhell ironsight defaults (VDC "Adding Ironsights"). Declared
+	// Underhell ironsight interpolation (VDC "Adding Ironsights"). Declared
 	// unconditionally so the class layout matches the server; only the client
-	// reads them.
-	m_bExpSighted = false;
+	// reads it.
 	m_expFactor = 0.0f;
 
 	// View model of this weapon
@@ -81,8 +80,7 @@ void CBaseViewModel::Spawn( void )
 	SetSize( Vector( -8, -4, -2), Vector(8, 4, 2) );
 	SetSolid( SOLID_NONE );
 
-	// Underhell: reset ironsight state on spawn (VDC "Adding Ironsights").
-	m_bExpSighted = false;
+	// Underhell: reset ironsight interpolation on spawn (VDC "Adding Ironsights").
 	m_expFactor = 0.0f;
 }
 
@@ -449,12 +447,15 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 #endif
 
 	// Underhell ironsight: slide the viewmodel up to the eye by the weapon's
-	// ExpOffset, interpolated over ~0.1 s (VDC "Adding Ironsights").
+	// ExpOffset, interpolated over ~0.1 s (VDC "Adding Ironsights"). The target
+	// state comes from the player's authoritative IsIronSighted() (the
+	// networked m_bIronSighted), not a locally-toggled flag — a single source
+	// of truth so the viewmodel can never desync from the server.
 #if defined( CLIENT_DLL )
 	UH_CalcExpWpnOffsets( owner, vmorigin, vmangles );
 
 	// Interpolate m_expFactor toward the target (1 = sighted, 0 = hip).
-	float flTarget = m_bExpSighted ? 1.0f : 0.0f;
+	float flTarget = owner->IsIronSighted() ? 1.0f : 0.0f;
 	float flSpeed = 10.0f;	// 1 / gMoveTime(0.1)
 	if ( m_expFactor < flTarget )
 		m_expFactor = min( flTarget, m_expFactor + flSpeed * gpGlobals->frametime );

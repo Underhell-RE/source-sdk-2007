@@ -56,17 +56,17 @@ public:
 								const QAngle& eyeAngles );
 	virtual void				AddViewModelBob( CBasePlayer *owner, Vector& eyePosition, QAngle& eyeAngles ) {};
 
-	// Underhell ironsight state (VDC "Adding Ironsights", jorg40/Cin).
-	// m_bExpSighted is toggled by ironsight_toggle; CalcViewModelView slides
-	// the viewmodel up to the eye by the weapon's ExpOffset, interpolated over
-	// time by m_expFactor (0 = hip, 1 = fully sighted).
+	// Underhell ironsight interpolation (VDC "Adding Ironsights", jorg40/Cin).
+	// CalcViewModelView slides the viewmodel up to the eye by the weapon's
+	// ExpOffset; m_expFactor interpolates 0 (hip) -> 1 (fully sighted). The
+	// target state is read from the player's IsIronSighted() each frame, so
+	// this is client-side visual state only.
 	//
 	// NOTE: declared on BOTH client and server (no #if CLIENT_DLL). This class
 	// is shared and networked (DECLARE_NETWORKCLASS / DECLARE_PREDICTABLE): a
 	// client-only member here would shift every CNetworkVar below it and make
 	// the client's network-var / prediction offsets diverge from the server's,
-	// corrupting memory. The fields are simply unused on the server.
-	bool						m_bExpSighted;
+	// corrupting memory. m_expFactor is simply unused on the server.
 	float						m_expFactor;
 
 	// Initializes the viewmodel for use			

@@ -45,6 +45,9 @@ public:
 	LadderMove_t		*GetLadderMove() { return &m_HL2Local.m_LadderMove; }
 	virtual void		ExitLadder();
 	bool				IsSprinting() const { return m_fIsSprinting; }
+
+	// C_BasePlayer::IsIronSighted override (mirrors the networked flag).
+	virtual bool		IsIronSighted() { return m_bIronSighted; }
 	
 	// Input handling
 	virtual bool	CreateMove( float flInputSampleTime, CUserCmd *pCmd );

@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Client-side CBasePlayer.
 //
@@ -98,6 +98,10 @@ public:
 	// View model prediction setup
 	virtual void		CalcView( Vector &eyeOrigin, QAngle &eyeAngles, float &zNear, float &zFar, float &fov );
 	virtual void		CalcViewModelView( const Vector& eyeOrigin, const QAngle& eyeAngles);
+
+	// Underhell: ironsight state (mirrors the networked m_bIronSighted).
+	// C_BaseHLPlayer overrides; base players are never ironsighted.
+	virtual bool		IsIronSighted() { return false; }
 	
 
 	// Handle view smoothing when going up stairs

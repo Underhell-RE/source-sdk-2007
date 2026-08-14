@@ -1,38 +1,21 @@
 //========= Copyright (c) 2008, Mxthe (Underhell). All rights reserved. ============//
 //
-// Purpose: Underhell ironsight — client-side.
+// Purpose: Underhell ironsight — client side.
 //
-// "ironsight_toggle" is a client command: it flips the local viewmodel's
-// m_bExpSighted (so CalcViewModelView slides the gun to the eye by the
-// weapon's ExpOffset) and forwards the command to the server, which toggles
-// the networked m_bIronSighted (accuracy + FOV zoom) and plays the sound.
-// Model: VDC "Adding Ironsights" (jorg40/Cin) + the note about propagating
-// the state to the server.
+// There is intentionally NO client "ironsight_toggle" command here. The
+// original does not register one either (the string only appears in a
+// server-resync path, sub_100D8E90): the keybinding forwards "ironsight_toggle"
+// to the server through the engine's client-command route (exactly like
+// dropitem/useitem/switch), the server toggles the networked m_bIronSighted,
+// and the client viewmodel slides by reading C_BaseHLPlayer::IsIronSighted()
+// every frame in CalcViewModelView. A single source of truth avoids the
+// client/server desync (and any double-execution) a locally-toggled flag
+// would cause.
 //
 // $NoKeywords: $
 //=============================================================================//
 
 #include "cbase.h"
-#include "c_basehlplayer.h"
-#include "baseviewmodel_shared.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
-
-CON_COMMAND( ironsight_toggle, "Toggles ironsight for the current weapon." )
-{
-	C_BaseHLPlayer *pPlayer = dynamic_cast<C_BaseHLPlayer *>( C_BasePlayer::GetLocalPlayer() );
-	if ( !pPlayer )
-		return;
-
-	// Toggle the local viewmodel slide immediately (server FOV/accuracy
-	// follows via the forwarded command below).
-	C_BaseViewModel *pViewModel = pPlayer->GetViewModel();
-	if ( pViewModel )
-	{
-		pViewModel->m_bExpSighted = !pViewModel->m_bExpSighted;
-	}
-
-	// Let the server toggle m_bIronSighted + FOV zoom + sound.
-	engine->ClientCmd( "ironsight_toggle" );
-}

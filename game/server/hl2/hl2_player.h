@@ -397,6 +397,9 @@ public:
 	void				UH_ToggleIronsight( void );
 	void				UH_DisableIronsight( void );	// force off (no debounce/sound) — weapon switch / drop
 
+	// CBasePlayer::IsIronSighted override (server-authoritative flag).
+	virtual bool		IsIronSighted() { return m_bIronSighted; }
+
 	//-----------------------------------------------------------------------------
 	// Underhell glowstick. The lit glowstick prop is parented to the player and
 	// tracked here (original m_hActiveGlowStick @2164) so it can be removed when
