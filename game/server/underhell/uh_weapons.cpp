@@ -15,6 +15,7 @@
 #include "ammodef.h"
 #include "in_buttons.h"
 #include "soundent.h"
+#include "npcevent.h"
 #include "ai_basenpc.h"
 #include "hl2_player.h"
 #include "uh_weapons.h"

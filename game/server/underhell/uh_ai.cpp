@@ -21,6 +21,11 @@
 
 #include "cbase.h"
 #include "ai_basenpc.h"
+#include "igamesystem.h"
+#include "ragdoll_shared.h"
+#include "physics_prop_ragdoll.h"
+#include "physics_shared.h"
+#include "decals.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -38,11 +43,11 @@ static ConVar uh_maxsergibs( "uh_maxsergibs", "8", FCVAR_ARCHIVE,
 	"Max server-side gibs before the oldest becomes a client ragdoll." );
 static ConVar uh_maxseragdolls( "uh_maxseragdolls", "16", FCVAR_ARCHIVE,
 	"Max server-side ragdolls before the oldest becomes a client ragdoll." );
-static ConVar uh_ragdollcollisiontype( "uh_ragdollcollisiontype", "11", FCVAR_ARCHIVE,
-	"Ragdoll collision: 0 = everything, 1 = nothing, 11 = everything but NPCs/player." );
+static ConVar uh_ragdollcollisiontype( "uh_ragdollcollisiontype", "1", FCVAR_ARCHIVE,
+	"Collision group for server-side ragdolls (-1 = client-side, 0-19 = group)." );
 static ConVar uh_bodymousedamper( "uh_bodymousedamper", "4", FCVAR_ARCHIVE,
 	"Mouse sensitivity divider while dragging a ragdoll (weight illusion)." );
-static ConVar uh_maxitems( "uh_maxitems", "16", FCVAR_ARCHIVE,
+static ConVar uh_maxitems( "uh_maxitems", "32", FCVAR_ARCHIVE,
 	"Limit on enemy-dropped items/objects." );
 
 //-----------------------------------------------------------------------------
@@ -292,13 +297,15 @@ void CAI_BaseNPC::UH_SpotBodiesThink( void )
 
 		// Classify: soldier / infected / default. The body's classname isn't
 		// preserved on the ragdoll, so use the model name as a proxy.
+		// FireOutput( pActivator, pCaller ): !activator = this NPC (who spotted),
+		// !caller = the body — matching the tutorial ("!caller is the body").
 		const char *pszModel = STRING( pEnt->GetModelName() );
 		if ( V_stristr( pszModel, "combine_soldier" ) )
-			m_OnSpotSoldierBody.FireOutput( pEnt, this );
+			m_OnSpotSoldierBody.FireOutput( this, pEnt );
 		else if ( V_stristr( pszModel, "infected" ) )
-			m_OnSpotInfectedBody.FireOutput( pEnt, this );
+			m_OnSpotInfectedBody.FireOutput( this, pEnt );
 		else
-			m_OnSpotDefaultBody.FireOutput( pEnt, this );
+			m_OnSpotDefaultBody.FireOutput( this, pEnt );
 
 		break;	// one body per scan
 	}
@@ -398,3 +405,82 @@ void CAI_BaseNPC::InputGibRightLeg( inputdata_t &inputdata )
 {
 	UH_GibBodyPart( HITGROUP_RIGHTLEG, GetAbsOrigin(), vec3_origin );
 }
+
+//-----------------------------------------------------------------------------
+// Ragdoll / gib management (decoded from the original's CRagdollProp additions
+// + the ragdoll manager list at 106960D0/D8/DC/E4/E8/F0). Three behaviours:
+//
+//   1. uh_ragdollcollisiontype — the collision group applied to NPC ragdolls
+//      (-1 = client-side, else a 0..19 collision group index).
+//   2. uh_maxseragdolls / uh_maxsergibs — cap server-side ragdolls/gibs; the
+//      oldest is retired (the SDK LRU fades it out; the original converts it to
+//      a client ragdoll, which is equivalent visually).
+//   3. Dragging a body sprays "blood_drop" decals while the player holds it
+//      (FVPHYSICS_PLAYER_HELD), like the original's DraggedThink.
+//-----------------------------------------------------------------------------
+class CUHRagdollManager : public CAutoGameSystemPerFrame
+{
+	typedef CAutoGameSystemPerFrame BaseClass;
+
+public:
+	CUHRagdollManager() : BaseClass( "CUHRagdollManager" ), m_flNextScan( 0.0f ) {}
+
+	virtual void LevelInitPostEntity( void )
+	{
+		// Feed the SDK's existing ragdoll LRU our max count.
+		s_RagdollLRU.SetMaxRagdollCount( uh_maxseragdolls.GetInt() );
+	}
+
+	virtual void FrameUpdatePostEntityThink( void )
+	{
+		if ( gpGlobals->curtime < m_flNextScan )
+			return;
+		m_flNextScan = gpGlobals->curtime + 0.5f;
+
+		// Keep the LRU cap in sync (convar may change at runtime).
+		s_RagdollLRU.SetMaxRagdollCount( uh_maxseragdolls.GetInt() );
+
+		int iCollision = uh_ragdollcollisiontype.GetInt();
+
+		CBaseEntity *pEnt = gEntList.FirstEnt();
+		while ( pEnt )
+		{
+			if ( FClassnameIs( pEnt, "prop_ragdoll" ) )
+			{
+				CRagdollProp *pRagdoll = assert_cast<CRagdollProp *>( pEnt );
+
+				// Only NPC-spawned ragdolls (owner = the dead NPC). Hammer-placed
+				// prop_ragdolls have no owner and are excluded, per the tutorial.
+				if ( pRagdoll->GetOwnerEntity() )
+				{
+					// Collision group from the convar.
+					if ( iCollision >= 0 && pRagdoll->GetCollisionGroup() != iCollision )
+					{
+						pRagdoll->SetCollisionGroup( iCollision );
+					}
+
+					// Blood trail while dragged.
+					IPhysicsObject *pPhys = pRagdoll->VPhysicsGetObject();
+					if ( pPhys && ( pPhys->GetGameFlags() & FVPHYSICS_PLAYER_HELD ) )
+					{
+						Vector vecPos = pRagdoll->GetAbsOrigin();
+						Vector vecDown = vecPos - Vector( 0, 0, 32.0f );
+						trace_t tr;
+						UTIL_TraceLine( vecPos, vecDown, MASK_SOLID_BRUSHONLY, pRagdoll, COLLISION_GROUP_NONE, &tr );
+						if ( tr.fraction < 1.0f )
+						{
+							UTIL_DecalTrace( &tr, "blood_drop" );
+						}
+					}
+				}
+			}
+
+			pEnt = gEntList.NextEnt( pEnt );
+		}
+	}
+
+private:
+	float m_flNextScan;
+};
+
+static CUHRagdollManager g_UHRagdollManager;
