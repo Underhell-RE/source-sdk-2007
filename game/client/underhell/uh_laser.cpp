@@ -37,7 +37,9 @@ public:
 		m_iDotModel  = C_BaseEntity::PrecacheModel( "sprites/laserdot.vmt" );
 	}
 
-	virtual void FrameUpdatePostEntityThink( void )
+	// Client-side per-frame hook (NOT FrameUpdatePostEntityThink — that is
+	// server-only). Called once per rendered frame.
+	virtual void Update( float frametime )
 	{
 		C_BaseHLPlayer *pPlayer = dynamic_cast<C_BaseHLPlayer *>( C_BasePlayer::GetLocalPlayer() );
 		if ( !pPlayer )

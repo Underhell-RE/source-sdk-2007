@@ -345,6 +345,7 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 
 	// A prop_dynamic has no physics object, so it neither collides with the
 	// player nor needs a collision solver — it just rides along as a child.
+	// (The original uses a prop_physics, but the stick has no physics need.)
 	CBaseEntity *pGlow = CreateEntityByName( "prop_dynamic" );
 	if ( !pGlow )
 		return;
@@ -357,11 +358,12 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 
 	pGlow->Spawn();
 
-	// Spawn() resets the render state, so the additive glow + the centred
-	// dynamic light must be applied afterwards. EF_BRIGHTLIGHT emits a dlight
-	// tinted by m_clrRender, so each colour lights its own shade (the original
-	// adds an env_flare via sub_1020FA00; this is the stock equivalent).
-	pGlow->SetRenderMode( kRenderGlow );
+	// The glowstick model's tip material is self-illuminated, so the visible
+	// glow comes from the model itself (per bodygroup colour). Do NOT force
+	// kRenderGlow — it re-renders the model additively as a glow mask and
+	// washes it out / hides it. EF_BRIGHTLIGHT emits a dlight tinted by
+	// m_clrRender so each colour also lights its surroundings (the original
+	// adds an env_flare; this is the stock equivalent).
 	pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
 	pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
 

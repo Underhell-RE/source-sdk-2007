@@ -159,27 +159,6 @@ const Vector &CUHGunWeapon::GetBulletSpread( void )
 }
 
 //-----------------------------------------------------------------------------
-// Silenced viewmodel activities: the silenced variants live on the viewmodel
-// (ACT_VM_*_SILENCED). SendWeaponAnim maps activity -> sequence on the server
-// and falls back to ACT_VM_IDLE when a model lacks the sequence.
-//-----------------------------------------------------------------------------
-Activity CUHGunWeapon::GetPrimaryAttackActivity( void )
-{
-	if ( m_bSilenced )
-		return ACT_VM_PRIMARYATTACK_SILENCED;
-
-	return BaseClass::GetPrimaryAttackActivity();
-}
-
-Activity CUHGunWeapon::GetDrawActivity( void )
-{
-	if ( m_bSilenced )
-		return ACT_VM_DRAW_SILENCED;
-
-	return BaseClass::GetDrawActivity();
-}
-
-//-----------------------------------------------------------------------------
 // Recoil: PunchPitch/PunchYaw ranges from the weapon script, scaled by
 // CrouchRecoilMult while ducked.
 //-----------------------------------------------------------------------------
@@ -205,118 +184,157 @@ void CUHGunWeapon::AddViewKick( void )
 }
 
 //-----------------------------------------------------------------------------
+// Skill convars. skill.cfg sets these at map load (the original registers them
+// default "0" and relies on skill.cfg — the defaults here mirror skill.cfg so
+// the damage is correct even if skill.cfg is absent). GetDamage() reads them.
+//-----------------------------------------------------------------------------
+ConVar sk_plr_dmg_axe( "sk_plr_dmg_axe", "35" );
+ConVar sk_npc_dmg_axe( "sk_npc_dmg_axe", "20" );
+ConVar sk_plr_dmg_baton( "sk_plr_dmg_baton", "13" );
+ConVar sk_npc_dmg_baton( "sk_npc_dmg_baton", "10" );
+ConVar sk_plr_dmg_pipe( "sk_plr_dmg_pipe", "15" );
+ConVar sk_npc_dmg_pipe( "sk_npc_dmg_pipe", "10" );
+ConVar sk_plr_dmg_wrench( "sk_plr_dmg_wrench", "25" );
+ConVar sk_npc_dmg_wrench( "sk_npc_dmg_wrench", "15" );
+ConVar sk_plr_dmg_cleaver( "sk_plr_dmg_cleaver", "50" );
+ConVar sk_npc_dmg_cleaver( "sk_npc_dmg_cleaver", "25" );
+ConVar sk_plr_dmg_pistol_glock( "sk_plr_dmg_pistol_glock", "10" );
+ConVar sk_plr_dmg_pistol_beretta( "sk_plr_dmg_pistol_beretta", "15" );
+ConVar sk_plr_dmg_pistol_socom( "sk_plr_dmg_pistol_socom", "20" );
+ConVar sk_plr_dmg_pistol_python( "sk_plr_dmg_pistol_python", "120" );
+ConVar sk_plr_dmg_pistol_dualberetta( "sk_plr_dmg_pistol_dualberetta", "20" );
+ConVar sk_plr_dmg_smg_mp5( "sk_plr_dmg_smg_mp5", "12" );
+ConVar sk_plr_dmg_smg_mp5_eod( "sk_plr_dmg_smg_mp5_eod", "10" );
+ConVar sk_plr_dmg_smg_mp7( "sk_plr_dmg_smg_mp7", "8" );
+ConVar sk_plr_dmg_shotgun_m3( "sk_plr_dmg_shotgun_m3", "12" );
+ConVar sk_plr_dmg_shotgun_m5( "sk_plr_dmg_shotgun_m5", "16" );
+ConVar sk_plr_dmg_shotgun_spas12( "sk_plr_dmg_shotgun_spas12", "14" );
+ConVar sk_plr_dmg_shotgun_xm1014( "sk_plr_dmg_shotgun_xm1014", "12" );
+ConVar sk_plr_dmg_rifle_g36k( "sk_plr_dmg_rifle_g36k", "20" );
+ConVar sk_plr_dmg_rifle_sniper( "sk_plr_dmg_rifle_sniper", "80" );
+ConVar sk_plr_dmg_bfg_mgl( "sk_plr_dmg_bfg_mgl", "200" );
+ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
+
+//-----------------------------------------------------------------------------
 // Registers one weapon class under its entity name and its send table.
-// Damage values are from the original's skill.cfg (sk_plr_dmg_*). Fire rates
-// extracted from serveror.dll:
+// Damage comes from the sk_plr_dmg_<weapon> convar. Fire rates extracted from
+// serveror.dll:
 //   - pistols: 0.2 s (shared fire routine sub_1027AEC0)
-//   - SMGs + BFG minigun: 0.075 s (GetFireRate override, vtable slot 277 ->
-//     sub_102801F0 -> "flds 0x105300E4" = 0.075)
-//   - G36K: 0.1 s (select-fire GetFireRate sub_103F5150 -> 0x1048775C = 0.1)
+//   - SMGs + BFG minigun: 0.075 s (GetFireRate vtable slot 277 -> sub_102801F0)
+//   - G36K: 0.1 s (select-fire GetFireRate sub_103F5150)
 // Shotgun / sniper / BFG MGL use custom pump/delay fire paths (not GetFireRate);
 // their values below are close estimates — TODO: recover the exact delay.
 //-----------------------------------------------------------------------------
-#define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damage, _weaponType ) \
+#define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damageConVar, _weaponType ) \
 	IMPLEMENT_SERVERCLASS_ST( _className, DT_##_shortName ) \
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flFireRate = _fireRate; m_iDamage = _damage; m_iWeaponType = _weaponType; m_bSilenced = false; m_flAccuracyPenalty = 0.0f; }
+	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_flAccuracyPenalty = 0.0f; }
 
-#define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damage ) \
+#define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
 	IMPLEMENT_SERVERCLASS_ST( _className, DT_##_shortName ) \
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flMeleeDamage = _damage; }
+	_className::_className() { m_pDamage = &_damageConVar; }
 
 //-----------------------------------------------------------------------------
-// Melee — damage from skill.cfg: axe 35, baton 13, pipe 15, wrench 25, cleaver 50.
+// Melee
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_MELEE( CWeaponAxe,		weapon_melee_axe,		WeaponAxe,		35.0f )
-UH_IMPLEMENT_MELEE( CWeaponBaton,		weapon_melee_baton,		WeaponBaton,	13.0f )
-UH_IMPLEMENT_MELEE( CWeaponPipe,		weapon_melee_pipe,		WeaponPipe,		15.0f )
-UH_IMPLEMENT_MELEE( CWeaponWrench,		weapon_melee_wrench,	WeaponWrench,	25.0f )
-UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	50.0f )
+UH_IMPLEMENT_MELEE( CWeaponAxe,		weapon_melee_axe,		WeaponAxe,		sk_plr_dmg_axe )
+UH_IMPLEMENT_MELEE( CWeaponBaton,		weapon_melee_baton,		WeaponBaton,	sk_plr_dmg_baton )
+UH_IMPLEMENT_MELEE( CWeaponPipe,		weapon_melee_pipe,		WeaponPipe,		sk_plr_dmg_pipe )
+UH_IMPLEMENT_MELEE( CWeaponWrench,		weapon_melee_wrench,	WeaponWrench,	sk_plr_dmg_wrench )
+UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	sk_plr_dmg_cleaver )
 
 //-----------------------------------------------------------------------------
-// Pistols — semi-auto, shared fire routine (0.2 s). Damage from skill.cfg.
+// Pistols — semi-auto, shared fire routine (0.2 s).
 // Weapon type 1 = pistol (silencer-gated on m_bHavePistolSilencer).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, 10, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, 15, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, 20, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, 120, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, 20, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1 )
 
 //-----------------------------------------------------------------------------
-// SMGs — full auto, 0.075 s (exact, GetFireRate). Damage: mp5 12, mp5_eod 10, mp7 8.
+// SMGs — full auto, 0.075 s (exact, GetFireRate).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, 12, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, 10, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, 8, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, sk_plr_dmg_smg_mp5, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, sk_plr_dmg_smg_mp5_eod, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0 )
 
 //-----------------------------------------------------------------------------
-// Shotguns — pump-action. Damage: m3 12, m5 16, spas12 14, xm1014 12.
-// All four share one fire/pump routine (sub_1027E0A0 + sub_1027F4E0); the
-// pump cycle constant in the DLL is 0.8 s (double at 0x10487878).
+// Shotguns — pump-action. All four share one fire/pump routine (sub_1027E0A0 +
+// sub_1027F4E0); the pump cycle constant in the DLL is 0.8 s (0x10487878).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, 12, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, 16, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, 14, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, 12, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0 )
 
 //-----------------------------------------------------------------------------
-// Rifles — G36K is select-fire (0.1 s full-auto). Damage: g36k 20, sniper 80.
-// Weapon type 4 = rifle (silencer-gated on m_bHaveRifleSilencer).
-// The sniper is bolt-action: the original gates refire on the bolt sequence
-// duration (like the vanilla sniper, GetFireRate 1.0), so 1.0 s.
+// Rifles — G36K is select-fire (0.1 s full-auto). Weapon type 4 = rifle.
+// The sniper is bolt-action: refire is gated on the bolt sequence duration
+// (like the vanilla sniper), so 1.0 s.
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, 20, 4 )
-UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.0f, 80, 4 )
+UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, sk_plr_dmg_rifle_g36k, 4 )
+UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.0f, sk_plr_dmg_rifle_sniper, 4 )
 
 //-----------------------------------------------------------------------------
-// BFG — mgl 200, minigun 50. Minigun is 0.075 s (exact, GetFireRate); MGL is a
-// single-shot grenade launcher (custom fire path, ~1.0 s — TODO exact).
+// BFG — minigun is 0.075 s (exact, GetFireRate); MGL is a single-shot grenade
+// launcher (custom fire path, ~1.0 s — TODO exact).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, 200, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, 50, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, sk_plr_dmg_bfg_mgl, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, sk_plr_dmg_bfg_minigun, 0 )
 
 //-----------------------------------------------------------------------------
-// Purpose: Give every Underhell weapon (used by impulse 101). Each weapon is
-// given the standard way so the script-derived clip/ammo apply.
+// Purpose: The original impulse-101 loadout (decode sub_101EC700 case 101):
+// full ammo for every type, then the Underhell weapon set + crossbow + frag.
+// Cleaver and the BFG weapons are NOT part of the cheat. Matches the original
+// exactly; the vanilla base class's impulse 101 is not also called.
 //-----------------------------------------------------------------------------
-static const char *s_UHAllWeapons[] =
-{
-	"weapon_melee_axe",
-	"weapon_melee_baton",
-	"weapon_melee_pipe",
-	"weapon_melee_wrench",
-	"weapon_cleaver",
-	"weapon_pistol_glock",
-	"weapon_pistol_beretta",
-	"weapon_pistol_socom",
-	"weapon_pistol_python",
-	"weapon_pistol_dualberetta",
-	"weapon_smg_mp5",
-	"weapon_smg_mp5_eod",
-	"weapon_smg_mp7",
-	"weapon_shotgun_m3",
-	"weapon_shotgun_m5",
-	"weapon_shotgun_spas12",
-	"weapon_shotgun_xm1014",
-	"weapon_rifle_g36k",
-	"weapon_rifle_sniper",
-	"weapon_bfg_mgl",
-	"weapon_bfg_minigun",
-};
-
 void UH_GiveAllWeapons( CBasePlayer *pPlayer )
 {
 	if ( !pPlayer )
 		return;
 
-	for ( int i = 0; i < ARRAYSIZE( s_UHAllWeapons ); i++ )
+	pPlayer->GiveAmmo( 255, "Pistol" );
+	pPlayer->GiveAmmo( 255, "AR2" );
+	pPlayer->GiveAmmo( 5, "AR2AltFire" );
+	pPlayer->GiveAmmo( 255, "SMG1" );
+	pPlayer->GiveAmmo( 255, "Buckshot" );
+	pPlayer->GiveAmmo( 3, "smg1_grenade" );
+	pPlayer->GiveAmmo( 3, "rpg_round" );
+	pPlayer->GiveAmmo( 5, "grenade" );
+	pPlayer->GiveAmmo( 32, "357" );
+	pPlayer->GiveAmmo( 16, "XBowBolt" );
+	pPlayer->GiveAmmo( 5, "Hopwire" );
+
+	pPlayer->GiveNamedItem( "weapon_frag" );
+	pPlayer->GiveNamedItem( "weapon_melee_pipe" );
+	pPlayer->GiveNamedItem( "weapon_melee_axe" );
+	pPlayer->GiveNamedItem( "weapon_melee_wrench" );
+	pPlayer->GiveNamedItem( "weapon_melee_baton" );
+	pPlayer->GiveNamedItem( "weapon_crossbow" );
+	pPlayer->GiveNamedItem( "weapon_pistol_glock" );
+	pPlayer->GiveNamedItem( "weapon_pistol_socom" );
+	pPlayer->GiveNamedItem( "weapon_pistol_beretta" );
+	pPlayer->GiveNamedItem( "weapon_pistol_python" );
+	pPlayer->GiveNamedItem( "weapon_pistol_dualberetta" );
+	pPlayer->GiveNamedItem( "weapon_smg_mp5" );
+	pPlayer->GiveNamedItem( "weapon_smg_mp7" );
+	pPlayer->GiveNamedItem( "weapon_smg_mp5_eod" );
+	pPlayer->GiveNamedItem( "weapon_shotgun_spas12" );
+	pPlayer->GiveNamedItem( "weapon_shotgun_m3" );
+	pPlayer->GiveNamedItem( "weapon_shotgun_m5" );
+	pPlayer->GiveNamedItem( "weapon_shotgun_xm1014" );
+	pPlayer->GiveNamedItem( "weapon_rifle_g36k" );
+	pPlayer->GiveNamedItem( "weapon_rifle_sniper" );
+
+	if ( pPlayer->GetHealth() < 100 )
 	{
-		pPlayer->GiveNamedItem( s_UHAllWeapons[i] );
+		pPlayer->TakeHealth( 25, DMG_GENERIC );
 	}
 }

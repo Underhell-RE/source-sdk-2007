@@ -6851,9 +6851,20 @@ void CAI_BaseNPC::NPCInit ( void )
 	{	// Does this npc spawn with a weapon
 		if ( m_spawnEquipment != NULL_STRING && strcmp(STRING(m_spawnEquipment), "0"))
 		{
-			CBaseCombatWeapon *pWeapon = Weapon_Create( STRING(m_spawnEquipment) );
-			if ( pWeapon )
+			// Underhell: "additionalequipment" may be a comma-separated list of
+			// weapons. Give each one (equip is per-slot, so the NPC can carry
+			// several different weapons).
+			CUtlVector<char *> items;
+			V_SplitString( STRING(m_spawnEquipment), ",", items );
+			for ( int i = 0; i < items.Count(); i++ )
 			{
+				if ( !items[i] || !items[i][0] )
+					continue;
+
+				CBaseCombatWeapon *pWeapon = Weapon_Create( items[i] );
+				if ( !pWeapon )
+					continue;
+
 				// If I have a name, make my weapon match it with "_weapon" appended
 				if ( GetEntityName() != NULL_STRING )
 				{
@@ -10866,7 +10877,18 @@ void CAI_BaseNPC::Precache( void )
 
 	if ( m_spawnEquipment != NULL_STRING && strcmp(STRING(m_spawnEquipment), "0") )
 	{
-		UTIL_PrecacheOther( STRING(m_spawnEquipment) );
+		// Underhell: "additionalequipment" may be a comma-separated list of
+		// weapons (e.g. "weapon_smg_mp5,weapon_smg_mp5_eod,..."). Precache each.
+		const char *pszEquipment = STRING( m_spawnEquipment );
+		CUtlVector<char *> items;
+		V_SplitString( pszEquipment, ",", items );
+		for ( int i = 0; i < items.Count(); i++ )
+		{
+			if ( items[i] && items[i][0] )
+			{
+				UTIL_PrecacheOther( items[i] );
+			}
+		}
 	}
 
 	// Make sure schedules are loaded for this NPC type

@@ -1,4 +1,4 @@
-//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		Player for HL2.
 //
@@ -1812,10 +1812,10 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 
 	case 101:
 	{
-		// Give the full Underhell weapon set in addition to the vanilla HL2
-		// weapons that the base class hands out for impulse 101.
+		// Original impulse 101 (decode sub_101EC700 case 101): the Underhell
+		// weapon set + full ammo. This REPLACES the vanilla HL2 weapon set
+		// (the base class is not called), matching the original exactly.
 		UH_GiveAllWeapons( this );
-		BaseClass::CheatImpulseCommands( iImpulse );
 		break;
 	}
 
@@ -2727,14 +2727,10 @@ bool CHL2_Player::Weapon_CanUse( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 void CHL2_Player::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 {
-	// Underhell: one weapon per slot. If the incoming weapon's slot is already
-	// occupied by a different weapon, eject it before equipping the new one.
-	CBaseCombatWeapon *pSlotWeapon = Weapon_GetSlot( pWeapon->GetSlot() );
-	if ( pSlotWeapon && pSlotWeapon != pWeapon )
-	{
-		Weapon_DropSlot( pWeapon->GetSlot() );
-	}
-
+	// The original does NOT restrict weapons to one per slot â€” multiple weapons
+	// can share a slot (ordered by bucket_position), exactly like vanilla HL2.
+	// An earlier "one weapon per slot" override here was dropping everything
+	// given by impulse 101. Restore vanilla multi-weapon-per-slot behaviour.
 	if( GetActiveWeapon() == NULL )
 	{
 		m_HL2Local.m_bWeaponLowered = false;

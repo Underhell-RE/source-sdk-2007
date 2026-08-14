@@ -41,12 +41,12 @@ class CUHMeleeWeapon : public CBaseHLBludgeonWeapon
 
 public:
 	virtual void	PrimaryAttack( void );	// drains StaminaToDrain, then swings
-	virtual float	GetDamageForActivity( Activity hitActivity ) { return m_flMeleeDamage; }
-	virtual float	GetDamage( void ) { return m_flMeleeDamage; }
+	virtual float	GetDamageForActivity( Activity hitActivity ) { return m_pDamage->GetFloat(); }
+	virtual float	GetDamage( void ) { return m_pDamage->GetFloat(); }
 	virtual float	GetRange( void ) { return GetWpnData().m_flMeleeRange; }
 	virtual float	GetFireRate( void ) { return GetWpnData().m_flMeleeRoF; }
 
-	float			m_flMeleeDamage;
+	ConVar			*m_pDamage;				// sk_plr_dmg_<weapon> (skill.cfg)
 };
 
 //-----------------------------------------------------------------------------
@@ -61,7 +61,7 @@ class CUHGunWeapon : public CBaseHLCombatWeapon
 
 public:
 	virtual void	PrimaryAttack( void );
-	virtual float	GetDamage( void ) { return (float)m_iDamage; }
+	virtual float	GetDamage( void ) { return m_pDamage->GetFloat(); }
 	virtual float	GetFireRate( void ) { return m_flFireRate; }
 	virtual const Vector &GetBulletSpread( void );
 	virtual void	AddViewKick( void );
@@ -69,20 +69,13 @@ public:
 	// Underhell silencer. "silencer_toggle" gates pistols (type 1) and rifles
 	// (type 4) on the player carrying the matching silencer (m_bHavePistol/
 	// RifleSilencer); everything else toggles freely (decode sub_101E2F50).
+	// m_bSilenced + the silenced activities live on the shared base
+	// CBaseHLCombatWeapon (networked, so the client viewmodel animates too).
 	virtual int		GetWeaponType( void ) { return m_iWeaponType; }
-	bool			IsSilenced( void ) const { return m_bSilenced; }
-	void			SetSilenced( bool bSilenced ) { m_bSilenced = bSilenced; }
-
-	// Silenced viewmodel activities (the viewmodel model carries the
-	// ACT_VM_*_SILENCED sequences; SendWeaponAnim falls back to idle if a
-	// model lacks one).
-	virtual Activity GetPrimaryAttackActivity( void );
-	virtual Activity GetDrawActivity( void );
 
 	float			m_flFireRate;			// seconds between shots
-	int				m_iDamage;				// per-shot damage (skill.cfg sk_plr_dmg_*)
+	ConVar			*m_pDamage;				// sk_plr_dmg_<weapon> (skill.cfg)
 	int				m_iWeaponType;			// 1 = pistol, 4 = rifle, 0 = other (silencer gating)
-	bool			m_bSilenced;			// silencer fitted (server-only; sound switches)
 	float			m_flAccuracyPenalty;	// grows per shot, decays over time
 };
 
@@ -101,7 +94,7 @@ public:
 		_className(); \
 	};
 
-#define UH_DECLARE_MELEE( _className, _shortName, _damage ) \
+#define UH_DECLARE_MELEE( _className, _shortName ) \
 	class _className : public CUHMeleeWeapon \
 	{ \
 		DECLARE_CLASS( _className, CUHMeleeWeapon ); \
@@ -113,11 +106,11 @@ public:
 //-----------------------------------------------------------------------------
 // Melee
 //-----------------------------------------------------------------------------
-UH_DECLARE_MELEE( CWeaponAxe,		WeaponAxe,		40.0f )
-UH_DECLARE_MELEE( CWeaponBaton,		WeaponBaton,	30.0f )
-UH_DECLARE_MELEE( CWeaponPipe,		WeaponPipe,		35.0f )
-UH_DECLARE_MELEE( CWeaponWrench,	WeaponWrench,	35.0f )
-UH_DECLARE_MELEE( CWeaponCleaver,	WeaponCleaver,	40.0f )
+UH_DECLARE_MELEE( CWeaponAxe,		WeaponAxe )
+UH_DECLARE_MELEE( CWeaponBaton,		WeaponBaton )
+UH_DECLARE_MELEE( CWeaponPipe,		WeaponPipe )
+UH_DECLARE_MELEE( CWeaponWrench,	WeaponWrench )
+UH_DECLARE_MELEE( CWeaponCleaver,	WeaponCleaver )
 
 //-----------------------------------------------------------------------------
 // Pistols

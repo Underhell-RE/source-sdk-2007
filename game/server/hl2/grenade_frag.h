@@ -16,4 +16,8 @@ CBaseGrenade *Fraggrenade_Create( const Vector &position, const QAngle &angles, 
 bool	Fraggrenade_WasPunted( const CBaseEntity *pEntity );
 bool	Fraggrenade_WasCreatedByCombine( const CBaseEntity *pEntity );
 
+// Underhell: throw a frag grenade immediately (used by "Throw_Nade").
+class CBaseCombatWeapon;
+void	WeaponFrag_ThrowNow( CBaseCombatWeapon *pWeapon );
+
 #endif // GRENADE_FRAG_H

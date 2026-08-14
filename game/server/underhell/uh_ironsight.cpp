@@ -26,6 +26,7 @@
 #include "hl2_player.h"
 #include "baseviewmodel_shared.h"
 #include "uh_weapons.h"
+#include "grenade_frag.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -184,7 +185,7 @@ void CHL2_Player::UH_DisableIronsight( void )
 //   - rifles (GetWeaponType() == 4) require m_bHaveRifleSilencer,
 //   - everything else (SMG / shotgun / BFG) toggles freely.
 // TODO: the original also skips when the weapon is lowered/holstered
-// (weapon flags @1144/@1145) and plays the ATTACH/DETACH_SILENCER activity.
+// (weapon flags @1144/@1145).
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_ToggleSilencer( void )
 {
@@ -209,9 +210,8 @@ void CHL2_Player::UH_ToggleSilencer( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Toggle the laser sight. The original toggles m_bLaserToggleState
-// (a networked bool) and the client draws a beam + impact dot (laserbeam /
-// laserpointer / laserdot sprites). TODO: client-side beam rendering.
+// Purpose: Toggle the laser sight. Toggles m_bLaserToggleState (networked);
+// the client draws a beam + impact dot (see uh_laser.cpp) while it is set.
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_ToggleLaser( void )
 {
@@ -296,8 +296,9 @@ void CHL2_Player::UH_ThrowNade( void )
 	if ( m_bIronSighted )
 		UH_ToggleIronsight();
 
-	// Start the throw: pulls the grenade back; releasing +attack completes it.
-	pGrenade->PrimaryAttack();
+	// Throw immediately (the original switches to a grenade-armed left arm and
+	// throws via the fire path; here we throw straight away).
+	WeaponFrag_ThrowNow( pGrenade );
 }
 
 //-----------------------------------------------------------------------------
