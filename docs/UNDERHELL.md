@@ -616,6 +616,21 @@ C++ classes. Recovered from the original:
   instead of the Underhell value. `CUHGunWeapon::PrimaryAttack` now builds the
   shot itself with `m_iDamage = GetDamage()`.
 
+### Silencer + laser sight (stage 31)
+
+Decoded from `sub_101E2F50` (toggle) + `sub_101F11D0` (ClientCommand dispatch)
++ the player sendtable (`sub_101F2D30`).
+
+- **Silencer**: `m_bSilenced` on the gun, `m_bHavePistolSilencer` /
+  `m_bHaveRifleSilencer` (networked) on the player. `silencer_toggle` gates
+  pistols (`GetWeaponType() == 1`) and rifles (`== 4`) on owning the matching
+  silencer; other weapons toggle freely. `SetPistolSilencer` /
+  `SetRifleSilencer` inputs grant the silencer. The original's SoundData adds
+  `single_shot_silenced` at index 2 (`SINGLE_SILENCED`), used when silenced.
+- **Laser sight**: `m_bLaserToggleState` (networked) + `UH_ToggleLaser`.
+  The client draws a beam + dot from `laserbeam` / `laserpointer` / `laserdot`
+  sprites (TODO).
+
 ### TODO (ironsight / weapons)
 
 - Free-aim (over-the-shoulder) camera still TODO — first-person only, and the
@@ -624,3 +639,28 @@ C++ classes. Recovered from the original:
   the port fires a single shot per trigger pull; the original fires 12 pellets.
 - Exact fire rate for SMG / shotgun / sniper / BFG (recover from each weapon's
   fire function in serveror.dll).
+- Silenced viewmodel activity (`ACT_VM_*_SILENCED`) + ATTACH/DETACH_SILENCER
+  animations — the port only switches the sound.
+- Client laser beam/dot rendering.
+
+## Remaining original parameters (stage 32 — inventory of what's left)
+
+Full list of original `CHL2_Player` state + commands not yet ported (from the
+sendtable `sub_101F2D30` / ClientCommand `sub_101F11D0`):
+
+| Feature | State | Command / input | Status |
+|---|---|---|---|
+| Night vision | `m_bHaveNightVision` @2138, `m_bNightVisionOn` @3369, `m_bNightVisionEnabled` @2140 | `NightVision_Toggle`, `SetNightVision` | TODO |
+| Gas mask | `m_bHaveGasMask` @2139, `m_bGasMaskOn` @3370, `m_bGasMaskEnabled` @2141 | `GasMask_Toggle`, `SetGasMask` | TODO |
+| Shoulder flashlight | `m_bShoulderFlashlight` @5040 | — | networked, viewmodel TODO |
+| Flashlight viewmodel | `m_bFlashlightHolstered` | `v_flashlight_pg.mdl` | TODO |
+| Fake flare | `m_bHoldingFlare` @2122, `m_bFlareHitting` @2124, `m_bFlareMarker` @2125 | `v_flare_pg.mdl` | TODO |
+| Kick | `m_bKickMarker` @4185 | `uh_jake_kick`, `v_kick_jake_*.mdl` | TODO |
+| Weapon drop | `m_bDisableWeaponDrop` @2136 | `DropWeapon`, `InputDisableDropWeapon` / `InputEnableDropWeapon` | TODO |
+| Grenade throw | — | `Throw_Nade` | TODO |
+| Fire-mode select | `m_iFireMode` (script `FireMode`) | `firemode_toggle` | TODO (G36K select-fire) |
+| Left arm | `m_bLeftArmDeployed` @2121 | — | TODO |
+| Hermit cards | `m_iUHHermitCardsCount` @5048, quest counters | — | partial (`uh_give_hermit_card` cheat) |
+
+Also still TODO from earlier stages: gas-mask check in food `Use()`, melee
+swing stamina gate, full bleeding→damage scaling, exact held-item handle @2164.
