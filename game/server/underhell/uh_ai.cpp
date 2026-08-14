@@ -27,6 +27,7 @@
 #include "physics_prop_ragdoll.h"
 #include "physics_shared.h"
 #include "decals.h"
+#include "particle_parse.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -235,7 +236,12 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 	else if ( V_stristr( pszModel, "combine_soldier" ) )
 		PrecacheModel( "models/items/helmet_visor.mdl" );
 
+	// Dismemberment blood sprays + sounds (1:1 with sub_10021D80 precache).
+	PrecacheParticleSystem( "blood_zombie_split_spray" );
+	PrecacheParticleSystem( "blood_advisor_puncture_withdraw" );
 	PrecacheScriptSound( "Player.Helmet" );
+	PrecacheScriptSound( "Player.Splat" );
+	PrecacheScriptSound( "Player.Headshot" );
 }
 
 //-----------------------------------------------------------------------------
@@ -244,7 +250,7 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 // limb flops naturally; a plain prop_physics with these models renders as an
 // invisible/static body.
 //-----------------------------------------------------------------------------
-static void UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, const Vector &vecDir, CBaseEntity *pOwner )
+static CBaseEntity *UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, const Vector &vecDir, CBaseEntity *pOwner )
 {
 	// The gib models are spawned dynamically (after the map precache phase),
 	// so force-precache them here. Without this, SetModel() fires
@@ -253,7 +259,7 @@ static void UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, co
 
 	CBaseEntity *pProp = CreateEntityByName( "prop_ragdoll" );
 	if ( !pProp )
-		return;
+		return NULL;
 
 	pProp->SetModel( pszModel );
 	pProp->SetAbsOrigin( vecPosition );
@@ -271,6 +277,65 @@ static void UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, co
 	}
 
 	pProp->SetOwnerEntity( pOwner );
+	return pProp;
+}
+
+//-----------------------------------------------------------------------------
+// Blood sprays for a severed limb — 1:1 with sub_10031BF0:
+//   arms: "blood_zombie_split_spray" on the body ("UpperArm_L/R") + on the
+//         severed gib ("ForeArm_L/R")
+//   legs: "blood_advisor_puncture_withdraw" on the severed gib ("Calf_L/R")
+//   head: "Blood_Trace" decal (handled separately via the trace)
+//-----------------------------------------------------------------------------
+static void UH_DispatchLimbBlood( CBaseAnimating *pBody, int iHitGroup, CBaseAnimating *pGib, const Vector &vecPosition, const Vector &vecDir )
+{
+	const char *pszParticle = NULL;
+	const char *pszBodyAttach = NULL;
+	const char *pszGibAttach = NULL;
+
+	switch ( iHitGroup )
+	{
+	case HITGROUP_LEFTARM:
+		pszParticle = "blood_zombie_split_spray";
+		pszBodyAttach = "UpperArm_L";
+		pszGibAttach = "ForeArm_L";
+		break;
+	case HITGROUP_RIGHTARM:
+		pszParticle = "blood_zombie_split_spray";
+		pszBodyAttach = "UpperArm_R";
+		pszGibAttach = "ForeArm_R";
+		break;
+	case HITGROUP_LEFTLEG:
+		pszParticle = "blood_advisor_puncture_withdraw";
+		pszGibAttach = "Calf_L";
+		break;
+	case HITGROUP_RIGHTLEG:
+		pszParticle = "blood_advisor_puncture_withdraw";
+		pszGibAttach = "Calf_R";
+		break;
+	case HITGROUP_HEAD:
+		// Decal, not a particle: trace backwards from the impact and lay the
+		// "Blood_Trace" (headshot "brainy" blood) decal.
+		{
+			trace_t tr;
+			UTIL_TraceLine( vecPosition, vecPosition - vecDir * 16.0f, MASK_SHOT, pBody, COLLISION_GROUP_NONE, &tr );
+			if ( tr.fraction < 1.0f )
+				UTIL_DecalTrace( &tr, "Blood_Trace" );
+		}
+		return;
+	}
+
+	if ( !pszParticle )
+		return;
+
+	if ( pBody && pszBodyAttach )
+	{
+		DispatchParticleEffect( pszParticle, PATTACH_POINT_FOLLOW, pBody, pszBodyAttach );
+	}
+	if ( pGib && pszGibAttach )
+	{
+		DispatchParticleEffect( pszParticle, PATTACH_POINT_FOLLOW, pGib, pszGibAttach );
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -350,16 +415,19 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 	case HITGROUP_RIGHTLEG:	pszLimb = "rightleg"; break;
 	}
 
+	CBaseEntity *pGib = NULL;
 	if ( pszLimb )
 	{
 		const char *pszModel = UH_GibModelFor( STRING( GetModelName() ), pszLimb );
 		if ( pszModel )
 		{
-			UH_SpawnGibProp( pszModel, vecPosition, vecDir, this );
+			pGib = UH_SpawnGibProp( pszModel, vecPosition, vecDir, this );
 		}
 	}
 
-	// Blood decal / particles at the wound.
+	// Blood spray (1:1 with sub_10031BF0) + a blood decal at the wound.
+	UH_DispatchLimbBlood( this, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, vecPosition, vecDir );
+
 	if ( BloodColor() != DONT_BLEED )
 	{
 		SpawnBlood( vecPosition, vecDir, BloodColor(), 24.0f );
@@ -782,15 +850,18 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 	pRagdoll->UH_SeverLimb( iPhysicsBone );
 
 	// Spawn a severed-limb gib at the hit position.
+	CBaseEntity *pGib = NULL;
 	if ( pszLimb )
 	{
 		const char *pszModel = UH_GibModelFor( STRING( pRagdoll->GetModelName() ), pszLimb );
 		if ( pszModel )
 		{
-			UH_SpawnGibProp( pszModel, pos, dir, pRagdoll );
+			pGib = UH_SpawnGibProp( pszModel, pos, dir, pRagdoll );
 		}
 	}
 
-	// Blood at the wound.
+	// Blood spray (1:1 with sub_10031BF0) + a blood decal at the wound.
+	UH_DispatchLimbBlood( pRagdoll, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, pos, dir );
+
 	SpawnBlood( pos, dir, BLOOD_COLOR_RED, 24.0f );
 }
