@@ -219,18 +219,19 @@ void CHL2_Player::UH_ToggleLaser( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Give the pistol / rifle silencer (entity inputs "SetPistolSilencer" /
-// "SetRifleSilencer", original datamap sub_101F2D30). Once owned, the matching
-// weapon's "silencer_toggle" is allowed.
+// Purpose: Give / take the pistol or rifle silencer (entity inputs
+// "SetPistolSilencer" / "SetRifleSilencer"). The original reads a FIELD_BOOLEAN
+// parameter (sub_101E36F0 / sub_101E3720), so "1" grants the silencer and "0"
+// removes it — see the Entity List tutorial ("setpistolsilencer 1" / "... 0").
 //-----------------------------------------------------------------------------
 void CHL2_Player::InputSetPistolSilencer( inputdata_t &inputdata )
 {
-	m_bHavePistolSilencer = true;
+	m_bHavePistolSilencer = inputdata.value.Bool();
 }
 
 void CHL2_Player::InputSetRifleSilencer( inputdata_t &inputdata )
 {
-	m_bHaveRifleSilencer = true;
+	m_bHaveRifleSilencer = inputdata.value.Bool();
 }
 
 //-----------------------------------------------------------------------------

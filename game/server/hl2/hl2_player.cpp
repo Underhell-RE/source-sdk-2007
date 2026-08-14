@@ -389,8 +389,8 @@ BEGIN_DATADESC( CHL2_Player )
 
 	// Underhell: give/take the pistol & rifle silencer (original datamap inputs
 	// "SetPistolSilencer" / "SetRifleSilencer", decode sub_101F2D30).
-	DEFINE_INPUTFUNC( FIELD_VOID, "SetPistolSilencer", InputSetPistolSilencer ),
-	DEFINE_INPUTFUNC( FIELD_VOID, "SetRifleSilencer", InputSetRifleSilencer ),
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetPistolSilencer", InputSetPistolSilencer ),
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetRifleSilencer", InputSetRifleSilencer ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "DisableDropWeapon", InputDisableDropWeapon ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "EnableDropWeapon", InputEnableDropWeapon ),
 

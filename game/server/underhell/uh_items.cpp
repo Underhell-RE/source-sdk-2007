@@ -615,9 +615,9 @@ UH_DEFINE_ITEM( CItemGasmaskGuard,		item_gasmask_guard,		"models/error.mdl" )	//
 LINK_ENTITY_TO_CLASS( item_random, CItemRandom );
 
 // Skill multipliers for the "nothing" chance (original convar names).
-static ConVar sk_itemrandom1( "sk_itemrandom1", "1", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Easy" );
-static ConVar sk_itemrandom2( "sk_itemrandom2", "1", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Normal" );
-static ConVar sk_itemrandom3( "sk_itemrandom3", "1", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Hard" );
+static ConVar sk_itemrandom1( "sk_itemrandom1", "0.75", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Easy" );
+static ConVar sk_itemrandom2( "sk_itemrandom2", "1.00", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Normal" );
+static ConVar sk_itemrandom3( "sk_itemrandom3", "1.50", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Hard" );
 
 static float UH_GetItemRandomSkillMultiplier( void )
 {
@@ -870,9 +870,15 @@ void CItemRandom::SpawnRandomItem( void )
 	if ( !pItem )
 		return;
 
-	// Original copies the spawnflags onto the spawned item and carries
-	// EF_NOSHADOW ("disableshadows") over.
+	// Original copies the spawnflags + targetname onto the spawned item
+	// (the "Item_Random for Random Loot" tutorial: "The name of the Item_Random
+	// is passed to the Item it will create") and carries EF_NOSHADOW
+	// ("disableshadows") over.
 	pItem->AddSpawnFlags( m_spawnflags );
+	if ( GetEntityName() != NULL_STRING )
+	{
+		pItem->SetName( GetEntityName() );
+	}
 	if ( m_bDisableShadows )
 	{
 		pItem->AddEffects( EF_NOSHADOW );

@@ -46,6 +46,11 @@ public:
 	virtual float	GetRange( void ) { return GetWpnData().m_flMeleeRange; }
 	virtual float	GetFireRate( void ) { return GetWpnData().m_flMeleeRoF; }
 
+	// NPC melee path (Swing() is player-only; the AE event routes here, like
+	// the crowbar's Operator_HandleAnimEvent / HandleAnimEventMeleeHit).
+	virtual void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
+	void			HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
+
 	ConVar			*m_pDamage;				// sk_plr_dmg_<weapon> (skill.cfg)
 };
 
@@ -66,6 +71,15 @@ public:
 	virtual const Vector &GetBulletSpread( void );
 	virtual void	AddViewKick( void );
 
+	// NPCs can fire this weapon as a ranged attack (the AI checks this bit in
+	// GatherConditions before setting COND_CAN_RANGE_ATTACK1). Without it, a
+	// combine soldier holding the gun never attempts to shoot.
+	virtual int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
+
+	// NPC fire path: the AE_NPC_WEAPON_FIRE anim event routes here (via
+	// Operator_HandleAnimEvent) instead of PrimaryAttack, which is player-only.
+	virtual void	Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary );
+
 	// Underhell silencer. "silencer_toggle" gates pistols (type 1) and rifles
 	// (type 4) on the player carrying the matching silencer (m_bHavePistol/
 	// RifleSilencer); everything else toggles freely (decode sub_101E2F50).
@@ -83,12 +97,15 @@ public:
 // Declares one concrete weapon. The weapon script (scripts/weapon_<classname>
 // .txt) supplies viewmodel, worldmodel, bucket, clip size and ammo. The short
 // name (_shortName) is the C++ identifier used for the send/recv table, and it
-// must match the client stub's class name in c_uh_weapons.cpp.
+// must match the client stub's class name in c_uh_weapons.cpp. _npcActivity is
+// the NPC ranged-attack activity (ACT_RANGE_ATTACK_*) the acttable maps
+// ACT_RANGE_ATTACK1 to, chosen from the weapon's anim_prefix.
 //-----------------------------------------------------------------------------
-#define UH_DECLARE_WEAPON( _className, _shortName ) \
+#define UH_DECLARE_WEAPON( _className, _shortName, _npcActivity ) \
 	class _className : public CUHGunWeapon \
 	{ \
 		DECLARE_CLASS( _className, CUHGunWeapon ); \
+		DECLARE_ACTTABLE(); \
 	public: \
 		DECLARE_SERVERCLASS(); \
 		_className(); \
@@ -98,6 +115,7 @@ public:
 	class _className : public CUHMeleeWeapon \
 	{ \
 		DECLARE_CLASS( _className, CUHMeleeWeapon ); \
+		DECLARE_ACTTABLE(); \
 	public: \
 		DECLARE_SERVERCLASS(); \
 		_className(); \
@@ -113,40 +131,41 @@ UH_DECLARE_MELEE( CWeaponWrench,	WeaponWrench )
 UH_DECLARE_MELEE( CWeaponCleaver,	WeaponCleaver )
 
 //-----------------------------------------------------------------------------
-// Pistols
+// Pistols (anim_prefix "pistol"; python uses "python" but the pistol attack
+// activity is the closest NPC animation)
 //-----------------------------------------------------------------------------
-UH_DECLARE_WEAPON( CWeaponPistolGlock,		WeaponPistolGlock )
-UH_DECLARE_WEAPON( CWeaponPistolBeretta,	WeaponPistolBeretta )
-UH_DECLARE_WEAPON( CWeaponPistolSocom,		WeaponPistolSocom )
-UH_DECLARE_WEAPON( CWeaponPython,			WeaponPython )
-UH_DECLARE_WEAPON( CWeaponPistolDualies,	WeaponPistolDualies )
+UH_DECLARE_WEAPON( CWeaponPistolGlock,		WeaponPistolGlock,		ACT_RANGE_ATTACK_PISTOL )
+UH_DECLARE_WEAPON( CWeaponPistolBeretta,	WeaponPistolBeretta,	ACT_RANGE_ATTACK_PISTOL )
+UH_DECLARE_WEAPON( CWeaponPistolSocom,		WeaponPistolSocom,		ACT_RANGE_ATTACK_PISTOL )
+UH_DECLARE_WEAPON( CWeaponPython,			WeaponPython,			ACT_RANGE_ATTACK_PISTOL )
+UH_DECLARE_WEAPON( CWeaponPistolDualies,	WeaponPistolDualies,	ACT_RANGE_ATTACK_PISTOL )
 
 //-----------------------------------------------------------------------------
-// SMGs
+// SMGs (anim_prefix "smg2")
 //-----------------------------------------------------------------------------
-UH_DECLARE_WEAPON( CWeaponSMGMP5,		WeaponSMGMP5 )
-UH_DECLARE_WEAPON( CWeaponSMGMP5EOD,	WeaponSMGMP5EOD )
-UH_DECLARE_WEAPON( CWeaponSMGMP7,		WeaponSMGMP7 )
+UH_DECLARE_WEAPON( CWeaponSMGMP5,		WeaponSMGMP5,		ACT_RANGE_ATTACK_SMG2 )
+UH_DECLARE_WEAPON( CWeaponSMGMP5EOD,	WeaponSMGMP5EOD,	ACT_RANGE_ATTACK_SMG2 )
+UH_DECLARE_WEAPON( CWeaponSMGMP7,		WeaponSMGMP7,		ACT_RANGE_ATTACK_SMG2 )
 
 //-----------------------------------------------------------------------------
-// Shotguns
+// Shotguns (anim_prefix "shotgun")
 //-----------------------------------------------------------------------------
-UH_DECLARE_WEAPON( CWeaponShotgunM3,		WeaponShotgunM3 )
-UH_DECLARE_WEAPON( CWeaponShotgunM5,		WeaponShotgunM5 )
-UH_DECLARE_WEAPON( CWeaponShotgunSpas12,	WeaponShotgunSpas12 )
-UH_DECLARE_WEAPON( CWeaponShotgunXM1014,	WeaponShotgunXM1014 )
+UH_DECLARE_WEAPON( CWeaponShotgunM3,		WeaponShotgunM3,		ACT_RANGE_ATTACK_SHOTGUN )
+UH_DECLARE_WEAPON( CWeaponShotgunM5,		WeaponShotgunM5,		ACT_RANGE_ATTACK_SHOTGUN )
+UH_DECLARE_WEAPON( CWeaponShotgunSpas12,	WeaponShotgunSpas12,	ACT_RANGE_ATTACK_SHOTGUN )
+UH_DECLARE_WEAPON( CWeaponShotgunXM1014,	WeaponShotgunXM1014,	ACT_RANGE_ATTACK_SHOTGUN )
 
 //-----------------------------------------------------------------------------
-// Rifles
+// Rifles (anim_prefix "ar2")
 //-----------------------------------------------------------------------------
-UH_DECLARE_WEAPON( CWeaponG36K,		WeaponG36K )
-UH_DECLARE_WEAPON( CWeaponSniper,		WeaponSniper )
+UH_DECLARE_WEAPON( CWeaponG36K,		WeaponG36K,		ACT_RANGE_ATTACK_AR2 )
+UH_DECLARE_WEAPON( CWeaponSniper,	WeaponSniper,	ACT_RANGE_ATTACK_AR2 )
 
 //-----------------------------------------------------------------------------
-// BFG
+// BFG (mgl = shotgun prefix; minigun = smg2 prefix)
 //-----------------------------------------------------------------------------
-UH_DECLARE_WEAPON( CWeaponBfgMgl,		WeaponBfgMgl )
-UH_DECLARE_WEAPON( CWeaponBfgMinigun,	WeaponBfgMinigun )
+UH_DECLARE_WEAPON( CWeaponBfgMgl,		WeaponBfgMgl,		ACT_RANGE_ATTACK_SHOTGUN )
+UH_DECLARE_WEAPON( CWeaponBfgMinigun,	WeaponBfgMinigun,	ACT_RANGE_ATTACK_SMG2 )
 
 // Helper used by the "give all weapons" cheat (impulse 101).
 void UH_GiveAllWeapons( CBasePlayer *pPlayer );

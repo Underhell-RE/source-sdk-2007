@@ -15,6 +15,7 @@
 #include "ammodef.h"
 #include "in_buttons.h"
 #include "soundent.h"
+#include "ai_basenpc.h"
 #include "hl2_player.h"
 #include "uh_weapons.h"
 
@@ -35,6 +36,64 @@ void CUHMeleeWeapon::PrimaryAttack( void )
 	}
 
 	BaseClass::PrimaryAttack();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: NPC melee attack — Swing() is player-only, so the NPC's melee anim
+// event routes here. Mirrors the crowbar's HandleAnimEventMeleeHit but uses
+// the per-weapon sk_plr_dmg_<weapon> damage.
+//-----------------------------------------------------------------------------
+void CUHMeleeWeapon::HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
+{
+	Vector vecDirection;
+	AngleVectors( GetAbsAngles(), &vecDirection );
+
+	CBaseEntity *pEnemy = pOperator->MyNPCPointer() ? pOperator->MyNPCPointer()->GetEnemy() : NULL;
+	if ( pEnemy )
+	{
+		Vector vecDelta;
+		VectorSubtract( pEnemy->WorldSpaceCenter(), pOperator->Weapon_ShootPosition(), vecDelta );
+		VectorNormalize( vecDelta );
+
+		Vector2D vecDelta2D = vecDelta.AsVector2D();
+		Vector2DNormalize( vecDelta2D );
+		if ( DotProduct2D( vecDelta2D, vecDirection.AsVector2D() ) > 0.8f )
+		{
+			vecDirection = vecDelta;
+		}
+	}
+
+	Vector vecEnd;
+	VectorMA( pOperator->Weapon_ShootPosition(), 50, vecDirection, vecEnd );
+	CBaseEntity *pHurt = pOperator->CheckTraceHullAttack( pOperator->Weapon_ShootPosition(), vecEnd,
+		Vector(-16,-16,-16), Vector(36,36,36), GetDamage(), DMG_CLUB, 0.75 );
+
+	if ( pHurt )
+	{
+		WeaponSound( MELEE_HIT );
+
+		trace_t traceHit;
+		UTIL_TraceLine( pOperator->Weapon_ShootPosition(), pHurt->GetAbsOrigin(), MASK_SHOT_HULL, pOperator, COLLISION_GROUP_NONE, &traceHit );
+		ImpactEffect( traceHit );
+	}
+	else
+	{
+		WeaponSound( MELEE_MISS );
+	}
+}
+
+void CUHMeleeWeapon::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
+{
+	switch ( pEvent->event )
+	{
+	case EVENT_WEAPON_MELEE_HIT:
+		HandleAnimEventMeleeHit( pEvent, pOperator );
+		break;
+
+	default:
+		BaseClass::Operator_HandleAnimEvent( pEvent, pOperator );
+		break;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -106,6 +165,37 @@ void CUHGunWeapon::PrimaryAttack( void )
 	// multipliers, not the penalty curve).
 	m_flAccuracyPenalty += 0.1f;
 	m_flAccuracyPenalty = clamp( m_flAccuracyPenalty, 0.0f, 1.0f );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: NPC fire path. PrimaryAttack() is player-only (it pulls the eye
+// origin / view vectors off CBasePlayer); NPCs fire through the AE_NPC_WEAPON_FIRE
+// anim event -> Operator_HandleAnimEvent -> here. Mirrors the vanilla machine
+// gun's Operator_ForceNPCFire (weapon_ar2.cpp), but uses the per-weapon
+// sk_plr_dmg_<weapon> convar for damage.
+//-----------------------------------------------------------------------------
+void CUHGunWeapon::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary )
+{
+	CAI_BaseNPC *pNPC = pOperator->MyNPCPointer();
+	if ( !pNPC )
+		return;
+
+	Vector vecShootOrigin, vecShootDir;
+	QAngle angShootDir;
+	GetAttachment( LookupAttachment( "muzzle" ), vecShootOrigin, angShootDir );
+	AngleVectors( angShootDir, &vecShootDir );
+
+	WeaponSound( SINGLE_NPC );
+
+	CSoundEnt::InsertSound( SOUND_COMBAT | SOUND_CONTEXT_GUNFIRE, pOperator->GetAbsOrigin(),
+		SOUNDENT_VOLUME_MACHINEGUN, 0.2, pOperator, SOUNDENT_CHANNEL_WEAPON, pOperator->GetEnemy() );
+
+	// Explicit per-weapon damage (the vanilla ammo def would give the generic
+	// sk_plr_dmg_<ammotype> value, not the Underhell per-weapon value).
+	pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, VECTOR_CONE_PRECALCULATED,
+		MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, (int)GetDamage(), NULL, false );
+
+	m_iClip1 = m_iClip1 - 1;
 }
 
 //-----------------------------------------------------------------------------
@@ -225,7 +315,12 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 // Shotgun / sniper / BFG MGL use custom pump/delay fire paths (not GetFireRate);
 // their values below are close estimates — TODO: recover the exact delay.
 //-----------------------------------------------------------------------------
-#define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damageConVar, _weaponType ) \
+#define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damageConVar, _weaponType, _npcActivity ) \
+	acttable_t _className::m_acttable[] = \
+	{ \
+		{ ACT_RANGE_ATTACK1, _npcActivity, true }, \
+	}; \
+	IMPLEMENT_ACTTABLE( _className ); \
 	IMPLEMENT_SERVERCLASS_ST( _className, DT_##_shortName ) \
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
@@ -233,6 +328,11 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_flAccuracyPenalty = 0.0f; }
 
 #define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
+	acttable_t _className::m_acttable[] = \
+	{ \
+		{ ACT_MELEE_ATTACK1, ACT_MELEE_ATTACK_SWING, true }, \
+	}; \
+	IMPLEMENT_ACTTABLE( _className ); \
 	IMPLEMENT_SERVERCLASS_ST( _className, DT_##_shortName ) \
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
@@ -252,42 +352,42 @@ UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	sk_plr_dmg
 // Pistols — semi-auto, shared fire routine (0.2 s).
 // Weapon type 1 = pistol (silencer-gated on m_bHavePistolSilencer).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1, ACT_RANGE_ATTACK_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1, ACT_RANGE_ATTACK_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1, ACT_RANGE_ATTACK_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1, ACT_RANGE_ATTACK_PISTOL )
+UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1, ACT_RANGE_ATTACK_PISTOL )
 
 //-----------------------------------------------------------------------------
 // SMGs — full auto, 0.075 s (exact, GetFireRate).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, sk_plr_dmg_smg_mp5, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, sk_plr_dmg_smg_mp5_eod, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, sk_plr_dmg_smg_mp5, 0, ACT_RANGE_ATTACK_SMG2 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, sk_plr_dmg_smg_mp5_eod, 0, ACT_RANGE_ATTACK_SMG2 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0, ACT_RANGE_ATTACK_SMG2 )
 
 //-----------------------------------------------------------------------------
 // Shotguns — pump-action. All four share one fire/pump routine (sub_1027E0A0 +
 // sub_1027F4E0); the pump cycle constant in the DLL is 0.8 s (0x10487878).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0, ACT_RANGE_ATTACK_SHOTGUN )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0, ACT_RANGE_ATTACK_SHOTGUN )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0, ACT_RANGE_ATTACK_SHOTGUN )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0, ACT_RANGE_ATTACK_SHOTGUN )
 
 //-----------------------------------------------------------------------------
 // Rifles — G36K is select-fire (0.1 s full-auto). Weapon type 4 = rifle.
 // The sniper is bolt-action: refire is gated on the bolt sequence duration
 // (like the vanilla sniper), so 1.0 s.
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, sk_plr_dmg_rifle_g36k, 4 )
-UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.0f, sk_plr_dmg_rifle_sniper, 4 )
+UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, sk_plr_dmg_rifle_g36k, 4, ACT_RANGE_ATTACK_AR2 )
+UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.0f, sk_plr_dmg_rifle_sniper, 4, ACT_RANGE_ATTACK_AR2 )
 
 //-----------------------------------------------------------------------------
 // BFG — minigun is 0.075 s (exact, GetFireRate); MGL is a single-shot grenade
 // launcher (custom fire path, ~1.0 s — TODO exact).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, sk_plr_dmg_bfg_mgl, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, sk_plr_dmg_bfg_minigun, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, sk_plr_dmg_bfg_mgl, 0, ACT_RANGE_ATTACK_SHOTGUN )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, sk_plr_dmg_bfg_minigun, 0, ACT_RANGE_ATTACK_SMG2 )
 
 //-----------------------------------------------------------------------------
 // Purpose: The original impulse-101 loadout (decode sub_101EC700 case 101):
