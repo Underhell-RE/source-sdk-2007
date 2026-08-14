@@ -49,8 +49,10 @@ public:
 };
 
 //-----------------------------------------------------------------------------
-// Shared gun base: fires a single bullet through the engine's
-// CBaseCombatWeapon::PrimaryAttack path (spread from GetBulletSpread).
+// Shared gun base: fires bullets through the engine's
+// CBaseCombatWeapon::PrimaryAttack path. Recoil (PunchPitch/PunchYaw) and
+// spread (CrouchAccuracyMult/RunAccuracyMult/ExpOffset accuracy) are read from
+// the weapon script via GetWpnData().
 //-----------------------------------------------------------------------------
 class CUHGunWeapon : public CBaseHLCombatWeapon
 {
@@ -58,6 +60,12 @@ class CUHGunWeapon : public CBaseHLCombatWeapon
 
 public:
 	virtual void	PrimaryAttack( void );
+	virtual float	GetFireRate( void ) { return m_flFireRate; }
+	virtual const Vector &GetBulletSpread( void );
+	virtual void	AddViewKick( void );
+
+	float			m_flFireRate;			// seconds between shots (TODO: per-weapon exact)
+	float			m_flAccuracyPenalty;	// grows per shot, decays over time
 };
 
 //-----------------------------------------------------------------------------

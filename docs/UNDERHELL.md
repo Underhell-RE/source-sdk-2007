@@ -512,3 +512,44 @@ attack viewmodels (distinct from weapons).
 `UH_Weapon_Special` also carries `"FireMode"` (only the G36K sets it, value 1
 = full auto; matches FIREMODE_FULLAUTO in basehlcombatweapon.h). Parsed as
 `FileWeaponInfo_t::m_iFireMode`.
+
+## Ironsight (stage 27)
+
+Port of the VDC "Adding Ironsights" system (jorg40/Cin) that Underhell uses:
+
+- **Shared viewmodel** (`baseviewmodel_shared.h/.cpp`): client-only
+  `m_bExpSighted` + `m_expFactor`. `UH_CalcExpWpnOffsets` applies the active
+  weapon's `ExpOffset` (position in eye-local space + orientation), then
+  `CalcViewModelView` interpolates the viewmodel toward the eye over ~0.1 s.
+- **Server** (`uh_ironsight.cpp`): `ironsight_toggle` client command →
+  `CHL2_Player::UH_ToggleIronsight()` (decode sub_101ECF40): 0.1 s debounce,
+  drop sprint, toggle networked `m_bIronSighted`, FOV zoom
+  (`defaultFOV - uh_ironsight_zoom_focus`, default 40), sounds
+  `HL2Player.Ironsighton/Ironsightoff`, and `m_fIronsightedTime`.
+- **Client** (`uh_ironsight.cpp`): `ironsight_toggle` CON_COMMAND flips the
+  local viewmodel `m_bExpSighted` and forwards the command to the server.
+
+`m_bIronSighted` / `m_fIronsightedTime` are networked (accuracy + FOV follow
+the authoritative server state).
+
+### Weapon fire tuning (stage 28)
+
+`CUHGunWeapon` now reads the parsed weapon-script stats in the fire path:
+
+- **Fire rate** (`GetFireRate`): the Underhell scripts carry no cycle-time key,
+  so each class gets a sensible default (pistols ~0.15 s, SMGs ~0.08 s,
+  shotguns ~0.9 s, rifles ~0.1 s, sniper ~1.2 s, BFG minigun ~0.07 s). TODO:
+  recover the exact per-class rates.
+- **Recoil** (`AddViewKick`): `PunchPitch`/`PunchYaw` ranges, scaled by
+  `CrouchRecoilMult` while ducked.
+- **Spread** (`GetBulletSpread`): a base cone lerped by an accumulated spam
+  penalty, scaled by `CrouchAccuracyMult` (duck), `RunAccuracyMult` (moving)
+  and the `ExpOffset` accuracy while ironsighted (`m_bIronSighted`).
+- **Ironsight desync**: switching weapons while sighted now un-sights
+  (`Weapon_Switch` calls `UH_ToggleIronsight`).
+
+### TODO (ironsight / weapons)
+
+- Free-aim (over-the-shoulder) camera still TODO — first-person only, and the
+  original gates it behind the one third-person location.
+- Exact per-weapon fire rate + damage values (currently hardcoded heuristics).
