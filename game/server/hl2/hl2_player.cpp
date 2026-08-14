@@ -369,6 +369,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flTargetFindTime, FIELD_TIME ),
 
 	DEFINE_FIELD( m_flAdmireGlovesAnimTime, FIELD_TIME ),
+	DEFINE_FIELD( m_iszKickViewModel, FIELD_STRING ),
 	DEFINE_FIELD( m_flNextFlashlightCheckTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flFlashlightPowerDrainScale, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bFlashlightDisabled, FIELD_BOOLEAN ),
@@ -393,6 +394,12 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetRifleSilencer", InputSetRifleSilencer ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "DisableDropWeapon", InputDisableDropWeapon ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "EnableDropWeapon", InputEnableDropWeapon ),
+
+	// Underhell player model / skin / viewmodel skin inputs (decode sub_101F2D30).
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetPlayerModel", InputSetPlayerModel ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetPlayerSkin", InputSetPlayerSkin ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "ViewModelSkin", InputViewModelSkin ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetPlayerKickModel", InputSetPlayerKickModel ),
 
 	DEFINE_SOUNDPATCH( m_sndLeeches ),
 	DEFINE_SOUNDPATCH( m_sndWaterSplashes ),

@@ -23,6 +23,8 @@ class CMessage : public CPointEntity
 public:
 	DECLARE_CLASS( CMessage, CPointEntity );
 
+	CMessage();
+
 	void	Spawn( void );
 	void	Precache( void );
 
@@ -57,7 +59,22 @@ private:
 	const char *ParseTitlesReference( const char *pszInput, char *outBuf, int outBufSize );
 	bool GetTitlesEntry( const char *pszEntryName, hudtextparms_t &outParms, char *outMessage, int outMessageSize );
 
-	string_t m_iszMessage;		// Message to display.
+	// Resolve a message string (handles @titles_*.txt_* references) and show it
+	// on the target player's HUD. Shared by ShowMessage / InputMessage.
+	void ShowMessageText( const char *psz );
+	// Return the currently-active message (highest stored priority, else the
+	// "message" keyvalue), or NULL when nothing is stored.
+	const char *GetActiveMessage( void );
+	// Store a message into one of the 16 priority slots (prio 1..16) and, when
+	// it is now the highest-priority slot, promote it to the active message.
+	void SetPriorityMessage( int prio, const char *psz );
+	// Persist / restore the active priority through the global state system
+	// when m_iGlobalEnvMessageIndex is set (0-7).
+	void UH_SyncGlobalMessagePriority( void );
+	void UH_RestoreGlobalMessagePriority( void );
+
+	string_t m_iszMessage;		// Message to display (keyvalue "message").
+	string_t m_iszSetMessage;	// Underhell: message set via "SetMessage" (highest priority).
 	float m_MessageVolume;
 	int m_MessageAttenuation;
 	float m_Radius;
@@ -67,9 +84,16 @@ private:
 	string_t m_sNoise;
 	COutputEvent m_OnShowMessage;
 
-	// Underhell: up to 16 priority messages (original had m_iMessagesPriority etc.)
-	// For compatibility we store them, ShowMessage shows highest set.
+	// Underhell: 16 priority slots (index 0 == priority 1 .. index 15 == priority 16).
+	// Higher priority number wins. "SetMessage" (m_iszSetMessage) beats all of them.
 	string_t m_iszMessagesPriority[16];
+
+	// Underhell: which priority slot (1..16, 17 == SetMessage, 0 == none) is active.
+	int m_iCurrentPriority;
+
+	// Underhell: GlobalEnvMessageIndex (0-7), -1 == disabled. Shares the active
+	// message priority between maps via the global state system.
+	int m_iGlobalEnvMessageIndex;
 };
 
 #endif // ENVMESSAGE_H

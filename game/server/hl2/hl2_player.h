@@ -1,4 +1,4 @@
-//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		Player for HL2.
 //
@@ -410,6 +410,14 @@ public:
 	void				InputDisableDropWeapon( inputdata_t &inputdata );
 	void				InputEnableDropWeapon( inputdata_t &inputdata );
 
+	// Underhell player model / skin / viewmodel skin inputs (decode sub_101F2D30).
+	// SetPlayerModel also flags the model mirror-only so it renders in
+	// func_reflective_glass instead of the first-person world view.
+	void				InputSetPlayerModel( inputdata_t &inputdata );
+	void				InputSetPlayerSkin( inputdata_t &inputdata );
+	void				InputViewModelSkin( inputdata_t &inputdata );
+	void				InputSetPlayerKickModel( inputdata_t &inputdata );
+
 	//-----------------------------------------------------------------------------
 	// Underhell glowstick. The lit glowstick prop is parented to the player and
 	// tracked here (original m_hActiveGlowStick @2164) so it can be removed when
@@ -520,6 +528,10 @@ private:
 	// Suit power fields
 	float				m_flSuitPowerLoad;	// net suit power drain (total of all device's drainrates)
 	float				m_flAdmireGlovesAnimTime;
+
+	// Underhell: kick-attack viewmodel set via "SetPlayerKickModel"
+	// (models/weapons/v_kick_jake_*.mdl). TODO: full kick system (uh_jake_kick).
+	string_t			m_iszKickViewModel;
 
 	float				m_flNextFlashlightCheckTime;
 	float				m_flFlashlightPowerDrainScale;

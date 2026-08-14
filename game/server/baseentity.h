@@ -1637,6 +1637,16 @@ private:
 	CNetworkVar( bool, m_bSimulatedEveryTick );
 	CNetworkVar( bool, m_bAnimatedEveryTick );
 	CNetworkVar( bool, m_bAlternateSorting );
+	// Underhell: render this entity ONLY in mirror/monitor render targets
+	// (keyvalue "uh_rendermirrorsonly"). Used for the player model and ghost
+	// apparitions so they show up in func_reflective_glass but not the world.
+	CNetworkVar( bool, m_bIsMirrorOnly );
+
+public:
+	// Underhell: set the mirror-only rendering flag (CHL2_Player::SetPlayerModel).
+	void	SetMirrorOnly( bool bMirrorOnly ) { m_bIsMirrorOnly = bMirrorOnly; }
+	bool	IsMirrorOnly( void ) const { return m_bIsMirrorOnly; }
+private:
 
 	// User outputs. Fired when the "FireInputX" input is triggered.
 	COutputEvent m_OnUser1;

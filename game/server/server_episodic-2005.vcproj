@@ -297,6 +297,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\uh_player_model.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\uh_weapons.cpp"
 					>
 				</File>

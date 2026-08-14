@@ -44,6 +44,10 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+// Underhell: gate for mirror/monitor-only rendering (matches the original
+// client convar cl_player_render_mirror, FCVAR_CHEAT).
+ConVar cl_player_render_mirror( "cl_player_render_mirror", "1", FCVAR_CHEAT, "Enable or disable player mirror/monitor rendering" );
+
 
 #ifdef INTERPOLATEDVAR_PARANOID_MEASUREMENT
 	int g_nInterpolatedVarsChanged = 0;
@@ -473,6 +477,8 @@ BEGIN_RECV_TABLE_NOBASE(C_BaseEntity, DT_BaseEntity)
 	RecvPropInt		( RECVINFO( m_bSimulatedEveryTick ), 0, RecvProxy_InterpolationAmountChanged ),
 	RecvPropInt		( RECVINFO( m_bAnimatedEveryTick ), 0, RecvProxy_InterpolationAmountChanged ),
 	RecvPropBool	( RECVINFO( m_bAlternateSorting ) ),
+	// Underhell: mirror/monitor-only rendering flag.
+	RecvPropBool	( RECVINFO( m_bIsMirrorOnly ) ),
 
 END_RECV_TABLE()
 
@@ -897,6 +903,7 @@ C_BaseEntity::C_BaseEntity() :
 
 	m_bSimulatedEveryTick = false;
 	m_bAnimatedEveryTick = false;
+	m_bIsMirrorOnly = false;
 	m_pPhysicsObject = NULL;
 
 #ifdef _DEBUG
@@ -1338,6 +1345,18 @@ bool C_BaseEntity::ShouldDraw()
 	if (g_pClientMode && !g_pClientMode->ShouldDrawEntity(this) )
 		return false;
 #endif
+
+	// Underhell: mirror-only entities draw only while the reflective/refractive
+	// glass view is rendering (and only while cl_player_render_mirror is on),
+	// so the player model / ghost apparitions appear in mirrors but never in
+	// the normal world view.
+	if ( m_bIsMirrorOnly )
+	{
+		if ( !cl_player_render_mirror.GetBool() )
+			return false;
+		if ( !g_bRenderingReflectiveGlass )
+			return false;
+	}
 
 	// Some rendermodes prevent rendering
 	if ( m_nRenderMode == kRenderNone )

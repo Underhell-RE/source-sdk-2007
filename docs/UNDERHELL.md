@@ -691,3 +691,37 @@ sendtable `sub_101F2D30` / ClientCommand `sub_101F11D0`):
 
 Also still TODO from earlier stages: gas-mask check in food `Use()`, melee
 swing stamina gate, full bleeding→damage scaling, exact held-item handle @2164.
+
+## Message entities + mirror reflection (env_message/env_hudhint/env_global + player-in-mirror)
+
+Decoded from the "New Message Entities Inputs" and "Player Model and Mirror
+Reflections" tutorials + the original datamaps (CMessage sub_101387F0,
+CEnvHudHint sub_10137AD0) and input handlers (sub_101EEE40 = ViewModelSkin).
+
+- **env_message** (`CMessage`): `InputMessage` shows the parameter directly
+  (does NOT store). `SetMessage` is the highest priority (17); `SetMessagePriorityN`
+  (1..16) store into a slot, higher N wins; `RemoveMessagePriority` takes the
+  priority number (1..16) and falls back to the next-highest; `ShowMessage`
+  displays the active one. `GlobalEnvMessageIndex` (0-7) persists the active
+  priority between maps via the global-state counter `uh_envmessage_<idx>`
+  (TODO: original stores the message "as player state" — verify string survives).
+- **env_hudhint** (`CEnvHudHint`): `InputHint` / `InputHintThroughParameter`
+  (FIELD_STRING) show the hint from the parameter.
+- **env_global** (`CEnvGlobal`): `SetGlobalOn` / `SetGlobalOff` / `SetGlobalDead`
+  affect the global NAMED in the parameter (not the entity's own keyvalue), so
+  one env_global can drive many shared globals.
+
+### Player in mirrors (mirror/monitor-only rendering)
+
+- `CBaseEntity::m_bIsMirrorOnly` (networked bool, keyvalue `uh_rendermirrorsonly`).
+  Server sendtable + client recvtable (after `m_bAlternateSorting`).
+- Client convar `cl_player_render_mirror` (FCVAR_CHEAT, default 1).
+- Client render hook: `g_bRenderingReflectiveGlass` is set around
+  `CReflectiveGlassView::Draw()` / `CRefractiveGlassView::Draw()`;
+  `C_BaseEntity::ShouldDraw()` rejects `m_bIsMirrorOnly` entities outside that
+  pass; `C_BasePlayer::ShouldDraw()` lets a mirror-only local player draw there
+  even in first person.
+- Player inputs `SetPlayerModel` (sets model + flags mirror-only),
+  `SetPlayerSkin`, `ViewModelSkin` (viewmodel hand/glove skin), and
+  `SetPlayerKickModel` (kick viewmodel, TODO full kick) — see
+  `game/server/underhell/uh_player_model.cpp`.
