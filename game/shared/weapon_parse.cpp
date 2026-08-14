@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Weapon data file parsing, shared by game & client dlls.
 //
@@ -338,6 +338,26 @@ FileWeaponInfo_t::FileWeaponInfo_t()
 	bShowUsageHint = false;
 	m_bAllowFlipping = true;
 	m_bBuiltRightHanded = true;
+
+	// Underhell weapon stats (defaults; overridden by the script).
+	m_bOneHanded = false;
+	m_flMeleeDelayedFire = 0.0f;
+	m_flMeleeRoF = 0.0f;
+	m_flMeleeRange = 32.0f;
+	m_flStaminaToDrain = 15.0f;
+	m_flPunchPitchMin = m_flPunchPitchMax = 0.0f;
+	m_flPunchYawMin = m_flPunchYawMax = 0.0f;
+	m_flSnapPitchMin = m_flSnapPitchMax = 0.0f;
+	m_flSnapYawMin = m_flSnapYawMax = 0.0f;
+	m_flCrouchRecoilMult = 1.0f;
+	m_flCrouchAccuracyMult = 1.0f;
+	m_flRunAccuracyMult = 1.0f;
+	m_bUHWeaponSpecial = false;
+	m_iPenetration = 0;
+	m_bHasExpOffset = false;
+	m_vecExpOffsetX = m_vecExpOffsetY = m_vecExpOffsetZ = 0.0f;
+	m_angExpOffsetX = m_angExpOffsetY = m_angExpOffsetZ = 0.0f;
+	m_flAccuracy = 1.0f;
 }
 
 #ifdef CLIENT_DLL
@@ -402,6 +422,52 @@ void FileWeaponInfo_t::Parse( KeyValues *pKeyValuesData, const char *szWeaponNam
 	m_bBuiltRightHanded = ( pKeyValuesData->GetInt( "BuiltRightHanded", 1 ) != 0 ) ? true : false;
 	m_bAllowFlipping = ( pKeyValuesData->GetInt( "AllowFlipping", 1 ) != 0 ) ? true : false;
 	m_bMeleeWeapon = ( pKeyValuesData->GetInt( "MeleeWeapon", 0 ) != 0 ) ? true : false;
+
+	//-----------------------------------------------------------------------------
+	// Underhell weapon stats (original decode sub_10274870).
+	//-----------------------------------------------------------------------------
+	m_bOneHanded = ( pKeyValuesData->GetInt( "OneHanded", 0 ) != 0 );
+
+	// "min, max" range strings -> two floats. Helper reads "<min>, <max>".
+	m_flMeleeDelayedFire = pKeyValuesData->GetFloat( "MeleeDelayedFire", 0.0f );
+	m_flMeleeRoF = pKeyValuesData->GetFloat( "MeleeRoF", 0.0f );
+	m_flMeleeRange = pKeyValuesData->GetFloat( "MeleeRange", 32.0f );
+	m_flStaminaToDrain = pKeyValuesData->GetFloat( "StaminaToDrain", 15.0f );
+
+	{
+		const char *pPunch = pKeyValuesData->GetString( "PunchPitch", "0, 0" );
+		sscanf( pPunch, "%f, %f", &m_flPunchPitchMin, &m_flPunchPitchMax );
+		pPunch = pKeyValuesData->GetString( "PunchYaw", "0, 0" );
+		sscanf( pPunch, "%f, %f", &m_flPunchYawMin, &m_flPunchYawMax );
+		pPunch = pKeyValuesData->GetString( "SnapPitch", "0, 0" );
+		sscanf( pPunch, "%f, %f", &m_flSnapPitchMin, &m_flSnapPitchMax );
+		pPunch = pKeyValuesData->GetString( "SnapYaw", "0, 0" );
+		sscanf( pPunch, "%f, %f", &m_flSnapYawMin, &m_flSnapYawMax );
+	}
+
+	m_flCrouchRecoilMult = pKeyValuesData->GetFloat( "CrouchRecoilMult", 1.0f );
+	m_flCrouchAccuracyMult = pKeyValuesData->GetFloat( "CrouchAccuracyMult", 1.0f );
+	m_flRunAccuracyMult = pKeyValuesData->GetFloat( "RunAccuracyMult", 1.0f );
+
+	KeyValues *pSpecial = pKeyValuesData->FindKey( "UH_Weapon_Special" );
+	if ( pSpecial )
+	{
+		m_bUHWeaponSpecial = true;
+		m_iPenetration = pSpecial->GetInt( "Penetration", 0 );
+	}
+
+	KeyValues *pExpOffset = pKeyValuesData->FindKey( "ExpOffset" );
+	if ( pExpOffset )
+	{
+		m_bHasExpOffset = true;
+		m_vecExpOffsetX = pExpOffset->GetFloat( "x", 0.0f );
+		m_vecExpOffsetY = pExpOffset->GetFloat( "y", 0.0f );
+		m_vecExpOffsetZ = pExpOffset->GetFloat( "z", 0.0f );
+		m_angExpOffsetX = pExpOffset->GetFloat( "xori", 0.0f );
+		m_angExpOffsetY = pExpOffset->GetFloat( "yori", 0.0f );
+		m_angExpOffsetZ = pExpOffset->GetFloat( "zori", 0.0f );
+		m_flAccuracy = pExpOffset->GetFloat( "accuracy", 1.0f );
+	}
 
 #if defined(_DEBUG) && defined(HL2_CLIENT_DLL)
 	// make sure two weapons aren't in the same slot & position

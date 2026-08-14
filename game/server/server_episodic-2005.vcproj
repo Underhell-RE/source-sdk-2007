@@ -289,6 +289,14 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\uh_weapons.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_weapons.h"
+					>
+				</File>
+				<File
 					RelativePath="..\shared\underhell\uh_inventory.cpp"
 					>
 				</File>

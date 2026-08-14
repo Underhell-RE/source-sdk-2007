@@ -1,4 +1,4 @@
-//========= Copyright � 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright � 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Weapon data file parsing, shared by game & client dlls.
 //
@@ -107,9 +107,39 @@ public:
 
 	// This tells if the weapon was built right-handed (defaults to true).
 	// This helps cl_righthand make the decision about whether to flip the model or not.
-	bool					m_bBuiltRightHanded;
-	bool					m_bAllowFlipping;	// False to disallow flipping the model, regardless of whether
+	bool						m_bBuiltRightHanded;
+	bool						m_bAllowFlipping;	// False to disallow flipping the model, regardless of whether
 												// it is built left or right handed.
+
+	//-----------------------------------------------------------------------------
+	// Underhell weapon stats (parsed from the weapon script; original decode
+	// sub_10274870). These are shared so both the server and client can read
+	// the melee / recoil / ironsight tuning from the same script data.
+	//-----------------------------------------------------------------------------
+	bool						m_bOneHanded;			// "OneHanded" — held in one hand
+	float						m_flMeleeDelayedFire;	// "MeleeDelayedFire"
+	float						m_flMeleeRoF;			// "MeleeRoF"
+	float						m_flMeleeRange;			// "MeleeRange"
+	float						m_flStaminaToDrain;		// "StaminaToDrain" — suit power per swing
+
+	// Recoil/viewpunch ranges ("PunchPitch"/"PunchYaw"/"SnapPitch"/"SnapYaw",
+	// stored as "min, max" strings).
+	float						m_flPunchPitchMin, m_flPunchPitchMax;
+	float						m_flPunchYawMin, m_flPunchYawMax;
+	float						m_flSnapPitchMin, m_flSnapPitchMax;
+	float						m_flSnapYawMin, m_flSnapYawMax;
+
+	float						m_flCrouchRecoilMult;	// "CrouchRecoilMult" (lower = less recoil)
+	float						m_flCrouchAccuracyMult;	// "CrouchAccuracyMult" (lower = more accurate)
+	float						m_flRunAccuracyMult;	// "RunAccuracyMult"
+
+	bool						m_bUHWeaponSpecial;		// "UH_Weapon_Special" block present
+	int							m_iPenetration;			// "Penetration" (inside UH_Weapon_Special)
+
+	bool						m_bHasExpOffset;		// "ExpOffset" ironsight block present
+	float						m_vecExpOffsetX, m_vecExpOffsetY, m_vecExpOffsetZ;		// "x"/"y"/"z"
+	float						m_angExpOffsetX, m_angExpOffsetY, m_angExpOffsetZ;	// "xori"/"yori"/"zori"
+	float						m_flAccuracy;			// "accuracy" (inside ExpOffset)
 
 // CLIENT DLL
 	// Sprite data, read from the data file

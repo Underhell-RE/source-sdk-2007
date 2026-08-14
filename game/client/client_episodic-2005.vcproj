@@ -273,6 +273,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\c_uh_weapons.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\hud_endurance.cpp"
 					>
 				</File>

@@ -47,6 +47,8 @@
 #include "filters.h"
 #include "tier0/icommandline.h"
 
+#include "underhell/uh_weapons.h"
+
 #ifdef HL2_EPISODIC
 #include "npc_alyx_episodic.h"
 #endif
@@ -1786,6 +1788,15 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 		break;
 	}
 
+	case 101:
+	{
+		// Give the full Underhell weapon set in addition to the vanilla HL2
+		// weapons that the base class hands out for impulse 101.
+		UH_GiveAllWeapons( this );
+		BaseClass::CheatImpulseCommands( iImpulse );
+		break;
+	}
+
 	default:
 		BaseClass::CheatImpulseCommands( iImpulse );
 	}
@@ -2694,14 +2705,13 @@ bool CHL2_Player::Weapon_CanUse( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 void CHL2_Player::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 {
-#if	HL2_SINGLE_PRIMARY_WEAPON_MODE
-
-	if ( pWeapon->GetSlot() == WEAPON_PRIMARY_SLOT )
+	// Underhell: one weapon per slot. If the incoming weapon's slot is already
+	// occupied by a different weapon, eject it before equipping the new one.
+	CBaseCombatWeapon *pSlotWeapon = Weapon_GetSlot( pWeapon->GetSlot() );
+	if ( pSlotWeapon && pSlotWeapon != pWeapon )
 	{
-		Weapon_DropSlot( WEAPON_PRIMARY_SLOT );
+		Weapon_DropSlot( pWeapon->GetSlot() );
 	}
-
-#endif
 
 	if( GetActiveWeapon() == NULL )
 	{
