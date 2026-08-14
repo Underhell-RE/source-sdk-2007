@@ -588,8 +588,39 @@ the authoritative server state).
 - **Ironsight desync**: switching weapons while sighted now un-sights
   (`Weapon_Switch` calls `UH_DisableIronsight`).
 
+### Weapon damage + fire rate (stage 30)
+
+The weapon scripts carry no damage / fire-rate keys — those are baked into the
+C++ classes. Recovered from the original:
+
+- **Damage** lives in `cfg/skill.cfg` as `sk_plr_dmg_<weapon>` (the original
+  registers each as a `ConVar` default "0" and the engine's skill.cfg sets the
+  real value; it also reads them through a per-weapon `GetDamage()` vtable
+  override — hexrays slot 213). Values (baked into the constructors here):
+
+  | Weapon | Damage | | Weapon | Damage |
+  |---|---|---|---|---|
+  | axe / baton / pipe / wrench / cleaver | 35 / 13 / 15 / 25 / 50 | | glock / beretta / socom / python / dualies | 10 / 15 / 20 / 120 / 20 |
+  | mp5 / mp5_eod / mp7 | 12 / 10 / 8 | | m3 / m5 / spas12 / xm1014 | 12 / 16 / 14 / 12 |
+  | g36k / sniper | 20 / 80 | | bfg_mgl / bfg_minigun | 200 / 50 |
+
+- **Fire rate**: the semi-auto pistols share one fire routine
+  (`sub_1027AEC0` → `m_flNextPrimaryAttack = curtime + 0.2`), so glock/beretta/
+  socom/dualies fire at 0.2 s. The G36K is a `CHLSelectFireMachineGun`
+  (`FireMode 1` = full-auto) → 0.1 s (vanilla select-fire rate). The remaining
+  rates (SMG/shotgun/sniper/BFG) are close estimates — TODO: recover each from
+  its own fire function.
+
+- **Note**: the vanilla base `CBaseCombatWeapon::PrimaryAttack` never sets
+  `info.m_iDamage`, so the previous port fired with the ammo-definition damage
+  instead of the Underhell value. `CUHGunWeapon::PrimaryAttack` now builds the
+  shot itself with `m_iDamage = GetDamage()`.
+
 ### TODO (ironsight / weapons)
 
 - Free-aim (over-the-shoulder) camera still TODO — first-person only, and the
   original gates it behind the one third-person location.
-- Exact per-weapon fire rate + damage values (currently hardcoded heuristics).
+- Shotgun multi-pellet fire (skill.cfg `sk_plr_num_shotgun_pellets = 12`):
+  the port fires a single shot per trigger pull; the original fires 12 pellets.
+- Exact fire rate for SMG / shotgun / sniper / BFG (recover from each weapon's
+  fire function in serveror.dll).

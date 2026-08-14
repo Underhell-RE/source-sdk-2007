@@ -32,8 +32,8 @@
 
 //-----------------------------------------------------------------------------
 // Shared melee base: reads MeleeRange / MeleeRoF / StaminaToDrain from the
-// weapon script. Damage is a per-class value (the original derives it from the
-// weapon; TODO: verify each value).
+// weapon script. Damage is per-class (values from the original skill.cfg's
+// sk_plr_dmg_* entries — see uh_weapons.cpp).
 //-----------------------------------------------------------------------------
 class CUHMeleeWeapon : public CBaseHLBludgeonWeapon
 {
@@ -42,6 +42,7 @@ class CUHMeleeWeapon : public CBaseHLBludgeonWeapon
 public:
 	virtual void	PrimaryAttack( void );	// drains StaminaToDrain, then swings
 	virtual float	GetDamageForActivity( Activity hitActivity ) { return m_flMeleeDamage; }
+	virtual int		GetDamage( void ) { return (int)m_flMeleeDamage; }
 	virtual float	GetRange( void ) { return GetWpnData().m_flMeleeRange; }
 	virtual float	GetFireRate( void ) { return GetWpnData().m_flMeleeRoF; }
 
@@ -49,8 +50,8 @@ public:
 };
 
 //-----------------------------------------------------------------------------
-// Shared gun base: fires bullets through the engine's
-// CBaseCombatWeapon::PrimaryAttack path. Recoil (PunchPitch/PunchYaw) and
+// Shared gun base: fires bullets through the engine's bullet path with the
+// per-weapon damage (skill.cfg sk_plr_dmg_*). Recoil (PunchPitch/PunchYaw) and
 // spread (CrouchAccuracyMult/RunAccuracyMult/ExpOffset accuracy) are read from
 // the weapon script via GetWpnData().
 //-----------------------------------------------------------------------------
@@ -60,11 +61,13 @@ class CUHGunWeapon : public CBaseHLCombatWeapon
 
 public:
 	virtual void	PrimaryAttack( void );
+	virtual int		GetDamage( void ) { return m_iDamage; }
 	virtual float	GetFireRate( void ) { return m_flFireRate; }
 	virtual const Vector &GetBulletSpread( void );
 	virtual void	AddViewKick( void );
 
-	float			m_flFireRate;			// seconds between shots (TODO: per-weapon exact)
+	float			m_flFireRate;			// seconds between shots
+	int				m_iDamage;				// per-shot damage (skill.cfg sk_plr_dmg_*)
 	float			m_flAccuracyPenalty;	// grows per shot, decays over time
 };
 
