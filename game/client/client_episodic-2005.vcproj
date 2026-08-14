@@ -281,6 +281,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\uh_laser.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\hud_endurance.cpp"
 					>
 				</File>

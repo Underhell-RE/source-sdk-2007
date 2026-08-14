@@ -212,10 +212,6 @@ public:
 	void				InputEnableFlashlight( inputdata_t &inputdata );
 	void				InputDisableFlashlight( inputdata_t &inputdata );
 
-	// Underhell gear inputs (give the pistol / rifle silencer).
-	void				InputSetPistolSilencer( inputdata_t &inputdata );
-	void				InputSetRifleSilencer( inputdata_t &inputdata );
-
 	const impactdamagetable_t &GetPhysicsImpactDamageTable();
 	virtual int			OnTakeDamage( const CTakeDamageInfo &info );
 	virtual int			OnTakeDamage_Alive( const CTakeDamageInfo &info );
@@ -405,6 +401,14 @@ public:
 	// Underhell gear toggles (client commands, decode sub_101F11D0).
 	void				UH_ToggleSilencer( void );
 	void				UH_ToggleLaser( void );
+	void				UH_DropWeapon( void );		// "DropWeapon" — throw the active weapon
+	void				UH_ThrowNade( void );		// "Throw_Nade" — grenade toss
+
+	// Underhell gear inputs (give the pistol / rifle silencer; disable drop).
+	void				InputSetPistolSilencer( inputdata_t &inputdata );
+	void				InputSetRifleSilencer( inputdata_t &inputdata );
+	void				InputDisableDropWeapon( inputdata_t &inputdata );
+	void				InputEnableDropWeapon( inputdata_t &inputdata );
 
 	//-----------------------------------------------------------------------------
 	// Underhell glowstick. The lit glowstick prop is parented to the player and
@@ -479,6 +483,10 @@ private:
 	float				m_flLastBleedTickBase;	// curtime of the previous think (dt accumulator base)
 	int					m_iEHealthCount;		// consecutive bleed-deaths (zeroes endurance at 10)
 	EHANDLE				m_hActiveGlowStick;		// lit glowstick prop parented to the player (original @2164)
+
+	// Underhell: block the "DropWeapon" command (set by the map via
+	// InputDisableDropWeapon / InputEnableDropWeapon; original m_bDisableWeaponDrop @2136).
+	bool				m_bDisableWeaponDrop;
 
 	// This player's HL2 specific data that should only be replicated to 
 	//  the player and not to other players.

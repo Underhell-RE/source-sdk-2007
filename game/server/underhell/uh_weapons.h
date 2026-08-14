@@ -42,7 +42,7 @@ class CUHMeleeWeapon : public CBaseHLBludgeonWeapon
 public:
 	virtual void	PrimaryAttack( void );	// drains StaminaToDrain, then swings
 	virtual float	GetDamageForActivity( Activity hitActivity ) { return m_flMeleeDamage; }
-	virtual int		GetDamage( void ) { return (int)m_flMeleeDamage; }
+	virtual float	GetDamage( void ) { return m_flMeleeDamage; }
 	virtual float	GetRange( void ) { return GetWpnData().m_flMeleeRange; }
 	virtual float	GetFireRate( void ) { return GetWpnData().m_flMeleeRoF; }
 
@@ -61,7 +61,7 @@ class CUHGunWeapon : public CBaseHLCombatWeapon
 
 public:
 	virtual void	PrimaryAttack( void );
-	virtual int		GetDamage( void ) { return m_iDamage; }
+	virtual float	GetDamage( void ) { return (float)m_iDamage; }
 	virtual float	GetFireRate( void ) { return m_flFireRate; }
 	virtual const Vector &GetBulletSpread( void );
 	virtual void	AddViewKick( void );

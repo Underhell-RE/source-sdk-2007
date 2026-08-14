@@ -76,8 +76,8 @@ void CUHGunWeapon::PrimaryAttack( void )
 	info.m_iAmmoType		= m_iPrimaryAmmoType;
 	info.m_iTracerFreq		= 2;
 	info.m_iShots			= 1;
-	info.m_iDamage			= GetDamage();
-	info.m_iPlayerDamage	= GetDamage();
+	info.m_iDamage			= (int)GetDamage();
+	info.m_iPlayerDamage	= (int)GetDamage();
 
 	pPlayer->FireBullets( info );
 
@@ -185,11 +185,14 @@ void CUHGunWeapon::AddViewKick( void )
 
 //-----------------------------------------------------------------------------
 // Registers one weapon class under its entity name and its send table.
-// Damage values are from the original's skill.cfg (sk_plr_dmg_*). Fire rates:
-// semi-auto pistols share one fire routine (decoded sub_1027AEC0 -> 0.2 s);
-// the G36K is a select-fire machine gun (CHLSelectFireMachineGun -> 0.1 s).
-// The remaining fire rates are close estimates (the original hardcodes each in
-// its own fire function) — TODO: recover the exact values.
+// Damage values are from the original's skill.cfg (sk_plr_dmg_*). Fire rates
+// extracted from serveror.dll:
+//   - pistols: 0.2 s (shared fire routine sub_1027AEC0)
+//   - SMGs + BFG minigun: 0.075 s (GetFireRate override, vtable slot 277 ->
+//     sub_102801F0 -> "flds 0x105300E4" = 0.075)
+//   - G36K: 0.1 s (select-fire GetFireRate sub_103F5150 -> 0x1048775C = 0.1)
+// Shotgun / sniper / BFG MGL use custom pump/delay fire paths (not GetFireRate);
+// their values below are close estimates — TODO: recover the exact delay.
 //-----------------------------------------------------------------------------
 #define UH_IMPLEMENT_WEAPON( _className, _entityName, _shortName, _fireRate, _damage, _weaponType ) \
 	IMPLEMENT_SERVERCLASS_ST( _className, DT_##_shortName ) \
@@ -225,11 +228,11 @@ UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5
 UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, 20, 1 )
 
 //-----------------------------------------------------------------------------
-// SMGs — full auto. Damage: mp5 12, mp5_eod 10, mp7 8.
+// SMGs — full auto, 0.075 s (exact, GetFireRate). Damage: mp5 12, mp5_eod 10, mp7 8.
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.1f, 12, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.1f, 10, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.1f, 8, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5,			weapon_smg_mp5,		WeaponSMGMP5,		0.075f, 12, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.075f, 10, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, 8, 0 )
 
 //-----------------------------------------------------------------------------
 // Shotguns — pump. Damage: m3 12, m5 16, spas12 14, xm1014 12.
@@ -247,10 +250,11 @@ UH_IMPLEMENT_WEAPON( CWeaponG36K,			weapon_rifle_g36k,		WeaponG36K,		0.1f, 20, 4
 UH_IMPLEMENT_WEAPON( CWeaponSniper,			weapon_rifle_sniper,	WeaponSniper,	1.5f, 80, 4 )
 
 //-----------------------------------------------------------------------------
-// BFG — mgl 200, minigun 50.
+// BFG — mgl 200, minigun 50. Minigun is 0.075 s (exact, GetFireRate); MGL is an
+// estimate (custom fire path).
 //-----------------------------------------------------------------------------
 UH_IMPLEMENT_WEAPON( CWeaponBfgMgl,			weapon_bfg_mgl,			WeaponBfgMgl,		1.0f, 200, 0 )
-UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.1f, 50, 0 )
+UH_IMPLEMENT_WEAPON( CWeaponBfgMinigun,		weapon_bfg_minigun,		WeaponBfgMinigun,	0.075f, 50, 0 )
 
 //-----------------------------------------------------------------------------
 // Purpose: Give every Underhell weapon (used by impulse 101). Each weapon is

@@ -332,6 +332,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_bHavePistolSilencer, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bHaveRifleSilencer, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bLaserToggleState, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bDisableWeaponDrop, FIELD_BOOLEAN ),
 
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),
@@ -390,6 +391,8 @@ BEGIN_DATADESC( CHL2_Player )
 	// "SetPistolSilencer" / "SetRifleSilencer", decode sub_101F2D30).
 	DEFINE_INPUTFUNC( FIELD_VOID, "SetPistolSilencer", InputSetPistolSilencer ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "SetRifleSilencer", InputSetRifleSilencer ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "DisableDropWeapon", InputDisableDropWeapon ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "EnableDropWeapon", InputEnableDropWeapon ),
 
 	DEFINE_SOUNDPATCH( m_sndLeeches ),
 	DEFINE_SOUNDPATCH( m_sndWaterSplashes ),
@@ -2879,6 +2882,20 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	if ( !Q_stricmp( args[0], "laser_toggle" ) )
 	{
 		UH_ToggleLaser();
+		return true;
+	}
+
+	// Underhell: throw the active weapon (original "DropWeapon" dispatch).
+	if ( !Q_stricmp( args[0], "DropWeapon" ) )
+	{
+		UH_DropWeapon();
+		return true;
+	}
+
+	// Underhell: throw a grenade (original "Throw_Nade" dispatch).
+	if ( !Q_stricmp( args[0], "Throw_Nade" ) )
+	{
+		UH_ThrowNade();
 		return true;
 	}
 

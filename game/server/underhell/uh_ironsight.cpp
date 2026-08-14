@@ -226,3 +226,84 @@ void CHL2_Player::InputSetRifleSilencer( inputdata_t &inputdata )
 {
 	m_bHaveRifleSilencer = true;
 }
+
+//-----------------------------------------------------------------------------
+// Purpose: Throw the active weapon forward (client command "DropWeapon").
+// Decoded from sub_101F11D0: un-sight, refuse while in a vehicle / sprinting /
+// holding a melee weapon, then Weapon_Drop with a forward velocity of 300.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_DropWeapon( void )
+{
+	if ( m_bDisableWeaponDrop )
+		return;
+
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	if ( !pWeapon )
+		return;
+
+	// Come out of ironsight so the FOV / viewmodel don't stay zoomed.
+	if ( m_bIronSighted )
+		UH_ToggleIronsight();
+
+	// Can't drop while in a vehicle.
+	if ( GetVehicle() && GetVehicle() != this )
+		return;
+
+	// The original refuses to drop melee weapons (weapon-info MeleeWeapon flag).
+	if ( pWeapon->GetWpnData().m_bMeleeWeapon )
+		return;
+
+	// Can't drop while sprinting.
+	if ( IsSprinting() )
+		return;
+
+	// Toss it forward (original velocity = forward * 300).
+	Vector forward;
+	AngleVectors( EyeAngles(), &forward );
+	Vector velocity = forward * 300.0f;
+
+	Weapon_Drop( pWeapon, NULL, &velocity );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Throw a grenade (client command "Throw_Nade"). Decoded from
+// sub_101ED130. The original is part of the arm-deploy system (m_bLeftArmDeployed
+// / m_bHoldingFlare) and throws via the grenade weapon's fire path; the flare
+// branch + grenade-viewmodel animation are TODO.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_ThrowNade( void )
+{
+	if ( GetHealth() <= 0 )
+		return;
+
+	if ( IsSprinting() )
+		return;
+
+	CBaseCombatWeapon *pGrenade = Weapon_OwnsThisType( "weapon_frag" );
+	if ( !pGrenade )
+		return;
+
+	if ( !pGrenade->HasPrimaryAmmo() )
+		return;
+
+	// Un-sight (the original does this before throwing).
+	if ( m_bIronSighted )
+		UH_ToggleIronsight();
+
+	// Start the throw: pulls the grenade back; releasing +attack completes it.
+	pGrenade->PrimaryAttack();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Block / allow the "DropWeapon" command (map inputs, original
+// "DisableDropWeapon" / "EnableDropWeapon" — datamap sub_101F2D30).
+//-----------------------------------------------------------------------------
+void CHL2_Player::InputDisableDropWeapon( inputdata_t &inputdata )
+{
+	m_bDisableWeaponDrop = true;
+}
+
+void CHL2_Player::InputEnableDropWeapon( inputdata_t &inputdata )
+{
+	m_bDisableWeaponDrop = false;
+}
