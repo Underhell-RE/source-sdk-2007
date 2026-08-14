@@ -6861,20 +6861,25 @@ void CAI_BaseNPC::NPCInit ( void )
 	{	// Does this npc spawn with a weapon
 		if ( m_spawnEquipment != NULL_STRING && strcmp(STRING(m_spawnEquipment), "0"))
 		{
-			// Underhell: "additionalequipment" may be a comma-separated list of
-			// weapons. Give each one (equip is per-slot, so the NPC can carry
-			// several different weapons).
-			CUtlVector<char *> items;
-			V_SplitString( STRING(m_spawnEquipment), ",", items );
-			for ( int i = 0; i < items.Count(); i++ )
+		// Underhell: "additionalequipment" may be a comma-separated list of
+		// weapons; the NPC picks ONE at random (decode sub_10021CB0: strtok on
+		// "," then this[725] = items[rand % count]). Giving every weapon broke
+		// the "pick between these weapons" semantics of the FGD key.
+		CUtlVector<char *> items;
+		V_SplitString( STRING(m_spawnEquipment), ",", items );
+
+		const char *pszChosen = NULL;
+		if ( items.Count() > 0 )
+		{
+			int nPick = random->RandomInt( 0, items.Count() - 1 );
+			pszChosen = items[nPick];
+		}
+
+		if ( pszChosen && pszChosen[0] )
+		{
+			CBaseCombatWeapon *pWeapon = Weapon_Create( pszChosen );
+			if ( pWeapon )
 			{
-				if ( !items[i] || !items[i][0] )
-					continue;
-
-				CBaseCombatWeapon *pWeapon = Weapon_Create( items[i] );
-				if ( !pWeapon )
-					continue;
-
 				// If I have a name, make my weapon match it with "_weapon" appended
 				if ( GetEntityName() != NULL_STRING )
 				{
@@ -6889,6 +6894,7 @@ void CAI_BaseNPC::NPCInit ( void )
 
 				Weapon_Equip( pWeapon );
 			}
+		}
 		}
 	}
 
