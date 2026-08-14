@@ -725,3 +725,33 @@ CEnvHudHint sub_10137AD0) and input handlers (sub_101EEE40 = ViewModelSkin).
   `SetPlayerSkin`, `ViewModelSkin` (viewmodel hand/glove skin), and
   `SetPlayerKickModel` (kick viewmodel, TODO full kick) — see
   `game/server/underhell/uh_player_model.cpp`.
+
+## Weapon pickup: one weapon per class/slot (stage follow-up)
+
+Decoded from the original pickup flow (`GiveNamedItem` sub_101F0AA0 + `Use` ->
+`BumpWeapon`) and confirmed against the weapon-script buckets:
+
+- **`CBasePlayer::GiveNamedItem`** now calls `Use(this, this, USE_TOGGLE, 0)`
+  instead of `Touch(this)`. Underhell weapons clear their touch function
+  (`SetPickupTouch` -> `SetTouch(NULL)`), so the vanilla `Touch` no-op'd and
+  impulse 101 spawned weapons on the floor without equipping them. `Use` ->
+  `BumpWeapon` is the same path as pressing +use.
+- **`CHL2_Player::BumpWeapon`** enforces one weapon per bucket/slot: picking up
+  a weapon of a class the player already carries drops (or, during the
+  impulse-101 cheat, silently removes) the current weapon(s) in that slot before
+  equipping the new one. This makes impulse 101 leave exactly one weapon per
+  slot (the last given) and makes +use replace the held weapon, matching the
+  original "weapon of a class can only be replaced" behaviour.
+
+### Mirror fix (follow-up)
+
+The first mirror attempt gated `C_BaseEntity::ShouldDraw()` on the reflective
+pass, which removed mirror-only entities from the leaf system (ShouldDraw is
+only re-evaluated on visibility updates, not per draw). Corrected:
+
+- `ShouldDraw()` returns true for mirror-only entities (always visible).
+- `C_BasePlayer::ShouldDraw()` returns true for a mirror-only local player even
+  in first person.
+- The draw is gated in `C_BaseEntity::DrawModel` / `C_BaseAnimating::DrawModel`
+  (skip unless `g_bRenderingReflectiveGlass`), so mirror-only entities stay in
+  the leaf system but only actually render during the reflective/refractive pass.

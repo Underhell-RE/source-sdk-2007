@@ -1211,9 +1211,10 @@ bool C_BasePlayer::ShouldInterpolate()
 
 bool C_BasePlayer::ShouldDraw()
 {
-	// Underhell: a mirror-only local player model draws during the reflective
-	// glass pass even in first person, so it shows up in mirrors.
-	if ( IsLocalPlayer() && IsMirrorOnly() && g_bRenderingReflectiveGlass )
+	// Underhell: a mirror-only local player stays visible (in the leaf system)
+	// even in first person, so it renders inside mirrors. The actual draw is
+	// gated in C_BaseAnimating::DrawModel by the reflective-glass pass flag.
+	if ( IsLocalPlayer() && IsMirrorOnly() )
 		return BaseClass::ShouldDraw();
 
 	return ( !IsLocalPlayer() || C_BasePlayer::ShouldDrawLocalPlayer() || (GetObserverMode() == OBS_MODE_DEATHCAM ) ) &&

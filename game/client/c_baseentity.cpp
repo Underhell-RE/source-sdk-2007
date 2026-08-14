@@ -1346,18 +1346,6 @@ bool C_BaseEntity::ShouldDraw()
 		return false;
 #endif
 
-	// Underhell: mirror-only entities draw only while the reflective/refractive
-	// glass view is rendering (and only while cl_player_render_mirror is on),
-	// so the player model / ghost apparitions appear in mirrors but never in
-	// the normal world view.
-	if ( m_bIsMirrorOnly )
-	{
-		if ( !cl_player_render_mirror.GetBool() )
-			return false;
-		if ( !g_bRenderingReflectiveGlass )
-			return false;
-	}
-
 	// Some rendermodes prevent rendering
 	if ( m_nRenderMode == kRenderNone )
 		return false;
@@ -1931,6 +1919,13 @@ int C_BaseEntity::DrawBrushModel( bool bSort, bool bShadowDepth )
 int C_BaseEntity::DrawModel( int flags )
 {
 	if ( !m_bReadyToDraw )
+		return 0;
+
+	// Underhell: mirror/monitor-only entities stay visible (in the leaf system)
+	// but are only actually drawn during the reflective/refractive glass pass,
+	// gated by cl_player_render_mirror. This is what hides the player model /
+	// ghost apparitions from the normal first-person world view.
+	if ( m_bIsMirrorOnly && ( !cl_player_render_mirror.GetBool() || !g_bRenderingReflectiveGlass ) )
 		return 0;
 
 	int drawn = 0;

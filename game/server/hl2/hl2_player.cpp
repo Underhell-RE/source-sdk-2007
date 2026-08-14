@@ -2753,80 +2753,37 @@ void CHL2_Player::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 {
-
-#if	HL2_SINGLE_PRIMARY_WEAPON_MODE
-
-	CBaseCombatCharacter *pOwner = pWeapon->GetOwner();
-
-	// Can I have this weapon type?
-	if ( pOwner || !Weapon_CanUse( pWeapon ) || !g_pGameRules->CanHavePlayerItem( this, pWeapon ) )
+	// Underhell: one weapon per bucket/slot. Picking up a weapon of a class the
+	// player already carries replaces it — the current weapon(s) in that slot
+	// are thrown out (silently removed during the impulse-101 cheat) and the
+	// new weapon takes their place. Decoded from the original pickup flow
+	// (GiveNamedItem -> Use -> BumpWeapon) and the "one weapon per class"
+	// behaviour described in the Underhell docs.
+	if ( !Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
 	{
-		if ( gEvilImpulse101 )
+		int slot = pWeapon->GetSlot();
+		if ( Weapon_GetSlot( slot ) != NULL )
 		{
-			UTIL_Remove( pWeapon );
-		}
-		return false;
-	}
-
-	// ----------------------------------------
-	// If I already have it just take the ammo
-	// ----------------------------------------
-	if (Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType())) 
-	{
-		//Only remove the weapon if we attained ammo from it
-		if ( Weapon_EquipAmmoOnly( pWeapon ) == false )
-			return false;
-
-		// Only remove me if I have no ammo left
-		// Can't just check HasAnyAmmo because if I don't use clips, I want to be removed, 
-		if ( pWeapon->UsesClipsForAmmo1() && pWeapon->HasPrimaryAmmo() )
-			return false;
-
-		UTIL_Remove( pWeapon );
-		return false;
-	}
-	// -------------------------
-	// Otherwise take the weapon
-	// -------------------------
-	else 
-	{
-		//Make sure we're not trying to take a new weapon type we already have
-		if ( Weapon_SlotOccupied( pWeapon ) )
-		{
-			CBaseCombatWeapon *pActiveWeapon = Weapon_GetSlot( WEAPON_PRIMARY_SLOT );
-
-			if ( pActiveWeapon != NULL && pActiveWeapon->HasAnyAmmo() == false && Weapon_CanSwitchTo( pWeapon ) )
+			if ( gEvilImpulse101 )
 			{
-				Weapon_Equip( pWeapon );
-				return true;
+				// Silently strip the old slot occupant(s) during the cheat so
+				// impulse 101 leaves exactly one weapon per slot (the last given).
+				for ( int i = 0; i < MAX_WEAPONS; i++ )
+				{
+					CBaseCombatWeapon *pOld = GetWeapon( i );
+					if ( pOld && pOld->GetSlot() == slot )
+						UTIL_Remove( pOld );
+				}
 			}
-
-			//Attempt to take ammo if this is the gun we're holding already
-			if ( Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
+			else
 			{
-				Weapon_EquipAmmoOnly( pWeapon );
+				// Real pickup: throw the current weapon(s) in this slot on the ground.
+				Weapon_DropSlot( slot );
 			}
-
-			return false;
 		}
-
-		pWeapon->CheckRespawn();
-
-		pWeapon->AddSolidFlags( FSOLID_NOT_SOLID );
-		pWeapon->AddEffects( EF_NODRAW );
-
-		Weapon_Equip( pWeapon );
-
-		EmitSound( "HL2Player.PickupWeapon" );
-		
-		return true;
 	}
-#else
 
 	return BaseClass::BumpWeapon( pWeapon );
-
-#endif
-
 }
 
 //-----------------------------------------------------------------------------

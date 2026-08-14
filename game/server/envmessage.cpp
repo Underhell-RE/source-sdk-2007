@@ -314,6 +314,13 @@ void CMessage::ShowMessageText( const char *psz )
 	if ( !psz || !*psz )
 		return;
 
+	// Resolve "@titles_*.txt_<entry>" references to the bare entry name so the
+	// titles lookup below can find it (InputMessage passes the raw parameter).
+	char szClean[512];
+	const char *pszParsed = ParseTitlesReference( psz, szClean, sizeof(szClean) );
+	if ( pszParsed )
+		psz = pszParsed;
+
 	// Resolve a titles entry (scripts/titles_*.txt) so chest comments / objectives
 	// render with the correct colour + position, not as a plain centred message.
 	hudtextparms_t hparms;
