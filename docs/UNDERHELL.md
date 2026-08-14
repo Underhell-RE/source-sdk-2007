@@ -755,3 +755,69 @@ only re-evaluated on visibility updates, not per draw). Corrected:
 - The draw is gated in `C_BaseEntity::DrawModel` / `C_BaseAnimating::DrawModel`
   (skip unless `g_bRenderingReflectiveGlass`), so mirror-only entities stay in
   the leaf system but only actually render during the reflective/refractive pass.
+
+## Bullet time (bt_* commands) — decoded (TODO: port)
+
+Reverse-engineered from `serveror.dll` (ConVar registrations sub_10453C20-10453CE0,
+change-callback sub_100EA800, bullet entity sub_10107970/sub_101078D0, EmitSound
+pitch hook sub_1023B9A0/sub_1023BC60, impulse-110 sub_101EC700, death hook
+sub_102DDB80).
+
+### ConVars / command
+
+| Name | Kind | Default | Flags | Purpose |
+|---|---|---|---|---|
+| `bt_enabled` | ConVar (change callback) | "0" | FCVAR_CHEAT\|FCVAR_REPLICATED | master toggle (callback applies timescale/overlay/speed) |
+| `bt_timescale` | ConVar | "0.3" | 0 | slow-mo factor (host_timescale + sound pitch) |
+| `bt_enemybulletspeed` | ConVar | "500" | 0 | tracer speed for enemy-fired bullets |
+| `bt_playerbulletspeed` | ConVar | "2000" | 0 | tracer speed for player-fired bullets |
+| `bt_plr_speed` | ConVar | "250" | 0 | player maxspeed while active |
+
+`bt_enabled` is a ConVar **with a change callback** (registered via the 6-arg
+ConVar ctor, unlike the plain 4-arg ConVars). The callback (sub_100EA800):
+
+- finds `host_timescale` + `hl2_normspeed` convars,
+- for every player:
+  - OFF: `r_screenoverlay off`, `host_timescale = 1.0`, restore maxspeed
+    (hl2_normspeed, 150).
+  - ON: `r_screenoverlay dev/bullettime`, `host_timescale = bt_timescale`,
+    `m_flMaxspeed (offset 4132) = bt_plr_speed`.
+
+### Bullet entity (CBullet — not present in vanilla Orange Box SDK)
+
+`sub_10107970` = Spawn: picks tracer model by ammo type — `bt_9mm.mdl` (9mm/
+AR2), `bt_357.mdl` (357), `w_pellet.mdl` (buckshot, `m_nBulletType ^= 1`), else
+`bt_762.mdl` (rifle default). Bullet speed = `bt_enemybulletspeed` or
+`bt_playerbulletspeed` depending on a shooter flag (offset 1212 = enemy-fire).
+
+`sub_101078D0` = Think: while bullet time active velocity = dir * (speed *
+timescale); otherwise dir * 2500. (So bullets visibly crawl during bullet time
+and zip at 2500 normally.)
+
+### Sound pitch
+
+`EmitSound` (sub_1023B9A0 / raw wave sub_1023BC60) scales the sound pitch by
+`bt_timescale` while active (≈ 65% pitch at 0.3) — the classic slow-mo audio.
+
+### Ammo / death / impulse
+
+- Ammo drain (sub_100CF490 / sub_100CF500) is **skipped while bullet time is
+  active** — infinite ammo during slow-mo.
+- Player death (sub_102DDB80) sets `bt_enabled = 0`.
+- `impulse 110` toggles it via the CheatImpulseCommands path (plays
+  `Player.bullettimestart` / loops `Player.bullettimeloop` / `Player.bullettimeend`,
+  and schedules a `BulletTimeEndContext` think that stops the loop).
+
+### Port plan (TODO)
+
+1. Register the 5 `bt_*` ConVars (bt_enabled with a change callback).
+2. Port the `CBullet` entity (models are already in the mod assets; precache via
+   sub_10107790: `w_bullet`, `bt_9mm`, `bt_357`, `bt_762`, `w_pellet`).
+3. Hook `FireBullets` to spawn `CBullet` (decode sub_100EAFB0 — the tracer/
+   penetration loop that spawns the bullet entity per ammo type).
+4. Pitch-scale in `CBaseEntity::EmitSound` when `bt_enabled`.
+5. Gate ammo drain on `bt_enabled`.
+6. Death hook + impulse 110 (already have the CheatImpulseCommands override).
+
+The heaviest unknown is #3 (the exact FireBullets -> CBullet wiring) since
+sub_100EAFB0 is a large inlined tracer loop.
