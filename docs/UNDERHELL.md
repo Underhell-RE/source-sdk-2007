@@ -1014,3 +1014,56 @@ TODO (decode leftovers): the original also clears `r_flashlightscissor` on the
 night-vision toggle, sets a custom effects flag 0x400 (outside SDK EF_MAX_BITS),
 and drains the flashlight battery while night vision is on (auto-off in
 sub_102E3DE0) — the turn-on battery gate is ported, the continuous drain is not.
+
+## Second hand / left arm (decoded, TODO: implement)
+
+The "second hand" is **viewmodel index 1** (index 0 = active weapon, index 2 =
+kick). It holds the flashlight, a flare, or a grenade. State (server offsets /
+networked where noted):
+
+| Field | Offset | Net | Meaning |
+|---|---|---|---|
+| `m_bLeftArmDeployed` | 2121 | yes (client 3451) | left arm raised / holding something |
+| `m_bHoldingFlare` | 2122 | yes (client 3452) | holding a flare (throws flare instead of grenade) |
+| `m_bFlareMarker` | 2123 | no | flare throw anim in progress |
+| `m_bFlareHitting` | 2124 | no | flare hitting (don't re-throw) |
+| `m_bFlashlightHolstered` | 2172 | no (saved) | flashlight holstered in the left hand |
+| `m_flFlareTime` | 2128 | no | flare fuse time |
+| `m_bShoulderFlashlight` | 5040 | yes | shoulder-mounted flashlight (vs hand-held) |
+
+Decode map:
+
+- `sub_101E7EA0(p, 1)` == `GetViewModel(1)` (reads m_hViewModel @4024 + 4*i).
+- **Throw_Nade** (`sub_101ED130`): if holding a flare -> `sub_101E97E0` (flare
+  throw chain); else if grenades: un-sight, get viewmodel 1, set its model to
+  `models/weapons/v_grenade.mdl`, skin 1, set `m_bLeftArmDeployed=1` +
+  `m_bFlareMarker=1`, play a 173 throw anim on the active weapon, then
+  `SetContextThink(curtime+0.4, "FlashLightContext")` (the actual throw is
+  staged 0.4 s later).
+- **FlashLightContext think** (`sub_101EE050`): the multi-stage throw chain.
+  If holding a flare it spawns a `prop_physics` `models/PG_props/pg_obj/pg_flare.mdl`
+  with a 90 s fuse and 200u velocity (`sub_101E9580`), sets viewmodel 1 skin 2,
+  clears `m_bHoldingFlare`, then re-schedules; finally it drops the active
+  weapon and re-equips (`sub_100CE740` + vtable 1248).
+- **Left-arm flashlight deploy** (`sub_101F0C60`): un-sight, throw any held
+  flare, toggle `m_bFlashlightHolstered`; when deploying sets viewmodel 1 model
+  = `models/weapons/v_flashlight_pg.mdl`, skin 1, activity 32, `m_bLeftArmDeployed=1`.
+  Registered in the datamap as "FlashlightViewModelThink".
+- **Flare throw** (`sub_101E9580`): spawns the flare prop_physics, sets a
+  curtime+90 fuse, applies 200,200,200 velocity in the throw direction, removes
+  the held flare viewmodel.
+- **Arm think** (`sub_101EB870`): the flare-hit trace (mask 1174421507) that
+  strikes a surface with the flare and marks `m_bFlareMarker`.
+
+The whole thing is driven by the weapon-script `OneHanded` flag (pistols/melee):
+while a one-handed weapon is active the left hand holds the flashlight (or a
+flare). `OneHanded` lives at weapon-info offset 80.
+
+Implementation notes for later:
+- MAX_VIEWMODELS is already 3 (index 1 = left arm, index 2 = kick), so the
+  viewmodel slot exists; `SetPlayerKickModel` already manages index 2.
+- Needs: a "FlashLightContext"-style staged think, `m_bLeftArmDeployed` /
+  `m_bHoldingFlare` networked bools, the flare prop_physics spawn/throw, and
+  hooking weapon deploy so one-handed weapons raise the left arm. The flare
+  (`v_flare_pg.mdl`) + flashlight (`v_flashlight_pg.mdl`) viewmodels are
+  precached in the original sub_101E25F0.
