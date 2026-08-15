@@ -123,6 +123,20 @@ static bool UH_RemoveBodygroupSide( CBaseAnimating *pNPC, const char *pszGroup, 
 	return true;
 }
 
+// sub_10031BF0 uses model-family-specific destroyed-head variants. In
+// particular, value 1 is valid for the prison guard but leaves a normal
+// combine soldier with an intact/incorrect head; soldiers use the high
+// destroyed-head variants instead.
+static int UH_DestroyedHeadBodygroup( CBaseAnimating *pBody )
+{
+	const char *pszModel = STRING( pBody->GetModelName() );
+	if ( V_stristr( pszModel, "combine_soldier_prisonguard" ) )
+		return 1;
+	if ( V_stristr( pszModel, "combine_soldier" ) )
+		return 9;
+	return 1;
+}
+
 //-----------------------------------------------------------------------------
 // Bodygroup string parser: "Helmet2Arms1Legs4" -> FindBodygroupByName + value.
 //-----------------------------------------------------------------------------
@@ -421,26 +435,33 @@ static void UH_DropGearItem( CBaseAnimating *pNPC, const char *pszBodygroup, con
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, const Vector &vecDir )
 {
-	// Update the model's bodygroup so the limb is visually removed.
+	// Bodygroups are the authoritative state shared by the living NPC and the
+	// server ragdoll created on death. Do not spawn duplicate gibs once a part
+	// is already absent.
+	bool bRemoved = false;
 	switch ( iHitGroup )
 	{
-	case HITGROUP_LEFTARM:	UH_RemoveBodygroupSide( this, "arms", 0 ); break;
-	case HITGROUP_RIGHTARM:	UH_RemoveBodygroupSide( this, "arms", 1 ); break;
-	case HITGROUP_LEFTLEG:	UH_RemoveBodygroupSide( this, "Legs", 0 ); break;
-	case HITGROUP_RIGHTLEG:	UH_RemoveBodygroupSide( this, "Legs", 1 ); break;
+	case HITGROUP_LEFTARM:	bRemoved = UH_RemoveBodygroupSide( this, "arms", 0 ); break;
+	case HITGROUP_RIGHTARM:	bRemoved = UH_RemoveBodygroupSide( this, "arms", 1 ); break;
+	case HITGROUP_LEFTLEG:	bRemoved = UH_RemoveBodygroupSide( this, "Legs", 0 ); break;
+	case HITGROUP_RIGHTLEG:	bRemoved = UH_RemoveBodygroupSide( this, "Legs", 1 ); break;
 	case HITGROUP_HEAD:
 		{
 			int iGroup = FindBodygroupByName( "head" );
-			if ( iGroup >= 0 )
-				SetBodygroup( iGroup, 1 );	// "Destroyed Head"
+			int iDestroyed = UH_DestroyedHeadBodygroup( this );
+			if ( iGroup >= 0 && GetBodygroup( iGroup ) != iDestroyed )
+			{
+				SetBodygroup( iGroup, iDestroyed );
+				bRemoved = true;
+			}
 
-			// Destroying the head also knocks off the respirator (combine_s)
-			// or gasmask (prison guard) if worn (sub_10031BF0).
 			UH_DropGearItem( this, "respirator", "item_respirator_guard", vecPosition, vecDir );
 			UH_DropGearItem( this, "gasmask", "item_gasmask_guard", vecPosition, vecDir );
 		}
 		break;
 	}
+	if ( !bRemoved )
+		return;
 
 	// Spawn the severed gib (a pickable physics prop) at the hit position. The
 	// head is "destroyed" via bodygroup only (no severed-head gib), matching
@@ -769,18 +790,11 @@ static CUHRagdollManager g_UHRagdollManager;
 // (CRagdollProp::TestCollision only sets tr.physicsbone). Recover the hitgroup
 // from the physics bone's studio bone via the model's hitbox set.
 //-----------------------------------------------------------------------------
-static int UH_RagdollBoneToHitgroup( CRagdollProp *pRagdoll, int iPhysicsBone )
+// Resolve a studio bone to its hitgroup. A ragdoll physics element often uses
+// a parent of the hitbox bone, so callers also walk its physics parents.
+static int UH_StudioBoneToHitgroup( CStudioHdr *pHdr, int iStudioBone )
 {
-	ragdoll_t *pRagdollPhys = pRagdoll->GetRagdoll();
-	if ( iPhysicsBone < 0 || iPhysicsBone >= pRagdollPhys->listCount )
-		return HITGROUP_GENERIC;
-
-	int iStudioBone = pRagdollPhys->boneIndex[iPhysicsBone];
-	if ( iStudioBone < 0 )
-		return HITGROUP_GENERIC;
-
-	CStudioHdr *pHdr = pRagdoll->GetModelPtr();
-	if ( !pHdr )
+	if ( !pHdr || iStudioBone < 0 )
 		return HITGROUP_GENERIC;
 
 	for ( int iSet = 0; iSet < pHdr->numhitboxsets(); iSet++ )
@@ -790,13 +804,48 @@ static int UH_RagdollBoneToHitgroup( CRagdollProp *pRagdoll, int iPhysicsBone )
 		{
 			mstudiobbox_t *pBox = pSet->pHitbox( i );
 			if ( pBox->bone == iStudioBone )
-			{
 				return pBox->group;
-			}
 		}
 	}
-
 	return HITGROUP_GENERIC;
+}
+
+static int UH_RagdollBoneToHitgroup( CRagdollProp *pRagdoll, int iPhysicsBone )
+{
+	ragdoll_t *pRagdollPhys = pRagdoll->GetRagdoll();
+	CStudioHdr *pHdr = pRagdoll->GetModelPtr();
+	if ( iPhysicsBone < 0 || iPhysicsBone >= pRagdollPhys->listCount || !pHdr )
+		return HITGROUP_GENERIC;
+
+	// Check the struck element then its parents. This covers a physics bone
+	// such as a forearm whose hitbox is authored on the upper-arm bone.
+	for ( int iElement = iPhysicsBone; iElement >= 0; iElement = pRagdollPhys->list[iElement].parentIndex )
+	{
+		int iHitgroup = UH_StudioBoneToHitgroup( pHdr, pRagdollPhys->boneIndex[iElement] );
+		if ( iHitgroup != HITGROUP_GENERIC )
+			return iHitgroup;
+	}
+	return HITGROUP_GENERIC;
+}
+
+// A shot commonly lands on a child physics object (forearm/calf). Sever the
+// highest consecutive element which belongs to that same hitgroup, otherwise
+// only the child constraint breaks and the limb stretches against its parent.
+static int UH_RagdollLimbRoot( CRagdollProp *pRagdoll, int iPhysicsBone, int iHitgroup )
+{
+	ragdoll_t *pRagdollPhys = pRagdoll->GetRagdoll();
+	CStudioHdr *pHdr = pRagdoll->GetModelPtr();
+	if ( iPhysicsBone <= 0 || iPhysicsBone >= pRagdollPhys->listCount || !pHdr )
+		return iPhysicsBone;
+
+	int iRoot = iPhysicsBone;
+	for ( int iParent = pRagdollPhys->list[iRoot].parentIndex; iParent > 0; iParent = pRagdollPhys->list[iParent].parentIndex )
+	{
+		if ( UH_StudioBoneToHitgroup( pHdr, pRagdollPhys->boneIndex[iParent] ) != iHitgroup )
+			break;
+		iRoot = iParent;
+	}
+	return iRoot;
 }
 
 void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage, int iPhysicsBone, const Vector &pos, const Vector &dir )
@@ -868,29 +917,42 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 
 	pRagdoll->m_flGibDamage[idx] = 0.0f;	// reset so the limb can be re-hit
 
-	// Visually remove the limb (bodygroup) so the severed bone doesn't leave a
-	// "ghost" limb on the corpse model.
+	// Visually remove the limb before touching physics. A bodygroup transition
+	// is also the persistent one-shot state: once it has already been removed,
+	// do not emit another gib/blood burst on every later bullet.
+	bool bRemoved = false;
 	switch ( iHitGroup )
 	{
-	case HITGROUP_LEFTARM:	UH_RemoveBodygroupSide( pRagdoll, "arms", 0 ); break;
-	case HITGROUP_RIGHTARM:	UH_RemoveBodygroupSide( pRagdoll, "arms", 1 ); break;
-	case HITGROUP_LEFTLEG:	UH_RemoveBodygroupSide( pRagdoll, "Legs", 0 ); break;
-	case HITGROUP_RIGHTLEG:	UH_RemoveBodygroupSide( pRagdoll, "Legs", 1 ); break;
+	case HITGROUP_LEFTARM:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "arms", 0 ); break;
+	case HITGROUP_RIGHTARM:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "arms", 1 ); break;
+	case HITGROUP_LEFTLEG:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "Legs", 0 ); break;
+	case HITGROUP_RIGHTLEG:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "Legs", 1 ); break;
 	case HITGROUP_HEAD:
 		{
 			int iGroup = pRagdoll->FindBodygroupByName( "head" );
-			if ( iGroup >= 0 )
-				pRagdoll->SetBodygroup( iGroup, 1 );
+			int iDestroyed = UH_DestroyedHeadBodygroup( pRagdoll );
+			if ( iGroup >= 0 && pRagdoll->GetBodygroup( iGroup ) != iDestroyed )
+			{
+				pRagdoll->SetBodygroup( iGroup, iDestroyed );
+				bRemoved = true;
+			}
 
-			// Respirator / gasmask knocked off with the destroyed head.
+			// Respirator / gasmask are part of the head destruction path.
 			UH_DropGearItem( pRagdoll, "respirator", "item_respirator_guard", pos, dir );
 			UH_DropGearItem( pRagdoll, "gasmask", "item_gasmask_guard", pos, dir );
 		}
 		break;
 	}
+	if ( !bRemoved )
+		return;
 
-	// Sever the bone (falls free from the rest of the body).
-	pRagdoll->UH_SeverLimb( iPhysicsBone );
+	// Heads are a bodygroup/decal destruction in the original path, not a
+	// detached ragdoll constraint. Arms and legs sever at their limb root.
+	if ( iHitGroup != HITGROUP_HEAD )
+	{
+		int iLimbRoot = UH_RagdollLimbRoot( pRagdoll, iPhysicsBone, iHitGroup );
+		pRagdoll->UH_SeverLimb( iLimbRoot );
+	}
 
 	// Spawn a severed-limb gib at the hit position.
 	CBaseEntity *pGib = NULL;
