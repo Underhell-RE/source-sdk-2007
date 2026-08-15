@@ -915,21 +915,6 @@ int CInput::CAM_IsThirdPerson( void )
 	return m_fCameraInThirdPerson;
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: Underhell first-person free-aim — active whenever the convar is on
-// (the mod gates it purely on cam_ots_freeaim_enable, NOT the third-person OTS
-// mode; see CBaseViewModel::CalcViewModelView sub_10014D80).
-//-----------------------------------------------------------------------------
-bool CInput::CAM_IsFreeAiming( void )
-{
-	return cam_ots_freeaim_enable.GetBool() && ( C_BasePlayer::GetLocalPlayer() != NULL );
-}
-
-Vector2D CInput::CAM_GetFreeAimCursor( void )
-{
-	return m_vecFreeAimPos;
-}
-
 /*
 ==============================
 CAM_GetCameraOffset

@@ -13,15 +13,6 @@
 #include "prediction.h"
 #include "weapon_parse.h"
 #include "basecombatweapon_shared.h"
-#include "iinput.h"
-
-// Underhell free-aim (see input.h / in_mouse.cpp). ScreenToWorld lives in
-// c_vguiscreen.cpp (no header).
-extern ConVar cam_ots_freeaim_enable;
-extern void ScreenToWorld( int mousex, int mousey, float fov,
-						   const Vector& vecRenderOrigin,
-						   const QAngle& vecRenderAngles,
-						   Vector& vecPickingRay );
 #else
 #include "vguiscreen.h"
 #endif
@@ -471,46 +462,6 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 
 	SetLocalOrigin( vmorigin );
 	SetLocalAngles( vmangles );
-
-#if defined( CLIENT_DLL )
-	// Underhell free-aim (sub_10014D80): tilt the weapon viewmodel toward the
-	// free-aim cursor when not ironsighted. The cursor (max magnitude
-	// cam_ots_freeaim_move_max = 0.1) maps to a few degrees of tilt toward
-	// where the mouse points.
-	if ( cam_ots_freeaim_enable.GetBool() && !m_bExpSighted && input )
-	{
-		Vector2D cursor = input->CAM_GetFreeAimCursor();
-		int screenW, screenH;
-		engine->GetScreenSize( screenW, screenH );
-		int sx = (int)( ( cursor.x * 0.25f + 0.5f ) * (float)screenW );
-		int sy = (int)( ( 0.25f * cursor.y + 0.5f ) * (float)screenH );
-
-		Vector ray;
-		C_BasePlayer *pOwner = static_cast<C_BasePlayer *>( owner );
-		float flFOV = pOwner ? pOwner->GetFOV() : 90.0f;
-		ScreenToWorld( sx, sy, flFOV, eyePosition, eyeAngles, ray );
-
-		QAngle freeAimAngles;
-		VectorAngles( ray, freeAimAngles );
-
-		// Far off-axis: blend ~10% back toward the view forward.
-		Vector forward;
-		AngleVectors( eyeAngles, &forward );
-		forward.z = 0.0f;
-		VectorNormalize( forward );
-		if ( DotProduct( forward, ray ) < 0.1f )
-		{
-			Vector tmp, tang;
-			CrossProduct( forward, ray, tmp );
-			CrossProduct( tmp, forward, tang );
-			Vector blended = forward * 0.1f + tang;
-			VectorNormalize( blended );
-			VectorAngles( blended, freeAimAngles );
-		}
-
-		SetLocalAngles( freeAimAngles );
-	}
-#endif
 
 #endif
 }

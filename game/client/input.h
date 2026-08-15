@@ -95,10 +95,6 @@ public:
 	virtual		void		CAM_ToOrthographic();
 	virtual		bool		CAM_IsOrthographic() const;
 	virtual		void		CAM_OrthographicSize( float& w, float& h ) const;
-
-	// Underhell free-aim (first-person weapon tilt toward the mouse).
-	virtual		bool		CAM_IsFreeAiming( void );
-	virtual		Vector2D	CAM_GetFreeAimCursor( void );
 	
 #if defined( HL2_CLIENT_DLL )
 	// IK back channel info
@@ -133,11 +129,6 @@ private:
 	void		ScaleMouse( float *x, float *y );
 	void		ApplyMouse( QAngle& viewangles, CUserCmd *cmd, float mouse_x, float mouse_y );
 	void		MouseMove ( CUserCmd *cmd );
-
-	// Underhell free-aim: move the free-aim cursor + auto-turn the view past
-	// the deadzone instead of ApplyMouse (see the VDC "Over the Shoulder View"
-	// OPTIONAL free-aim section).
-	void		TryCursorMove( QAngle& viewangles, CUserCmd *cmd, float mouse_x, float mouse_y );
 
 	// Joystick  movement input helpers
 	void		ControllerMove ( float frametime, CUserCmd *cmd );
@@ -238,10 +229,6 @@ private:
 	// orthographic camera settings
 	bool		m_CameraIsOrthographic;
 
-	// Underhell free-aim cursor (normalized, magnitude clamped to
-	// cam_ots_freeaim_move_max). The crosshair + viewmodel tilt read this.
-	Vector2D	m_vecFreeAimPos;
-
 	QAngle		m_angPreviousViewAngles;
 
 	float		m_flLastForwardMove;
@@ -279,15 +266,6 @@ extern kbutton_t in_joyspeed;
 
 extern class ConVar in_joystick;
 extern class ConVar joy_autosprint;
-
-// Underhell free-aim convars (defined in in_main.cpp).
-extern ConVar cam_ots_freeaim_enable;
-extern ConVar cam_ots_freeaim_interval_enable;
-extern ConVar cam_ots_freeaim_move_threshold;
-extern ConVar cam_ots_freeaim_move_max;
-extern ConVar cam_ots_freeaim_speed_turn;
-extern ConVar cam_ots_freeaim_speed_evenyawspeed;
-extern ConVar cam_ots_freeaim_autoturn_speed;
 
 extern void KeyDown( kbutton_t *b, const char *c );
 extern void KeyUp( kbutton_t *b, const char *c );
