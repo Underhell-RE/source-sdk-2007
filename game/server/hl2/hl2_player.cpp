@@ -340,6 +340,10 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_bNightVisionEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bGasMaskEnabled, FIELD_BOOLEAN ),
 	DEFINE_SOUNDPATCH( m_pGasMaskBreathLoop ),
+	DEFINE_FIELD( m_bLeftArmDeployed, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bHoldingFlare, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bFlareMarker, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bFlashlightHolstered, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bDisableWeaponDrop, FIELD_BOOLEAN ),
 
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
@@ -462,6 +466,12 @@ CHL2_Player::CHL2_Player()
 	m_bGasMaskEnabled = true;
 	m_pGasMaskBreathLoop = NULL;
 
+	// Underhell second hand defaults.
+	m_bLeftArmDeployed = false;
+	m_bHoldingFlare = false;
+	m_bFlareMarker = false;
+	m_bFlashlightHolstered = false;
+
 	UH_InitializeInventory();
 	UH_InitializeEndurance();
 }
@@ -516,6 +526,9 @@ IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	// Underhell night vision / gas mask active state (client overlay).
 	SendPropBool( SENDINFO(m_bNightVisionOn) ),
 	SendPropBool( SENDINFO(m_bGasMaskOn) ),
+	// Underhell second hand / left arm state.
+	SendPropBool( SENDINFO(m_bLeftArmDeployed) ),
+	SendPropBool( SENDINFO(m_bHoldingFlare) ),
 END_SEND_TABLE()
 
 
@@ -560,6 +573,12 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "Player.GasMaskOn" );
 	PrecacheScriptSound( "Player.GasMaskOff" );
 	PrecacheScriptSound( "GasMask.Breath.Normal" );
+
+	// Underhell second hand / left arm viewmodels + flare prop.
+	PrecacheModel( "models/weapons/v_grenade.mdl" );
+	PrecacheModel( "models/weapons/v_flashlight_pg.mdl" );
+	PrecacheModel( "models/weapons/v_flare_pg.mdl" );
+	PrecacheModel( "models/PG_props/pg_obj/pg_flare.mdl" );
 }
 
 //-----------------------------------------------------------------------------
@@ -1265,8 +1284,10 @@ void CHL2_Player::Spawn(void)
 
 	InitSprinting();
 
-	// Underhell: create the kick viewmodel (index 2) and give it the default
-	// model. "SetPlayerKickModel" swaps it per outfit.
+	// Underhell: create the kick viewmodel (index 2) and the second-hand /
+	// left-arm viewmodel (index 1). "SetPlayerKickModel" swaps index 2 per
+	// outfit; index 1 holds the flashlight / flare / grenade.
+	CreateViewModel( 1 );
 	CreateViewModel( 2 );
 	UH_SetKickViewModel( "models/weapons/v_kick_jake_casual.mdl" );
 
@@ -2198,6 +2219,9 @@ void CHL2_Player::FlashlightTurnOn( void )
 	AddEffects( EF_DIMLIGHT );
 	EmitSound( "HL2Player.FlashLightOn" );
 
+	// Underhell: raise the left-arm flashlight viewmodel.
+	UH_UpdateLeftArm();
+
 	// Start draining the current battery.
 	if ( m_flUHBatteryCharge <= 0.0f )
 	{
@@ -2216,6 +2240,9 @@ void CHL2_Player::FlashlightTurnOff( void )
 {
 	RemoveEffects( EF_DIMLIGHT );
 	EmitSound( "HL2Player.FlashLightOff" );
+
+	// Underhell: holster the left-arm flashlight viewmodel.
+	UH_UpdateLeftArm();
 
 	variant_t flashlightoff;
 	flashlightoff.SetFloat( m_HL2Local.m_flSuitPower / 100.0f );
@@ -3551,6 +3578,9 @@ bool CHL2_Player::Weapon_Switch( CBaseCombatWeapon *pWeapon, int viewmodelindex 
 	// Underhell: leaving ironsight when switching weapons (the viewmodel
 	// resets to hip anyway; keep the authoritative flag + FOV in sync).
 	UH_DisableIronsight();
+
+	// Underhell: re-evaluate the left-arm flashlight (one-handed vs two-handed).
+	UH_UpdateLeftArm();
 
 	return BaseClass::Weapon_Switch( pWeapon, viewmodelindex );
 }

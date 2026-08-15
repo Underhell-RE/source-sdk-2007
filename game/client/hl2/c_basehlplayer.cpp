@@ -58,6 +58,9 @@ IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	// Underhell night vision / gas mask active state (client overlay).
 	RecvPropBool( RECVINFO( m_bNightVisionOn ) ),
 	RecvPropBool( RECVINFO( m_bGasMaskOn ) ),
+	// Underhell second hand / left arm state.
+	RecvPropBool( RECVINFO( m_bLeftArmDeployed ) ),
+	RecvPropBool( RECVINFO( m_bHoldingFlare ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )

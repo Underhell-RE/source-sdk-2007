@@ -87,6 +87,8 @@ public:
 	bool								m_bKickMarker;						// kick window active
 	bool								m_bNightVisionOn;					// night vision overlay active
 	bool								m_bGasMaskOn;						// gas mask overlay active
+	bool								m_bLeftArmDeployed;					// left arm raised (second hand)
+	bool								m_bHoldingFlare;					// holding a flare
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible

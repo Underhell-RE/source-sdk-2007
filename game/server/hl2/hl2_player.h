@@ -414,7 +414,22 @@ public:
 	void				UH_ToggleSilencer( void );
 	void				UH_ToggleLaser( void );
 	void				UH_DropWeapon( void );		// "DropWeapon" — throw the active weapon
-	void				UH_ThrowNade( void );		// "Throw_Nade" — grenade toss
+
+	// Underhell second hand / left arm (viewmodel index 1). Holds the
+	// flashlight (one-handed weapons), a flare, or a grenade being thrown.
+	// Decoded from sub_101ED130 (Throw_Nade) / sub_101EE050 (FlashLightContext)
+	// / sub_101F0C60 (flashlight deploy) / sub_101E9580 (flare throw).
+	void				UH_ThrowNade( void );		// "Throw_Nade" — staged throw (grenade or flare)
+	void				UH_LeftArmContextThink( void );	// the delayed grenade throw
+	void				UH_ThrowFlare( void );		// throw the held flare
+	void				UH_UpdateLeftArm( void );	// sync left-arm viewmodel with weapon + flashlight
+	void				UH_EquipFlare( void );		// put a flare in the left hand (flare pack use)
+	void				UH_HolsterLeftArm( void );	// put the left arm away (weapon switch / drop)
+	void				UH_SetLeftArmModel( const char *pszModel, int nSkin, bool bDeployed );
+
+	// Underhell flashlight viewmodel in the left hand. Raised while the
+	// flashlight is on and a one-handed weapon is active.
+	bool				UH_IsFlashlightInLeftArm( void ) const { return !m_bShoulderFlashlight; }
 
 	// Underhell night vision + gas mask toggles (client commands
 	// "NightVision_Toggle" -> vtable 404 = sub_102E19B0, "GasMask_Toggle" ->
@@ -534,6 +549,14 @@ private:
 	bool				m_bNightVisionEnabled;	// map allows night vision use
 	bool				m_bGasMaskEnabled;		// map allows gas mask use
 	CSoundPatch			*m_pGasMaskBreathLoop;	// looping breath sound while masked
+
+	// Underhell second hand / left arm (viewmodel index 1). m_bLeftArmDeployed
+	// @2121 and m_bHoldingFlare @2122 are networked (client mirrors them for
+	// prediction); the rest is server-local (matches the original binary).
+	CNetworkVar( bool, m_bLeftArmDeployed );	// left arm raised
+	CNetworkVar( bool, m_bHoldingFlare );		// holding a flare (throws flare, not grenade)
+	bool				m_bFlareMarker;			// grenade throw anim in progress
+	bool				m_bFlashlightHolstered;	// flashlight holstered in the left hand
 
 	// Server-only runtime accumulators (mirror the original binary's members;
 	// not networked, saved for parity).

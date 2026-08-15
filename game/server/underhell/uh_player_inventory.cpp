@@ -268,6 +268,16 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 		return false;
 	}
 
+	// Flare packs equip a flare in the left hand instead of spawning a world
+	// item (original: holding a flare lets "Throw_Nade" toss a flare).
+	if ( bUse && iItem == UH_ITEM_FLARE_PACK )
+	{
+		UH_EquipFlare();
+		UH_RemoveInventoryItem( iSlot );
+		engine->ClientCommand( edict(), "UpdateInventory" );
+		return true;
+	}
+
 	if ( !bUse )
 	{
 		// Drop path — spawn the styled world item in front of the player

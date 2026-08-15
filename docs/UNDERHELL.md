@@ -1067,3 +1067,46 @@ Implementation notes for later:
   hooking weapon deploy so one-handed weapons raise the left arm. The flare
   (`v_flare_pg.mdl`) + flashlight (`v_flashlight_pg.mdl`) viewmodels are
   precached in the original sub_101E25F0.
+
+## Second hand / left arm — implemented (flashlight / flare / grenade)
+
+The left arm is viewmodel index 1 (index 0 = weapon, 2 = kick). State added to
+CHL2_Player (m_bLeftArmDeployed @2121 + m_bHoldingFlare @2122 networked; the
+rest server-local). New file `game/server/underhell/uh_leftarm.cpp`:
+
+- **Animated grenade throw** (`Throw_Nade`, sub_101ED130): the grenade viewmodel
+  (`v_grenade.mdl`) goes into the left hand, the arm raises, `ACT_VM_THROW`
+  plays on the active weapon, and the grenade actually leaves 0.4 s later from
+  `UH_LeftArmContextThink` (the original "FlashLightContext" think). The old
+  immediate `WeaponFrag_ThrowNow` call was replaced.
+- **Flare** (`sub_101E9580`): using a flare pack (`UH_ITEM_FLARE_PACK`) now
+  equips a flare in the left hand (`v_flare_pg.mdl`) instead of re-picking the
+  item; `Throw_Nade` then throws a lit `prop_physics` flare
+  (`pg_flare.mdl`, 200 u/s, 90 s fuse) instead of a grenade.
+- **Flashlight in the left hand** (`sub_101F0C60`): while the flashlight is on
+  and a one-handed (pistol) or melee weapon is active, the left arm raises
+  `v_flashlight_pg.mdl`; otherwise it is hidden. Re-evaluated on flashlight
+  on/off, weapon switch and weapon drop (`UH_UpdateLeftArm`).
+
+NOTE: the flashlight's LIGHT is still the vanilla EF_DIMLIGHT; the left-arm
+`v_flashlight_pg.mdl` is the visual hold. The full viewmodel flashlight entity
+(shoulder mount, holster animation, FlashlightViewModelThink) is still TODO.
+
+## Night vision "solid gradient" — shader DLLs, not game code
+
+The night vision / gas mask overlays use custom shaders shipped in the mod:
+
+- **`game_shader_generic_eshader_2007.dll`** — the game-shader DLL that
+  implements the `shader/nightvision` / `shader/gasmask` / `shader/filmgrain`
+  shaders. Loaded by the material system (engine), NOT by client.dll — do NOT
+  reverse it; it just needs to be present in `<mod>/bin/` and load correctly.
+- **`shadereditor_2007.dll`** — the runtime shader editor (dev tool). client.dll
+  loads it at startup via `CreateInterface("ShaderEditor005")` (sub_1011F6E0)
+  and only activates it with `-shaderedit`. Irrelevant to gameplay; do NOT
+  reverse it.
+
+The client already draws `shader/nightvision` / `shader/gasmask` full-screen
+(matching sub_10141600's DrawScreenSpaceRectangle). A "solid gradient" means the
+shader from the game-shader DLL isn't being applied — i.e. the DLL isn't
+loading in the install (check `Underhell/bin/game_shader_generic_eshader_2007.dll`
+exists and gameinfo.txt points at the mod), not a client.dll/server.dll bug.

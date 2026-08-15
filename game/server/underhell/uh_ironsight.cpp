@@ -26,7 +26,6 @@
 #include "hl2_player.h"
 #include "baseviewmodel_shared.h"
 #include "uh_weapons.h"
-#include "grenade_frag.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -270,36 +269,9 @@ void CHL2_Player::UH_DropWeapon( void )
 	Vector velocity = forward * 300.0f;
 
 	Weapon_Drop( pWeapon, NULL, &velocity );
-}
 
-//-----------------------------------------------------------------------------
-// Purpose: Throw a grenade (client command "Throw_Nade"). Decoded from
-// sub_101ED130. The original is part of the arm-deploy system (m_bLeftArmDeployed
-// / m_bHoldingFlare) and throws via the grenade weapon's fire path; the flare
-// branch + grenade-viewmodel animation are TODO.
-//-----------------------------------------------------------------------------
-void CHL2_Player::UH_ThrowNade( void )
-{
-	if ( GetHealth() <= 0 )
-		return;
-
-	if ( IsSprinting() )
-		return;
-
-	CBaseCombatWeapon *pGrenade = Weapon_OwnsThisType( "weapon_frag" );
-	if ( !pGrenade )
-		return;
-
-	if ( !pGrenade->HasPrimaryAmmo() )
-		return;
-
-	// Un-sight (the original does this before throwing).
-	if ( m_bIronSighted )
-		UH_ToggleIronsight();
-
-	// Throw immediately (the original switches to a grenade-armed left arm and
-	// throws via the fire path; here we throw straight away).
-	WeaponFrag_ThrowNow( pGrenade );
+	// Underhell: re-evaluate the left-arm flashlight after the drop.
+	UH_UpdateLeftArm();
 }
 
 //-----------------------------------------------------------------------------
