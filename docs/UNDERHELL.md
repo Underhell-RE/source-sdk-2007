@@ -905,11 +905,14 @@ case where an NPC kicks the player (sk_combine_s_kick etc.), not yet ported.
 
 ## Weapon pickup + shotgun fire fixes (decoded from DefaultTouch/BumpWeapon)
 
-The original `CBaseCombatWeapon::DefaultTouch` (sub_100D02C0) auto-picks weapons
-on touch — the earlier "no auto pickup" change was wrong. Corrected 1:1:
+Weapons are **+use only** — no auto-pickup on touch. `SetPickupTouch` sets
+`SetTouch(NULL)` (the earlier DefaultTouch auto-pickup attempt was reverted:
+walking over a weapon was grabbing it and throwing the player's same-bucket
+weapon out, most visibly under impulse 101). Picking up goes through
+`CBaseCombatWeapon::Use -> CHL2_Player::BumpWeapon` (+use, and GiveNamedItem's
+`Use` call for impulse 101). Ammo boxes keep the vanilla walk-over pickup.
 
-- `SetPickupTouch` restored to `SetTouch(DefaultTouch)` (walk-over pickup).
-- `CHL2_Player::BumpWeapon`:
+- `CHL2_Player::BumpWeapon` (the +use path):
   - `weapon_frag` is an ammo pickup (give 1 grenade, max 4, remove the frag) and
     never replaces another weapon (fixes the BFG being dropped when grabbing a
     frag in the same bucket 5).
@@ -923,6 +926,11 @@ on touch — the earlier "no auto pickup" change was wrong. Corrected 1:1:
 TODO: sk_plr_num_shotgun_pellets is hardcoded to 7 (its default) rather than
 read from the convar; shotgun pump animation delay (m_bNeedPump / SequenceDuration)
 is approximated by the 0.8 s fire rate.
+
+NOTE: the original DLL's `DefaultTouch` (sub_100D02C0) does auto-pick on touch,
+which conflicts with the observed in-game behaviour (weapons need +use). Kept
+the working +use-only model and left this note rather than matching the
+decompile byte-for-byte.
 
 ## Select fire (firemode_toggle) — ported
 

@@ -1859,7 +1859,12 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 		// Original impulse 101 (decode sub_101EC700 case 101): the Underhell
 		// weapon set + full ammo. This REPLACES the vanilla HL2 weapon set
 		// (the base class is not called), matching the original exactly.
+		// The original sets gEvilImpulse101 around the GiveNamedItem calls so
+		// the one-weapon-per-bucket logic strips the old occupant silently
+		// instead of dropping it on the floor (dword_106BB4D0 = 1 / = 0).
+		gEvilImpulse101 = true;
 		UH_GiveAllWeapons( this );
+		gEvilImpulse101 = false;
 		break;
 	}
 
