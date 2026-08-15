@@ -1628,65 +1628,37 @@ STRONG trust signal, but `verify` still contains some genuine matches (and
 `unmatched` contains vanilla functions Diaphora simply couldn't match, e.g.
 CAchievementNotificationPanel). Use the tiers as a triage map, not ground truth.
 
-## Free-aim (weapon tilts toward the mouse) — decoded, not yet ported
+## Free-aim (weapon tilts toward the mouse) — NOT a standalone feature
 
-The "weapon sways/tilts toward the mouse when not aiming" is **free-aim**, the
-"OPTIONAL: Adding free aim" section of the VDC "Over the Shoulder View" tutorial
-(the mod author's `notes/Over the Shoulder View - Valve Developer Community.html`).
-It is FIRST-PERSON and separate from the third-person OTS camera.
+The "weapon sways/tilts toward the mouse when not aiming" is a SIDE EFFECT of
+the third-person OTS (over-the-shoulder) camera + aim-angle separation, NOT a
+standalone first-person feature. A first port attempt (based on the VDC
+"Over the Shoulder View" tutorial's OPTIONAL free-aim section, shipped in the
+mod's `notes/`) was reverted after it felt wrong in game. Decode corrections:
 
-### Architecture (tutorial + Underhell binary)
+### What the binary actually does (not the tutorial)
 
-1. **Input decoupling** (`in_mouse.cpp`): when free-aiming, `CInput::MouseMove`
-   routes to `TryCursorMove(m_angViewAngle, cmd, x, y)` instead of
-   `ApplyMouse(...)` — the mouse moves a free-aim CURSOR (`m_vecFreeAimPos`,
-   Vector2D in [-1,1]) on screen; only when the cursor leaves the deadzone
-   (`cam_ots_freeaim_move_threshold`/`move_max`) does the view auto-turn
-   (`cam_ots_freeaim_autoturn_speed`, `cam_ots_TurnAuto`).
-2. **Crosshair** (`hud_crosshair.cpp`): drawn at
-   `x = ScreenWidth()/2 * (m_vecFreeAimPos.x + 1)` — i.e. at the cursor.
-3. **Viewmodel tilt**: the weapon viewmodel re-orients toward the cursor (the
-   observable "roll toward the mouse").
-4. **Server sync** (`serveror.dll`): `update_freeaim %f %f %f` is a server
-   ConCommand (client → server, via the engine command route); the client's
-   dot-reticle paint `sub_100BC870` computes the free-aim world target every
-   frame via `ScreenToWorld` (`sub_10070AD0`) and sends it. The server tracks
-   the free-aim aim direction for networked aim/prediction.
+- `cam_ots_freeaim_enable` is read in EXACTLY ONE place: `sub_10014D80`
+  (`CBaseViewModel::CalcViewModelView`), where it gates the viewmodel tilt.
+- The OTHER 6 `cam_ots_freeaim_*` ConVars (`interval_enable`, `move_threshold`,
+  `move_max`, `speed_turn`, `speed_evenYawSpeed`, `autoturn_speed`) are
+  **registered but never read** — the tutorial's deadzone/auto-turn cursor
+  logic does NOT exist in the binary.
+- `CInput` has no `TryCursorMove` / `CAM_IsFreeAiming` / `CAM_GetFreeAimCursor`
+  (confirmed from the decompile's named `CInput::*` methods).
+- The viewmodel tilt reads a Vector2D "cursor" via IInput vtable slot 12, which
+  is populated by the OTS angle-separation logic (`CalcPlayerAngle`-style
+  view-vs-aim split, `m_angViewAngle`) in `CInput::MouseMove` — entangled with
+  the third-person camera, not a first-person mouse-cursor.
+- `update_freeaim %f %f %f` is a server ConCommand; the client dot-reticle paint
+  `sub_100BC870` computes the free-aim world target via `ScreenToWorld`
+  (`sub_10070AD0`) and sends it each frame.
 
-### ConVars (client, from `Cliento.dll` + tutorial)
+### Conclusion / TODO
 
-| ConVar | default | purpose |
-|---|---|---|
-| `cam_ots_freeaim_enable` | 1 | master toggle (FCVAR_ARCHIVE) |
-| `cam_ots_freeaim_interval_enable` | 0 | use an interval for view turning |
-| `cam_ots_freeaim_move_threshold` | 0.05 | deadzone (cursor past this turns the view) |
-| `cam_ots_freeaim_move_max` | 0.1 | cursor clamp |
-| `cam_ots_freeaim_speed_turn` | 1 | turn speed |
-| `cam_ots_freeaim_speed_evenYawSpeed` | 0 | even yaw speed |
-| `cam_ots_freeaim_autoturn_speed` | 250 | auto-turn rate |
-
-Commands: `cam_ots_TurnAuto` (→ `CAM_UpdateAngleByFreeAiming(true)`),
-`cam_ots_Turn180` (→ `CAM_UpdateAngle180`).
-
-### Where the tilt is applied in our SDK
-
-`CBaseViewModel::CalcViewModelView` (`baseviewmodel_shared.cpp`) already hosts
-the ironsight `ExpOffset`/`m_expFactor` slide — free-aim's viewmodel roll is the
-same kind of client-side `vmangles`/`vmorigin` offset, driven by the free-aim
-cursor instead of `m_bExpSighted`.
-
-### Port plan (staged)
-
-1. `iinput.h` / `input.h` / `input.cpp` / `in_mouse.cpp`: add `m_vecFreeAimPos`
-   + `TryCursorMove` + `CAM_IsFreeAiming`/`CAM_GetFreeAimCursor` and route
-   `MouseMove` through it (the input-decoupling core — highest risk, needs
-   in-game testing).
-2. `hud_crosshair.cpp`: draw the crosshair at the free-aim cursor.
-3. `baseviewmodel_shared.cpp` `CalcViewModelView`: tilt `vmangles` toward the
-   cursor (the observable weapon roll).
-4. Server: `update_freeaim` ConCommand + free-aim aim tracking (needed only for
-   network/prediction parity; the visual roll is client-side).
-5. Register the 7 `cam_ots_freeaim_*` ConVars.
-
-TODO until then — see "Free-aim (first-person …)" in the ironsight/weapons
-TODO list.
+The "weapon tilt" is entangled with the OTS third-person camera system
+(angle separation, `m_angViewAngle`, `AllowOvertheShoulderView`, server aim
+sync via `update_freeaim`). A faithful port requires the whole OTS system, not
+a small viewmodel offset. Treat as TODO alongside the OTS third-person camera;
+do not port the tutorial's first-person free-aim in isolation — the binary
+doesn't implement it that way.
