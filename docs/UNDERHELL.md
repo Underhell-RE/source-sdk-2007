@@ -1509,3 +1509,57 @@ Note `hud_battery_meter` + `hud_flashlight` + `hud_shoulderflashlight` are not
 referenced by the HUD ctors in the decompile (the battery bar is drawn as
 chunks, not the meter texture) — `hud_flashlight` / `hud_shoulderflashlight`
 belong to the (TODO) shoulder-flashlight viewmodel HUD.
+## Diaphora reference (new asset in the hexrays repo) — how to use it
+
+`klaxons1/underhell-hexrays` now ships a Diaphora export + a full re-decompile:
+`Underhell/bin/diaphora/cliento.diaphora` (SQLite) and
+`Cliento_diaphora.dll.c` (24 MB, Hex-Rays 9.1).
+
+### What it is
+
+- `cliento.diaphora`: Diaphora match of `Cliento.dll` (Underhell) vs
+  `original/Client.dll` (vanilla OB). **11405 matched / 12685 unmatched**.
+  Match types: best 10199 / multimatch 1199 / partial 7.
+- `Cliento_diaphora.dll.c`: the full Hex-Rays 9.1 decompile of Cliento.dll with
+  Diaphora names + RTTI class names applied (e.g. `CHudDotReticle::`vftable'`).
+
+### Value (real)
+
+1. **Better decompile reference** — Hex-Rays 9.1, single grep-able file,
+   struct-typed in places. Prefer it over the old per-function `sub_*.cpp`.
+2. **RTTI class attribution is correct** — the vtable owners
+   (`CHudDotReticle`, `CHudUHBattery`, `CHudEndurance`, `CHudStamina`,
+   `CHudBleeding`, `CHudUHHermitCards`) match the vtable analysis in § RTTI
+   validation. Confirms the class mapping.
+3. **`unmatched` = the Underhell delta** — a clean to-do map of the 12685
+   functions that are mod-specific (HUD, inventory, weapons, gear).
+
+### Caveat (critical): false positives in the modified regions
+
+Diaphora matches by AST/pseudocode similarity, and Underhell REPLACED vanilla
+code in the HUD/inventory/weapon regions. There, custom functions get spurious
+matches to nearby unrelated vanilla functions — with ratio 1.0. Concrete cases:
+
+| Underhell function | what it really is | Diaphora named it |
+|---|---|---|
+| `sub_100BDC80` | battery HUD paint (reads m_iUHBatteryCount@5292, draws chunked bar + "x<N>") | `CAsyncCaptionResourceManager::~CAsyncCaptionResourceManager` |
+| `sub_100BE800` | bleeding HUD paint (m_iBleedCounter@3436 * 2.55) | `CHudCloseCaption::CHudCloseCaption` |
+| `sub_100BCFA0` | hermit-cards think | `CUtlVector<CaptionLookup_t>::CopyArray` |
+| `sub_100BD080` | hermit-cards paint | `CUtlVector<AsyncCaption_t>::RemoveAll` |
+
+All "best"/"multimatch", ratio 1.0, all wrong. The tell: genuine matches carry
+the region's consistent address shift (~0x13xxx); these false matches have
+anomalous small deltas (-0x530 … -0x30).
+
+**Rule**: never trust a Diaphora name in the HUD/inventory/weapon regions
+without reading the code. Use it as a MAP (unmatched = delta, matched = vanilla
+framework), not ground truth.
+
+### Reticle re-confirmed (caret, not square)
+
+The 9.1 decompile of the dot-reticle paint (`sub_100BC870`) confirms the first
+fix: it draws `DrawSetColor(white, alpha)` + `DrawFilledRect(dotx, doty, 2, 8)`,
+then `DrawSetColor(black, alpha)` + `DrawFilledRect(dotx, doty, 3, 8)` — a tiny
+2-3 px × 8 px tick, NOT a filled square. `alpha = (3.0 - (curtime - trigger)) * 85`.
+The exact screen origin is ambiguous from the decompile (the rect coords read
+degenerate); verify pixel position in game.
