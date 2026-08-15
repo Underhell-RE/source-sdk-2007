@@ -2208,6 +2208,21 @@ void CHL2_Player::FlashlightTurnOn( void )
 	if( m_bFlashlightDisabled )
 		return;
 
+	// Underhell: the hand-held flashlight is held in the left hand, which only
+	// works when the left arm is free — no weapon, a one-handed weapon (pistol)
+	// or melee. A shoulder-mounted flashlight (item_shoulderflashlight) works
+	// with any weapon.
+	if ( !m_bShoulderFlashlight )
+	{
+		CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+		bool bLeftArmFree = !pWeapon || pWeapon->GetWpnData().m_bOneHanded || pWeapon->GetWpnData().m_bMeleeWeapon;
+		if ( !bLeftArmFree )
+		{
+			EmitSound( "HL2Player.UseDeny" );
+			return;
+		}
+	}
+
 	// Underhell: the flashlight runs on batteries (m_iUHBatteryCount), not on
 	// suit power like vanilla HL2.
 	if ( UH_GetBatteryCount() <= 0 )
