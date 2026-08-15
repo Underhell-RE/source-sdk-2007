@@ -28,7 +28,6 @@ public:
 	~CRagdollProp( void );
 
 	virtual void UpdateOnRemove( void );
-	virtual int ObjectCaps( void ) { return BaseClass::ObjectCaps() | FCAP_IMPULSE_USE; }
 	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	void DrawDebugGeometryOverlays();
