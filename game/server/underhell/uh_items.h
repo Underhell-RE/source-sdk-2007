@@ -82,6 +82,20 @@ public:
 		virtual int	 GetInventoryItemType() const { return _itemId; } \
 	};
 
+// Auto-applies on pickup (armour / gear / ammo): overrides MyTouch to grant its
+// effect and remove itself, and reports UH_ITEM_UNKNOWN so CUHItem::MyTouch
+// doesn't treat it as an inventory item.
+#define UH_DECLARE_PICKUP_ITEM( _className )						\
+	class _className : public CUHItem								\
+	{																\
+	public:															\
+		DECLARE_CLASS( _className, CUHItem );						\
+		virtual void Spawn( void );									\
+		virtual void Precache( void );								\
+		virtual bool MyTouch( CBasePlayer *pPlayer );				\
+		virtual int	 GetInventoryItemType() const { return UH_ITEM_UNKNOWN; } \
+	};
+
 //-----------------------------------------------------------------------------
 // Food
 //
@@ -163,11 +177,11 @@ public:
 // Underhell ammo pickups (boxed). Vanilla rounds keep their vanilla classes.
 // TODO: ammo uses a separate id space — pickups auto-add ammo.
 //-----------------------------------------------------------------------------
-UH_DECLARE_ITEM( CItem_UHPistolAmmo,	UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItem_UH357Ammo,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItem_UHSMG1Ammo,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItem_UHRifleAmmo,		UH_ITEM_UNKNOWN )
-UH_DECLARE_ITEM( CItem_UHBuckShot,		UH_ITEM_UNKNOWN )
+UH_DECLARE_PICKUP_ITEM( CItem_UHPistolAmmo )
+UH_DECLARE_PICKUP_ITEM( CItem_UH357Ammo )
+UH_DECLARE_PICKUP_ITEM( CItem_UHSMG1Ammo )
+UH_DECLARE_PICKUP_ITEM( CItem_UHRifleAmmo )
+UH_DECLARE_PICKUP_ITEM( CItem_UHBuckShot )
 
 //-----------------------------------------------------------------------------
 // Equipment
@@ -185,9 +199,9 @@ public:
 	virtual int	 GetInventoryItemType() const { return UH_ITEM_UNKNOWN; }
 };
 
-UH_DECLARE_ITEM( CItemFlashlight,		UH_ITEM_UNKNOWN )	// TODO: flashlight system
-UH_DECLARE_ITEM( CItemNightVision,		UH_ITEM_UNKNOWN )	// TODO: gear system
-UH_DECLARE_ITEM( CItemGasMask,			UH_ITEM_UNKNOWN )	// TODO: gear system
+UH_DECLARE_PICKUP_ITEM( CItemFlashlight )
+UH_DECLARE_PICKUP_ITEM( CItemNightVision )
+UH_DECLARE_PICKUP_ITEM( CItemGasMask )
 
 // Armour auto-applies on pickup (original sub_10171F60: only while armour
 // is below full). TODO: verify the amount granted.
@@ -228,7 +242,7 @@ UH_DECLARE_ITEM( CItemFlarePack,		UH_ITEM_FLARE_PACK )
 UH_DECLARE_ITEM( CItemFMRadio,			UH_ITEM_FM_RADIO )
 UH_DECLARE_ITEM( CItemRadioCracker,		UH_ITEM_RADIO_CRACKER )
 
-UH_DECLARE_ITEM( CItemHeavyArmor,		UH_ITEM_UNKNOWN )	// TODO: heavy armour pickup
+UH_DECLARE_PICKUP_ITEM( CItemHeavyArmor )
 
 //-----------------------------------------------------------------------------
 // Health
@@ -281,10 +295,10 @@ public:
 // can: CanThink + CanTouch + 1 HP). Original RTTI still has that class next
 // to CEnvBeverage. Inventory sodas are item_uhsoda / CItemUHSoda.
 //-----------------------------------------------------------------------------
-UH_DECLARE_ITEM( CItemShield,			UH_ITEM_UNKNOWN )	// item_shield — TODO: id, model
-UH_DECLARE_ITEM( CItemShoulderFlashlight, UH_ITEM_UNKNOWN )	// item_shoulderflashlight — TODO
-UH_DECLARE_ITEM( CItemCapPMC,			UH_ITEM_UNKNOWN )	// item_cap_pmc — TODO
-UH_DECLARE_ITEM( CItemHeadsetPMC,		UH_ITEM_UNKNOWN )	// item_headset_pmc — TODO
+UH_DECLARE_PICKUP_ITEM( CItemShield )
+UH_DECLARE_PICKUP_ITEM( CItemShoulderFlashlight )
+UH_DECLARE_PICKUP_ITEM( CItemCapPMC )
+UH_DECLARE_PICKUP_ITEM( CItemHeadsetPMC )
 
 
 // TODO: item_bandagespack, item_syringepack, item_flags, item_health — class

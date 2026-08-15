@@ -9,6 +9,8 @@
 //=============================================================================//
 
 #include "cbase.h"
+#include "ammodef.h"
+#include "gamerules.h"
 #include "hl2_player.h"
 #include "uh_items.h"
 
@@ -24,6 +26,12 @@ static void UH_PrecacheItemSounds( void )
 {
 	// Free function — must qualify; PrecacheScriptSound is CBaseEntity::.
 	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupItems" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupArmor" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupBuckShotAmmo" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupPistolAmmoBox" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.Pickup357AmmoBox" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupSMGAmmoBox" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupRifleAmmoBox" );
 }
 
 //-----------------------------------------------------------------------------
@@ -399,14 +407,88 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 }
 
 //-----------------------------------------------------------------------------
-// Underhell ammo pickups (boxed). Models from Underhell.fgd.
-// TODO: ammo auto-add semantics (amounts per weapon type).
+// Underhell ammo pickups (boxed). Models + amounts + pickup sounds decoded from
+// the original per-item MyTouch (sub_10171670 / sub_101716F0 / sub_10171780 /
+// sub_10171820 / sub_101718B0).
 //-----------------------------------------------------------------------------
 UH_DEFINE_ITEM( CItem_UHPistolAmmo,	item_box_pistol_ammo,	"models/pg_props/pg_weapons/pg_pistol_ammo.mdl" )
 UH_DEFINE_ITEM( CItem_UH357Ammo,	item_box_357_ammo,		"models/pg_props/pg_weapons/pg_357_ammo.mdl" )
 UH_DEFINE_ITEM( CItem_UHSMG1Ammo,	item_box_smg1_ammo,		"models/pg_props/pg_weapons/pg_smg_ammo.mdl" )
 UH_DEFINE_ITEM( CItem_UHRifleAmmo,	item_box_rifle_ammo,	"models/pg_props/pg_weapons/pg_rifle_ammo.mdl" )
 UH_DEFINE_ITEM( CItem_UHBuckShot,	item_ammo_buckshot,		"models/items/buckshot.mdl" )
+
+// Give an ammo pickup's rounds to the player (skill-scaled, like the original
+// sub_102EC5A0 / ITEM_GiveAmmo) and play its pickup sound.
+static bool UH_GiveAmmoPickup( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName, const char *pszPickupSound )
+{
+	int iAmmoType = GetAmmoDef()->Index( pszAmmoName );
+	if ( iAmmoType == -1 )
+	{
+		Msg( "ERROR: Attempting to give unknown ammo type (%s)\n", pszAmmoName );
+		return false;
+	}
+
+	flCount = max( 1.0f, flCount * g_pGameRules->GetAmmoQuantityScale( iAmmoType ) );
+	int nGiven = pPlayer->GiveAmmo( (int)flCount, iAmmoType );
+	if ( nGiven > 0 )
+		pPlayer->EmitSound( pszPickupSound );
+	return nGiven > 0;
+}
+
+bool CItem_UHPistolAmmo::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	UH_GiveAmmoPickup( pPlayer, 30.0f, "Pistol", "HL2Player.PickupPistolAmmoBox" );
+	UTIL_Remove( this );
+	return true;
+}
+
+bool CItem_UH357Ammo::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	UH_GiveAmmoPickup( pPlayer, 20.0f, "357", "HL2Player.Pickup357AmmoBox" );
+	UTIL_Remove( this );
+	return true;
+}
+
+bool CItem_UHSMG1Ammo::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	UH_GiveAmmoPickup( pPlayer, 50.0f, "SMG1", "HL2Player.PickupSMGAmmoBox" );
+	UTIL_Remove( this );
+	return true;
+}
+
+bool CItem_UHRifleAmmo::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	UH_GiveAmmoPickup( pPlayer, 50.0f, "AR2", "HL2Player.PickupRifleAmmoBox" );
+	UTIL_Remove( this );
+	return true;
+}
+
+bool CItem_UHBuckShot::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	UH_GiveAmmoPickup( pPlayer, 6.0f, "Buckshot", "HL2Player.PickupBuckShotAmmo" );
+	UTIL_Remove( this );
+	return true;
+}
 
 //-----------------------------------------------------------------------------
 // Equipment
@@ -441,6 +523,128 @@ UH_DEFINE_ITEM( CItemHeavyArmor,	item_heavyarmor,	"models/items/kevlar.mdl" )
 UH_DEFINE_ITEM( CItemFlashlight,	item_flashlight,	"models/pg_props/pg_obj/pg_flashlight.mdl" )
 UH_DEFINE_ITEM( CItemNightVision,	item_nightvision,	"models/items/nightvision.mdl" )
 UH_DEFINE_ITEM( CItemGasMask,		item_gasmask,		"models/items/gasmask.mdl" )
+
+//-----------------------------------------------------------------------------
+// Heavy armour — same pickup as item_armor but a bigger grant (original
+// sub_10174730: 45 armour, max 200).
+//-----------------------------------------------------------------------------
+bool CItemHeavyArmor::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	if ( pHL2Player->ArmorValue() >= 200 )
+		return false;
+
+	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
+	SetOwnerEntity( pHL2Player );
+
+	pHL2Player->IncrementArmorValue( 45, 200 );
+	UTIL_Remove( this );
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Gear pickups — grant the piece and consume the item. The night-vision / gas
+// mask usage (m_bNightVisionOn / m_bGasMaskOn toggles + client overlay) is still
+// TODO, but ownership is tracked here so the pickups work end-to-end.
+//-----------------------------------------------------------------------------
+bool CItemFlashlight::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	pHL2Player->UH_SetFlashlightOn( true );
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	SetOwnerEntity( pHL2Player );
+	UTIL_Remove( this );
+
+	return true;
+}
+
+bool CItemNightVision::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	pHL2Player->UH_SetHaveNightVision( true );
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	SetOwnerEntity( pHL2Player );
+	UTIL_Remove( this );
+
+	return true;
+}
+
+bool CItemGasMask::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	pHL2Player->UH_SetHaveGasMask( true );
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	SetOwnerEntity( pHL2Player );
+	UTIL_Remove( this );
+
+	return true;
+}
+
+bool CItemShoulderFlashlight::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	pHL2Player->UH_SetShoulderFlashlight( true );
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	SetOwnerEntity( pHL2Player );
+	UTIL_Remove( this );
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Shield / PMC cap / PMC headset — wearable armour pieces. The original grants
+// them as equipment (the shield in particular has a full block mechanic that is
+// still TODO); here they grant armour like the helmets so they are at least
+// functional pickups.
+//-----------------------------------------------------------------------------
+static bool UH_GiveArmorPickup( CBasePlayer *pPlayer, CBaseEntity *pItem, int iAmount, int iMax )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	if ( pHL2Player->ArmorValue() >= iMax )
+		return false;
+
+	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
+	pItem->SetOwnerEntity( pHL2Player );
+	pHL2Player->IncrementArmorValue( iAmount, iMax );
+	UTIL_Remove( pItem );
+
+	return true;
+}
+
+bool CItemShield::MyTouch( CBasePlayer *pPlayer )
+{
+	return UH_GiveArmorPickup( pPlayer, this, 10, 100 );
+}
+
+bool CItemCapPMC::MyTouch( CBasePlayer *pPlayer )
+{
+	return UH_GiveArmorPickup( pPlayer, this, 10, 100 );
+}
+
+bool CItemHeadsetPMC::MyTouch( CBasePlayer *pPlayer )
+{
+	return UH_GiveArmorPickup( pPlayer, this, 10, 100 );
+}
+
 UH_DEFINE_ARMOR_ITEM( CItemHelmetGuard,	item_helmet_guard,	"models/items/helmet_visor.mdl" )
 UH_DEFINE_ARMOR_ITEM( CItemHelmetPrison,	item_helmet_prison,	"models/items/helmet.mdl" )
 UH_DEFINE_ARMOR_ITEM( CItemHelmetPMC,		item_helmet_pmc,	"models/items/pmc_helmet.mdl" )
@@ -618,10 +822,10 @@ void CItemBandages::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE
 // Classnames from the original serveror.dll string table; models TODO.
 // item_sodacan stays vanilla (CItemSoda in effects.cpp) — do not re-link it.
 //-----------------------------------------------------------------------------
-UH_DEFINE_ITEM( CItemShield,			item_shield,			"models/error.mdl" )	// TODO: model
-UH_DEFINE_ITEM( CItemShoulderFlashlight, item_shoulderflashlight, "models/error.mdl" )	// TODO: model
-UH_DEFINE_ITEM( CItemCapPMC,			item_cap_pmc,			"models/error.mdl" )	// TODO: model
-UH_DEFINE_ITEM( CItemHeadsetPMC,		item_headset_pmc,		"models/error.mdl" )	// TODO: model
+UH_DEFINE_ITEM( CItemShield,			item_shield,			"models/items/riotshield.mdl" )
+UH_DEFINE_ITEM( CItemShoulderFlashlight, item_shoulderflashlight, "models/nh2_gmn/flashlight.mdl" )
+UH_DEFINE_ITEM( CItemCapPMC,			item_cap_pmc,			"models/items/pmc_cap.mdl" )
+UH_DEFINE_ITEM( CItemHeadsetPMC,		item_headset_pmc,		"models/items/pmc_headset.mdl" )
 UH_DEFINE_ARMOR_ITEM( CItemRespiratorGuard,	item_respirator_guard,	"models/items/respirator.mdl" )
 UH_DEFINE_ARMOR_ITEM( CItemGasmaskGuard,		item_gasmask_guard,		"models/items/gasmask.mdl" )
 

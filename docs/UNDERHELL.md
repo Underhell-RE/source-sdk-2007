@@ -963,3 +963,28 @@ full-auto vs shotgun, plus silenced variants — sub_10279580 returns 207/208/20
 etc.). Those enum entries don't exist in the vanilla activity list, so the
 animation mapping is left at ACT_VM_PRIMARYATTACK here.
 
+
+## Item pickups — implemented (ammo / gear / armour)
+
+Decoded the remaining item MyTouch handlers and implemented them (server-side,
++use pickup, auto-apply + consume, matching the original amounts/sounds):
+
+- **Ammo boxes** (sub_10171670 / 101716F0 / 10171780 / 10171820 / 101718B0),
+  skill-scaled via GetAmmoQuantityScale:
+  - item_box_pistol_ammo -> 30 Pistol (`HL2Player.PickupPistolAmmoBox`)
+  - item_box_357_ammo   -> 20 357    (`HL2Player.Pickup357AmmoBox`)
+  - item_box_smg1_ammo  -> 50 SMG1   (`HL2Player.PickupSMGAmmoBox`)
+  - item_box_rifle_ammo -> 50 AR2    (`HL2Player.PickupRifleAmmoBox`)
+  - item_ammo_buckshot  -> 6 Buckshot (`HL2Player.PickupBuckShotAmmo`)
+- **item_heavyarmor** -> 45 armour, max 200 (sub_10174730).
+- **Gear ownership** (item_flashlight / item_nightvision / item_gasmask /
+  item_shoulderflashlight) sets the player flags (m_bFlashlightOn /
+  m_bHaveNightVision / m_bHaveGasMask / m_bShoulderFlashlight). NOTE: night
+  vision / gas mask USAGE (the toggle commands + client overlay) is still TODO —
+  the pickups just grant ownership.
+- **item_shield / item_cap_pmc / item_headset_pmc** -> grant 10 armour like the
+  helmets (models riotshield / pmc_cap / pmc_headset). The shield's real block
+  mechanic is still TODO.
+
+Still TODO (unknown class names / no RTTI): item_bandagespack, item_syringepack,
+item_flags, item_health.

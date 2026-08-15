@@ -333,6 +333,8 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_bHavePistolSilencer, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bHaveRifleSilencer, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bLaserToggleState, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bHaveNightVision, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bHaveGasMask, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bDisableWeaponDrop, FIELD_BOOLEAN ),
 
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),

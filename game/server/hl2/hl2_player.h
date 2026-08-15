@@ -387,6 +387,16 @@ public:
 	void				UH_AddBattery( int iCount ) { m_iUHBatteryCount = m_iUHBatteryCount + iCount; }
 	void				UH_UpdateFlashlightBattery( void );	// drain a battery while the flashlight is on
 
+	// Underhell gear ownership accessors (the fields themselves are private;
+	// item pickups route through these). Night-vision / gas-mask usage is still
+	// TODO, but the pickups set ownership so they work end-to-end.
+	bool				UH_HasNightVision( void ) const { return m_bHaveNightVision; }
+	void				UH_SetHaveNightVision( bool bHave ) { m_bHaveNightVision = bHave; }
+	bool				UH_HasGasMask( void ) const { return m_bHaveGasMask; }
+	void				UH_SetHaveGasMask( bool bHave ) { m_bHaveGasMask = bHave; }
+	void				UH_SetShoulderFlashlight( bool bHave ) { m_bShoulderFlashlight = bHave; }
+	void				UH_SetFlashlightOn( bool bOn ) { m_bFlashlightOn = bOn; }
+
 	//-----------------------------------------------------------------------------
 	// Underhell ironsight. The "ironsight_toggle" client command toggles
 	// m_bIronSighted (networked so accuracy/FOV follow) and the viewmodel's
@@ -497,6 +507,13 @@ private:
 	CNetworkVar( bool, m_bHavePistolSilencer );
 	CNetworkVar( bool, m_bHaveRifleSilencer );
 	CNetworkVar( bool, m_bLaserToggleState );
+
+	// Underhell gear ownership (original CBasePlayer members m_bHaveNightVision
+	// @2138 / m_bHaveGasMask @2139). Server-side only for now — the night-vision
+	// overlay / gas-mask usage system (m_bNightVisionOn @3369 / m_bGasMaskOn
+	// @3370) is still TODO, so nothing on the client reads these yet.
+	bool				m_bHaveNightVision;
+	bool				m_bHaveGasMask;
 
 	// Server-only runtime accumulators (mirror the original binary's members;
 	// not networked, saved for parity).
