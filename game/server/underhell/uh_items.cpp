@@ -313,6 +313,9 @@ void CItemGlowStick::Spawn( void )
 {
 	Precache();
 	SetModel( "models/pg_props/pg_obj/pg_glow_stick_pack.mdl" );
+	// sub_101741C0: half the packs stay skin 0; the rest select one of the
+	// five authored colour skins. The inventory id must retain this value.
+	m_nSkin = random->RandomInt( 0, 1 ) ? random->RandomInt( 0, 4 ) : 0;
 	BaseClass::Spawn();
 }
 
@@ -328,7 +331,9 @@ bool CItemGlowStick::MyTouch( CBasePlayer *pPlayer )
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
 
-	pHL2Player->UH_GiveItem( UH_ITEM_GLOWSTICK_FIRST + random->RandomInt( 0, 4 ) );
+	// sub_101741C0 stores the random colour in m_nSkin (0..4); preserve that
+	// exact world-model skin when converting the pickup into an inventory id.
+	pHL2Player->UH_GiveItem( UH_ITEM_GLOWSTICK_FIRST + clamp( m_nSkin, 0, 4 ) );
 	UTIL_Remove( this );
 
 	return true;
@@ -390,9 +395,12 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	pGlow->SetRenderMode( kRenderGlow );
 	pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
 
-	// Follow the player (strapped to the waist).
-	pGlow->SetParent( pPlayer );
-	pGlow->SetLocalOrigin( Vector( 0, 0, 36 ) );
+	// The original creates the lit prop at player origin + 36 and records it
+	// as the active glowstick; it does not parent a visible model to the waist.
+	// Parenting was our reconstruction and is the reason a glowstick rendered
+	// permanently on the belt.
+	pGlow->SetOwnerEntity( pPlayer );
+	pGlow->SetContextThink( &CBaseEntity::SUB_Remove, gpGlobals->curtime + 360.0f, "GlowStickLifetime" );
 
 	pPlayer->UH_SetActiveGlowStick( pGlow );
 	pPlayer->EmitSound( "glowstick.crack" );
