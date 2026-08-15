@@ -477,9 +477,9 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 	// free-aim cursor when not ironsighted. The cursor (max magnitude
 	// cam_ots_freeaim_move_max = 0.1) maps to a few degrees of tilt toward
 	// where the mouse points.
-	if ( cam_ots_freeaim_enable.GetBool() && !m_bExpSighted && input )
+	if ( cam_ots_freeaim_enable.GetBool() && !m_bExpSighted && ::input )
 	{
-		Vector2D cursor = input->CAM_GetFreeAimCursor();
+		Vector2D cursor = ::input->CAM_GetFreeAimCursor();
 		int screenW, screenH;
 		engine->GetScreenSize( screenW, screenH );
 		int sx = (int)( ( cursor.x * 0.25f + 0.5f ) * (float)screenW );
