@@ -43,6 +43,10 @@
 #include "physics_prop_ragdoll.h"
 #include "basecombatcharacter.h"
 #include "ammodef.h"
+#include "explode.h"		// ExplosionCreate (radiocracker detonation, serveror.dll sub_10173A20)
+
+// skill convar used by the radiocracker detonation (defined in hl2_gamerules.cpp)
+extern ConVar sk_plr_dmg_smg1_grenade;
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -183,6 +187,8 @@ public:
 	void GatherConditions( void );
 	void PrescheduleThink( void );
 	void BuildScheduleTestBits( void );
+
+	int GetSoundInterests( void );
 
 	int MeleeAttack1Conditions( float flDot, float flDist );
 	int RangeAttack1Conditions( float flDot, float flDist ) { return COND_NONE; } // no leap in our port, but we have sprint
@@ -817,6 +823,15 @@ int CNPC_UH_Infected::MeleeAttack1Conditions( float flDot, float flDist )
 }
 
 // ---------------------------------------------------------------------------
+// GetSoundInterests – also listen for the Underhell FM radio / radiocracker
+// attract sound (SOUND_FMRADIO) so OnListened() can raise COND_HEAR_FMRADIO.
+// ---------------------------------------------------------------------------
+int CNPC_UH_Infected::GetSoundInterests( void )
+{
+	return BaseClass::GetSoundInterests() | SOUND_FMRADIO;
+}
+
+// ---------------------------------------------------------------------------
 // GatherConditions – infected ignores unreachable, handles climb touch
 // ---------------------------------------------------------------------------
 void CNPC_UH_Infected::GatherConditions( void )
@@ -834,38 +849,13 @@ void CNPC_UH_Infected::GatherConditions( void )
 		SetCondition( COND_UH_INFECTED_RANDOMRUN );
 	}
 
-	// Scan for active radio (uh_radio or item_fmradio that is active)
-	// Original used CSoundEnt + COND_HEAR_FMRADIO, we approximate by distance check
-	if ( !HasCondition( COND_SEE_ENEMY ) )
+	// Original serveror.dll attracted infected via CSoundEnt + COND_HEAR_FMRADIO.
+	// The active radio (uh_radio) now emits SOUND_FMRADIO; the sound system raises
+	// COND_HEAR_FMRADIO in OnListened() when we hear it, so propagate it to our
+	// investigate schedule instead of scanning by distance.
+	if ( HasCondition( COND_HEAR_FMRADIO ) && !HasCondition( COND_SEE_ENEMY ) )
 	{
-		CBaseEntity *pRadio = gEntList.FindEntityByClassname( NULL, "uh_radio" );
-		while ( pRadio )
-		{
-			if ( (pRadio->GetAbsOrigin() - GetAbsOrigin()).Length() < 1024.0f )
-			{
-				SetCondition( COND_UH_INFECTED_GRENADE );
-				// Remember radio as target for investigate schedule
-				SetTarget( pRadio );
-				break;
-			}
-			pRadio = gEntList.FindEntityByClassname( pRadio, "uh_radio" );
-		}
-
-		if ( !HasCondition( COND_UH_INFECTED_GRENADE ) )
-		{
-			// Also check world item_fmradio that is active (has m_bIsActive)
-			CBaseEntity *pItemRadio = gEntList.FindEntityByClassname( NULL, "item_fmradio" );
-			while ( pItemRadio )
-			{
-				if ( (pItemRadio->GetAbsOrigin() - GetAbsOrigin()).Length() < 1024.0f )
-				{
-					SetCondition( COND_UH_INFECTED_GRENADE );
-					SetTarget( pItemRadio );
-					break;
-				}
-				pItemRadio = gEntList.FindEntityByClassname( pItemRadio, "item_fmradio" );
-			}
-		}
+		SetCondition( COND_UH_INFECTED_GRENADE );
 	}
 }
 
@@ -929,10 +919,7 @@ int CNPC_UH_Infected::SelectSchedule( void )
 
 	if ( HasCondition( COND_BLOCKED_BY_DOOR ) )
 	{
-		// Find blocking door
-		CBaseEntity *pDoor = NULL;
-		// Use base zombie's door handling – try to find prop_door_rotating or func_door
-		// Simplified: return bash door
+		// Bash the door currently blocking us (base zombie door logic handles the rest).
 		m_flDoorBashYaw = GetAbsAngles().y;
 		return SCHED_ZOMBIE_BASH_DOOR;
 	}
@@ -1122,11 +1109,11 @@ void CNPC_UH_Infected::StartTask( const Task_t *pTask )
 							pRadio->Explode();
 						else
 						{
-							// Fallback: generic explosion for item_radiocracker
-							CTakeDamageInfo info( this, this, 150.0f, DMG_BLAST );
-							ExplosionCreate( pTarget->GetAbsOrigin(), QAngle(0,0,0), this, 150, 250, false );
-							RadiusDamage( info, pTarget->GetAbsOrigin(), 250.0f, CLASS_NONE, NULL );
-							UTIL_Remove( pTarget );
+					// Fallback: explode the world item_radiocracker with the same
+					// formula as CUHRadio::Explode() (serveror.dll sub_10173A20).
+					float flDamage = sk_plr_dmg_smg1_grenade.GetFloat();
+					ExplosionCreate( pTarget->GetAbsOrigin(), QAngle(0,0,0), this, flDamage, 256, 1064, 50000.0f, this, -1 );
+					UTIL_Remove( pTarget );
 						}
 					}
 					else
