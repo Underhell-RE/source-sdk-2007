@@ -1110,3 +1110,83 @@ The client already draws `shader/nightvision` / `shader/gasmask` full-screen
 shader from the game-shader DLL isn't being applied — i.e. the DLL isn't
 loading in the install (check `Underhell/bin/game_shader_generic_eshader_2007.dll`
 exists and gameinfo.txt points at the mod), not a client.dll/server.dll bug.
+
+## Radio / flashlight / grenade throw fixes (second-hand system)
+
+Three bugs fixed in the second-hand (left arm, viewmodel index 1) + inventory
+paths, each cross-checked against the decompile (`klaxons1/underhell-hexrays`,
+`Underhell/bin/server/sub_*.cpp`).
+
+### 1. FM radio / radio cracker "useitem" never threw (dead code)
+
+`UH_ItemAction` (server `uh_player_inventory.cpp`) had the FM-radio / radio-
+cracker branch **nested inside** the flare-pack branch, after its `return true;`:
+
+```cpp
+if ( bUse && iItem == UH_ITEM_FLARE_PACK )
+{
+    ...
+    return true;
+
+    // unreachable: this `if` was inside the flare block, after `return true`
+    if ( bUse && ( iItem == UH_ITEM_FM_RADIO || ... ) )
+    {
+        ...
+    }
+}
+```
+
+The radio `if` was dead code — MSVC compiles it (C4702 unreachable-code
+warning) but it never runs, so "useitem" on a radio did nothing. "dropitem"
+worked because it goes through the separate `if (!bUse)` drop path (no radio
+attract logic — expected).
+
+Fix: close the flare-pack block after `return true;` so the radio branch is a
+sibling. The radio branch spawns `uh_radio` (class `CUHRadio`), sets
+`SetIsCracker()` per id, `Spawn()`, then `Use(USE_ON)` to activate (think +5 s,
+then `CSoundEnt::InsertSound( SOUND_FMRADIO, … 1024, 1.0 )` every second).
+
+Decode: `UH_ItemAction` = vtable [411] = `sub_102E05F0`; radio activation =
+`sub_10173790` (Use -> think +5 s) / `sub_101737E0` (SOUND_FMRADIO insert).
+
+### 2. Second hand didn't raise the flashlight (no-weapon case)
+
+`UH_UpdateLeftArm` gated the hand-held flashlight viewmodel on
+`bOneHanded = pWeapon && (OneHanded || MeleeWeapon)` — **false when the player
+has no active weapon**. `FlashlightTurnOn` already allows the light with
+`!pWeapon || OneHanded || MeleeWeapon`, so with no weapon the flashlight turned
+ON (EF_DIMLIGHT) but the left hand never showed `v_flashlight_pg.mdl`.
+
+Fix: `UH_UpdateLeftArm` now uses the same `bLeftArmFree = !pWeapon || OneHanded
+|| MeleeWeapon` gate, keeping the two functions in sync.
+
+Decode: the whole left-arm flashlight hold is driven by the weapon-script
+`OneHanded` flag at weapon-info offset 80 (pistols: `weapon_pistol_glock.txt` /
+`weapon_pistol_beretta.txt`; melee: `weapon_melee_axe/baton/pipe/wrench.txt` +
+`weapon_cleaver.txt` all ship `"OneHanded" "1"`). Deploy = `sub_101F0C60`
+(sets viewmodel 1 = `v_flashlight_pg.mdl`, skin 1, `m_bLeftArmDeployed=1`).
+
+### 3. Grenades never threw (`weapon_frag` never owned)
+
+`UH_ThrowNade` / `UH_LeftArmContextThink` looked up
+`Weapon_OwnsThisType("weapon_frag")` and called `WeaponFrag_ThrowNow()`. But in
+Underhell a grenade is **ammo, not a weapon**: `CHL2_Player::BumpWeapon`
+converts a picked-up `weapon_frag` into `"grenade"` ammo (max 4) and removes the
+entity. The player therefore never owns `weapon_frag`, the lookup returned
+NULL, and every `Throw_Nade` returned early.
+
+Fix (decode `sub_101ED130`): the original gates the throw on the grenade ammo
+count — `sub_100CF610(a1, "grenade") > 0`, where `sub_100CF610` is
+`GetAmmoCount(name)` (`this[v5 + 445]` = the player's ammo array). The port now:
+
+- `UH_ThrowNade`: `GetAmmoDef()->Index("grenade")` + `GetAmmoCount() <= 0` gate,
+  then stages the throw (grenade viewmodel in left hand, `m_bFlareMarker=1`,
+  `ACT_VM_THROW`, think +0.4 s — unchanged).
+- `UH_LeftArmContextThink`: spawns the frag directly via
+  `Fraggrenade_Create(… , vForward*1200, 3.0 s fuse, owner=player)` and
+  `RemoveAmmo(1, grenade)` — the vanilla `CWeaponFrag::ThrowGrenade` +
+  `DecrementAmmo` path, run against the player's grenade ammo instead of a
+  weapon_frag instance.
+
+`WeaponFrag_ThrowNow` / `CWeaponFrag::ThrowNow` are now unused (left in place,
+harmless) — the throw no longer needs a weapon_frag entity.

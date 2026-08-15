@@ -289,6 +289,7 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 		UH_RemoveInventoryItem( iSlot );
 		engine->ClientCommand( edict(), "UpdateInventory" );
 		return true;
+	}
 
 	// FM radio / radio cracker – spawn active radio prop that attracts infected (sub_10173790/ sub_101737E0)
 	if ( bUse && ( iItem == UH_ITEM_FM_RADIO || iItem == UH_ITEM_RADIO_CRACKER ) )
@@ -312,8 +313,6 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 		UH_RemoveInventoryItem( iSlot );
 		engine->ClientCommand( edict(), "UpdateInventory" );
 		return true;
-	}
-
 	}
 
 	if ( !bUse )

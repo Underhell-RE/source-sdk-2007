@@ -19,6 +19,7 @@
 #include "cbase.h"
 #include "hl2_player.h"
 #include "baseviewmodel_shared.h"
+#include "ammodef.h"
 #include "grenade_frag.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -31,6 +32,7 @@ static const char *UH_FLARE_PROP         = "models/PG_props/pg_obj/pg_flare.mdl"
 
 #define UH_THROW_STAGE_DELAY  0.4f   // command -> grenade actually leaves the hand
 #define UH_FLARE_FUSE         90.0f  // seconds a thrown flare burns
+#define UH_GRENADE_TIMER      3.0f   // frag detonation fuse (vanilla GRENADE_TIMER)
 
 //-----------------------------------------------------------------------------
 // Purpose: set (or clear) the left-arm viewmodel's model, skin and raised state.
@@ -76,12 +78,14 @@ void CHL2_Player::UH_UpdateLeftArm( void )
 		return;
 	}
 
-	// Hand-held (non-shoulder) flashlight, raised while on and the active
-	// weapon is one-handed (pistol) or melee.
+	// Hand-held (non-shoulder) flashlight, raised while on and the left arm is
+	// free: no weapon, a one-handed weapon (pistol) or melee. Must match
+	// FlashlightTurnOn's gate exactly, otherwise the flashlight can be ON but
+	// its left-hand viewmodel never appears.
 	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
-	bool bOneHanded = pWeapon && ( pWeapon->GetWpnData().m_bOneHanded || pWeapon->GetWpnData().m_bMeleeWeapon );
+	bool bLeftArmFree = !pWeapon || pWeapon->GetWpnData().m_bOneHanded || pWeapon->GetWpnData().m_bMeleeWeapon;
 
-	if ( FlashlightIsOn() && UH_IsFlashlightInLeftArm() && bOneHanded )
+	if ( FlashlightIsOn() && UH_IsFlashlightInLeftArm() && bLeftArmFree )
 	{
 		UH_SetLeftArmModel( UH_LEFTARM_FLASHLIGHT, 1, true );
 		return;
@@ -129,11 +133,13 @@ void CHL2_Player::UH_ThrowNade( void )
 		return;
 	}
 
-	CBaseCombatWeapon *pGrenade = Weapon_OwnsThisType( "weapon_frag" );
-	if ( !pGrenade )
-		return;
-
-	if ( !pGrenade->HasPrimaryAmmo() )
+	// Underhell grenades are AMMO, not a weapon: picking up a weapon_frag
+	// converts it into "grenade" ammo (CHL2_Player::BumpWeapon) and removes the
+	// entity, so Weapon_OwnsThisType("weapon_frag") is always NULL here. The
+	// original gates the throw on the grenade ammo count instead
+	// (sub_101ED130 -> sub_100CF610 reads GetAmmoCount("grenade") > 0).
+	int iGrenadeAmmo = GetAmmoDef()->Index( "grenade" );
+	if ( iGrenadeAmmo < 0 || GetAmmoCount( iGrenadeAmmo ) <= 0 )
 		return;
 
 	// Un-sight (the original does this before throwing).
@@ -160,10 +166,30 @@ void CHL2_Player::UH_LeftArmContextThink( void )
 {
 	m_bFlareMarker = false;
 
-	// Actually throw the grenade.
-	CBaseCombatWeapon *pGrenade = Weapon_OwnsThisType( "weapon_frag" );
-	if ( pGrenade )
-		WeaponFrag_ThrowNow( pGrenade );
+	// Actually throw the grenade: spawn the frag projectile and consume one
+	// grenade ammo. This replicates CWeaponFrag::ThrowGrenade + DecrementAmmo
+	// directly against the player's "grenade" ammo (the original stages the
+	// throw here rather than through a weapon_frag the player never owns).
+	int iGrenadeAmmo = GetAmmoDef()->Index( "grenade" );
+	if ( iGrenadeAmmo >= 0 && GetAmmoCount( iGrenadeAmmo ) > 0 )
+	{
+		Vector vecEye = EyePosition();
+		Vector vForward, vRight;
+		EyeVectors( &vForward, &vRight, NULL );
+
+		Vector vecSrc = vecEye + vForward * 18.0f + vRight * 8.0f;
+		vForward[2] += 0.1f;
+
+		Vector vecThrow;
+		GetVelocity( &vecThrow, NULL );
+		vecThrow += vForward * 1200.0f;
+
+		Fraggrenade_Create( vecSrc, vec3_angle, vecThrow,
+							AngularImpulse( 600, random->RandomInt( -1200, 1200 ), 0 ),
+							this, UH_GRENADE_TIMER, false );
+
+		RemoveAmmo( 1, iGrenadeAmmo );
+	}
 
 	// Restore the left arm (flashlight / flare / nothing).
 	UH_UpdateLeftArm();
