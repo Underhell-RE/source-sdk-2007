@@ -905,12 +905,12 @@ case where an NPC kicks the player (sk_combine_s_kick etc.), not yet ported.
 
 ## Weapon pickup + shotgun fire fixes (decoded from DefaultTouch/BumpWeapon)
 
-Weapons are **+use only** — no auto-pickup on touch. `SetPickupTouch` sets
-`SetTouch(NULL)` (the earlier DefaultTouch auto-pickup attempt was reverted:
-walking over a weapon was grabbing it and throwing the player's same-bucket
-weapon out, most visibly under impulse 101). Picking up goes through
+Weapons are **+use only** — no auto-equip on touch. Picking up goes through
 `CBaseCombatWeapon::Use -> CHL2_Player::BumpWeapon` (+use, and GiveNamedItem's
-`Use` call for impulse 101). Ammo boxes keep the vanilla walk-over pickup.
+`Use` call for impulse 101). Walking over a weapon instead **scavenges its
+loaded clip ammo** into the player's reserve and leaves the weapon on the
+ground (`SetPickupTouch` -> `AmmoScavengeTouch`; grenades `weapon_frag` are
+consumed as a grenade pickup). Ammo boxes keep the vanilla walk-over pickup.
 
 - `CHL2_Player::BumpWeapon` (the +use path):
   - `weapon_frag` is an ammo pickup (give 1 grenade, max 4, remove the frag) and
