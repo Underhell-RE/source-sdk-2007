@@ -273,11 +273,67 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\c_uh_weapons.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_ironsight.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_laser.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_gear_overlay.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_endurance.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_stamina.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_uhbattery.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_bleeding.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_hermitcards.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\shared\underhell\uh_inventory.cpp"
 					>
 				</File>
 				<File
 					RelativePath=".\underhell\c_inventory_panel.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_endurance.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_stamina.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_uhbattery.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_bleeding.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_hermitcards.h"
 					>
 				</File>
 				<File

@@ -93,6 +93,9 @@ BEGIN_DATADESC(CRagdollProp)
 	DEFINE_FIELD( m_hUnragdoll, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_bFirstCollisionAfterLaunch, FIELD_BOOLEAN ),
 
+	// Underhell dismemberment damage accumulation.
+	DEFINE_ARRAY( m_flGibDamage, FIELD_FLOAT, 5 ),
+
 	DEFINE_FIELD( m_flBlendWeight, FIELD_FLOAT ),
 	DEFINE_FIELD( m_nOverlaySequence, FIELD_INTEGER ),
 	DEFINE_AUTO_ARRAY( m_ragdollMins, FIELD_VECTOR ),
@@ -275,6 +278,9 @@ CRagdollProp::CRagdollProp( void )
 	m_allAsleep = false;
 	m_flFadeScale = 1;
 	m_flDefaultFadeScale = 1;
+
+	for ( int i = 0; i < 5; i++ )
+		m_flGibDamage[i] = 0.0f;
 }
 
 CRagdollProp::~CRagdollProp( void )
@@ -819,6 +825,31 @@ void CRagdollProp::TraceAttack( const CTakeDamageInfo &info, const Vector &dir, 
 		VPhysicsSwapObject( m_ragdoll.list[ptr->physicsbone].pObject );
 	}
 	BaseClass::TraceAttack( info, dir, ptr );
+
+	// Underhell: shoot limbs off a dead body (uh_gibhealth / uh_headhealth).
+	extern void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage, int iPhysicsBone, const Vector &pos, const Vector &dir );
+	UH_RagdollDismember( this, ptr->hitgroup, info.GetDamage(), ptr->physicsbone, ptr->endpos, dir );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Sever a ragdoll limb by destroying its physics constraint, so the
+// bone falls free (Underhell dismemberment).
+//-----------------------------------------------------------------------------
+void CRagdollProp::UH_SeverLimb( int iPhysicsBone )
+{
+	if ( iPhysicsBone <= 0 || iPhysicsBone >= m_ragdoll.listCount )
+		return;	// root bone (0) is the body — can't sever it
+
+	ragdollelement_t &el = m_ragdoll.list[iPhysicsBone];
+	if ( el.pConstraint )
+	{
+		physenv->DestroyConstraint( el.pConstraint );
+		el.pConstraint = NULL;
+	}
+	if ( el.pObject )
+	{
+		el.pObject->Wake();
+	}
 }
 
 void CRagdollProp::SetupBones( matrix3x4_t *pBoneToWorld, int boneMask )

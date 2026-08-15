@@ -96,12 +96,16 @@ void CHL2_Player::UH_InitializeInventory( void )
 
 	m_bShoulderFlashlight = false;
 	m_iUHBatteryCount = 0;
+	m_flUHBatteryCharge = 0.0f;
 	m_iUHHermitCardsCount = 0;
 	m_iUHHermitCurrentQuestCount = 0;
 	m_iUHHermitTotalQuestCount = 0;
 	m_bDisplayHermitCard = false;
 	m_bFlashlightOn = false;
 	m_bInventoryEnabled = true;
+	m_hActiveGlowStick = NULL;
+	m_bIronSighted = false;
+	m_fIronsightedTime = 0.0f;
 }
 
 //-----------------------------------------------------------------------------
@@ -113,6 +117,37 @@ void CHL2_Player::UH_InitializeInventory( void )
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 {
+	// Original: origin = eye + forward*56 + up*64 (sub_102DE310).
+	Vector vecForward;
+	EyeVectors( &vecForward );
+
+	Vector vecOrigin = EyePosition() + vecForward * 56.0f + Vector( 0, 0, 64.0f );
+	QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
+
+	// Glowsticks (unlit 14..18 AND lit 19..23) drop as a coloured lit prop.
+	// The lit ids have classname "nothing" (no world entity), so they must be
+	// spawned as a glowstick prop directly instead of going through
+	// CreateEntityByName("nothing"), which returns NULL and lost the item.
+	if ( UH_IsGlowstick( iItem ) || UH_IsLitGlowstick( iItem ) )
+	{
+		CBaseEntity *pGlow = CreateEntityByName( "prop_physics" );
+		if ( !pGlow )
+			return;
+
+		pGlow->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
+		static_cast<CBaseAnimating *>( pGlow )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
+
+		Color glowColor = UH_GetGlowstickColor( iItem );
+		pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
+		pGlow->SetRenderMode( kRenderGlow );
+		pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
+
+		pGlow->SetAbsOrigin( vecOrigin );
+		pGlow->SetAbsAngles( angItem );
+		pGlow->Spawn();
+		return;
+	}
+
 	const char *pszClass = UH_GetInventoryItemClass( iItem );
 	CBaseEntity *pItem = CreateEntityByName( pszClass );
 	if ( !pItem )
@@ -120,13 +155,6 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 		Warning( "Unable to create entity?!\n" );
 		return;
 	}
-
-	// Original: origin = eye + forward*56 + up*64 (sub_102DE310).
-	Vector vecForward;
-	EyeVectors( &vecForward );
-
-	Vector vecOrigin = EyePosition() + vecForward * 56.0f + Vector( 0, 0, 64.0f );
-	QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
 
 	// Per-id styling (original switch, sub_102E05F0 / sub_102DE310).
 	switch ( iItem )
@@ -136,18 +164,6 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 		UTIL_Remove( pItem );
 		pItem = CreateEntityByName( "prop_physics" );
 		pItem->SetModel( "models/PG_props/pg_obj/pg_flare.mdl" );
-		break;
-
-	case UH_ITEM_GLOWSTICK_FIRST:
-	case UH_ITEM_GLOWSTICK_YELLOW:
-	case UH_ITEM_GLOWSTICK_GREEN:
-	case UH_ITEM_GLOWSTICK_BLUE:
-	case UH_ITEM_GLOWSTICK_LAST:
-		// Glowsticks drop as coloured lit props.
-		UTIL_Remove( pItem );
-		pItem = CreateEntityByName( "prop_physics" );
-		pItem->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
-		static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
 		break;
 
 	default:
@@ -264,6 +280,16 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 		return false;
 	}
 
+	// Flare packs equip a flare in the left hand instead of spawning a world
+	// item (original: holding a flare lets "Throw_Nade" toss a flare).
+	if ( bUse && iItem == UH_ITEM_FLARE_PACK )
+	{
+		UH_EquipFlare();
+		UH_RemoveInventoryItem( iSlot );
+		engine->ClientCommand( edict(), "UpdateInventory" );
+		return true;
+	}
+
 	if ( !bUse )
 	{
 		// Drop path — spawn the styled world item in front of the player
@@ -285,11 +311,20 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 	{
 		if ( UH_IsLitGlowstick( iItem ) )
 		{
+			// Lit glowsticks have no world entity ("nothing"): using the slot
+			// again removes the lit prop strapped to the player.
 			UH_RemoveInventoryItem( iSlot );
 
-			// TODO: find the lit glowstick attached to the player and remove
-			// it (original warns if none found — keep the exact wording).
-			Warning( "Attempted to remove Lit glowstick, but did not find one on player! \n" );
+			CBaseEntity *pGlow = UH_GetActiveGlowStick();
+			if ( pGlow )
+			{
+				UTIL_Remove( pGlow );
+				UH_SetActiveGlowStick( NULL );
+			}
+			else
+			{
+				Warning( "Attempted to remove Lit glowstick, but did not find one on player! \n" );
+			}
 		}
 		else
 		{

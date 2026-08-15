@@ -28,6 +28,11 @@ public:
 private:
 	void InputShowHudHint( inputdata_t &inputdata );
 	void InputHideHudHint( inputdata_t &inputdata );
+	// Underhell: show the hint text passed in the parameter.
+	void InputHint( inputdata_t &inputdata );
+	void InputHintThroughParameter( inputdata_t &inputdata );
+	// Shared KeyHintText user-message helper.
+	void ShowHintText( const char *pszHint );
 	string_t m_iszMessage;
 	DECLARE_DATADESC();
 };
@@ -39,6 +44,8 @@ BEGIN_DATADESC( CEnvHudHint )
 	DEFINE_KEYFIELD( m_iszMessage, FIELD_STRING, "message" ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "ShowHudHint", InputShowHudHint ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "HideHudHint", InputHideHudHint ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "InputHint", InputHint ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "InputHintThroughParameter", InputHintThroughParameter ),
 
 END_DATADESC()
 
@@ -64,60 +71,53 @@ void CEnvHudHint::Precache( void )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Send the KeyHintText user message with the given hint text.
+//-----------------------------------------------------------------------------
+void CEnvHudHint::ShowHintText( const char *pszHint )
+{
+	CBaseEntity *pPlayer = UTIL_GetLocalPlayer();
+	if ( !pPlayer || !pPlayer->IsNetClient() )
+		return;
+
+	CSingleUserRecipientFilter user( (CBasePlayer *)pPlayer );
+	user.MakeReliable();
+	UserMessageBegin( user, "KeyHintText" );
+		WRITE_BYTE( 1 );	// one message
+		WRITE_STRING( pszHint );
+	MessageEnd();
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Input handler for showing the message and/or playing the sound.
 //-----------------------------------------------------------------------------
 void CEnvHudHint::InputShowHudHint( inputdata_t &inputdata )
 {
-	CBaseEntity *pPlayer = NULL;
-
-	if ( inputdata.pActivator && inputdata.pActivator->IsPlayer() )
-	{
-		pPlayer = inputdata.pActivator;
-	}
-	else
-	{
-		pPlayer = UTIL_GetLocalPlayer();
-	}
-
-	if ( pPlayer )
-	{
-		if ( !pPlayer || !pPlayer->IsNetClient() )
-			return;
-
-		CSingleUserRecipientFilter user( (CBasePlayer *)pPlayer );
-		user.MakeReliable();
-		UserMessageBegin( user, "KeyHintText" );
-			WRITE_BYTE( 1 );	// one message
-			WRITE_STRING( STRING(m_iszMessage) );
-		MessageEnd();
-	}
+	ShowHintText( STRING(m_iszMessage) );
 }
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 void CEnvHudHint::InputHideHudHint( inputdata_t &inputdata )
 {
-	CBaseEntity *pPlayer = NULL;
+	ShowHintText( "" );
+}
 
-	if ( inputdata.pActivator && inputdata.pActivator->IsPlayer() )
-	{
-		pPlayer = inputdata.pActivator;
-	}
-	else
-	{
-		pPlayer = UTIL_GetLocalPlayer();
-	}
+//-----------------------------------------------------------------------------
+// Purpose: Underhell extension — show the hint text passed in the parameter
+// (independent of the entity's "message" keyvalue).
+//-----------------------------------------------------------------------------
+void CEnvHudHint::InputHint( inputdata_t &inputdata )
+{
+	ShowHintText( inputdata.value.String() );
+}
 
-	if ( pPlayer )
-	{
-		if ( !pPlayer || !pPlayer->IsNetClient() )
-			return;
-
-		CSingleUserRecipientFilter user( (CBasePlayer *)pPlayer );
-		user.MakeReliable();
-		UserMessageBegin( user, "KeyHintText" );
-		WRITE_BYTE( 1 );	// one message
-		WRITE_STRING( STRING(NULL_STRING) );
-		MessageEnd();
-	}
+//-----------------------------------------------------------------------------
+// Purpose: Underhell — like InputHint, but the parameter is a localization
+// token resolved through the message/titles system. TODO: verify the exact
+// original resolution (currently the raw parameter is shown, which the client
+// localizes via its '#' prefix).
+//-----------------------------------------------------------------------------
+void CEnvHudHint::InputHintThroughParameter( inputdata_t &inputdata )
+{
+	ShowHintText( inputdata.value.String() );
 }

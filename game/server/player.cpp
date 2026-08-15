@@ -5590,7 +5590,11 @@ CBaseEntity	*CBasePlayer::GiveNamedItem( const char *pszName, int iSubType )
 
 	if ( pent != NULL && !(pent->IsMarkedForDeletion()) ) 
 	{
-		pent->Touch( this );
+		// Underhell: weapons are not auto-picked on touch (SetPickupTouch clears
+		// the touch function), so give/equip them through Use -> BumpWeapon, which
+		// is the same path as a player pressing +use. Matches the original
+		// CBasePlayer::GiveNamedItem (decode sub_101F0AA0).
+		pent->Use( this, this, USE_TOGGLE, 0 );
 	}
 
 	return pent;

@@ -71,11 +71,23 @@ public:
 
 	virtual bool	IsRagdoll() { return true; }
 
+	// Underhell: ragdolls (bodies and severed limbs) are NOT treated as "flesh"
+	// for the physcannon — the player can pick them up and drag them around
+	// (see the "Bodygroups, Gibs, Ragdolls and Decals" tutorial). Vanilla
+	// CBaseEntity::VPhysicsIsFlesh() returns true for ragdolls, which makes
+	// CWeaponPhysCannon::CanPickupObject() reject them.
+	virtual bool	VPhysicsIsFlesh( void ) { return false; }
+
 	// Damage passing
 	virtual void	SetDamageEntity( CBaseEntity *pEntity );
 	virtual int		OnTakeDamage( const CTakeDamageInfo &info );
 	virtual void OnSave( IEntitySaveUtils *pUtils );
 	virtual void OnRestore();
+
+	// Underhell dismemberment. Sever a limb (break its ragdoll constraint) so a
+	// dead body can be shot apart, and accumulate per-hitgroup gib damage.
+	void			UH_SeverLimb( int iPhysicsBone );
+	float			m_flGibDamage[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
 
 	// Purpose: CDefaultPlayerPickupVPhysics
 	virtual void VPhysicsCollision( int index, gamevcollisionevent_t *pEvent );

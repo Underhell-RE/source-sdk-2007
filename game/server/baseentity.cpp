@@ -271,6 +271,8 @@ IMPLEMENT_SERVERCLASS_ST_NOBASE( CBaseEntity, DT_BaseEntity )
 	SendPropInt		(SENDINFO(m_bSimulatedEveryTick),		1, SPROP_UNSIGNED ),
 	SendPropInt		(SENDINFO(m_bAnimatedEveryTick),		1, SPROP_UNSIGNED ),
 	SendPropBool( SENDINFO( m_bAlternateSorting )),
+	// Underhell: mirror/monitor-only rendering flag.
+	SendPropBool( SENDINFO( m_bIsMirrorOnly )),
 
 END_SEND_TABLE()
 
@@ -292,6 +294,7 @@ CBaseEntity::CBaseEntity( bool bServerOnly )
 #endif
 
 	m_bAlternateSorting = false;
+	m_bIsMirrorOnly = false;
 	m_CollisionGroup = COLLISION_GROUP_NONE;
 	m_iParentAttachment = 0;
 	CollisionProp()->Init( this );
@@ -1728,6 +1731,8 @@ BEGIN_DATADESC_NO_BASE( CBaseEntity )
 	DEFINE_FIELD( m_bSimulatedEveryTick, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bAnimatedEveryTick, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bAlternateSorting, FIELD_BOOLEAN ),
+	// Underhell: mirror/monitor-only rendering flag (keyvalue "uh_rendermirrorsonly").
+	DEFINE_KEYFIELD( m_bIsMirrorOnly, FIELD_BOOLEAN, "uh_rendermirrorsonly" ),
 	DEFINE_KEYFIELD( m_spawnflags, FIELD_INTEGER, "spawnflags" ),
 	DEFINE_FIELD( m_nTransmitStateOwnedCounter, FIELD_CHARACTER ),
 	DEFINE_FIELD( m_angAbsRotation, FIELD_VECTOR ),
@@ -1795,6 +1800,9 @@ BEGIN_DATADESC_NO_BASE( CBaseEntity )
 	DEFINE_OUTPUT( m_OnUser2, "OnUser2" ),
 	DEFINE_OUTPUT( m_OnUser3, "OnUser3" ),
 	DEFINE_OUTPUT( m_OnUser4, "OnUser4" ),
+
+	// Underhell: fired when the player kicks this entity (uh_jake_kick).
+	DEFINE_OUTPUT( m_OnKicked, "OnKicked" ),
 
 	// Function Pointers
 	DEFINE_FUNCTION( SUB_Remove ),

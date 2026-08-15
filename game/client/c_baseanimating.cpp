@@ -2780,6 +2780,11 @@ int C_BaseAnimating::DrawModel( int flags )
 	if ( !m_bReadyToDraw )
 		return 0;
 
+	// Underhell: mirror/monitor-only studio models (player model, ghost actors)
+	// draw only during the reflective/refractive glass pass.
+	if ( IsMirrorOnly() && ( !cl_player_render_mirror.GetBool() || !g_bRenderingReflectiveGlass ) )
+		return 0;
+
 	int drawn = 0;
 
 	if ( r_drawothermodels.GetInt() )

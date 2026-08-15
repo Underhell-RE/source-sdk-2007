@@ -1,4 +1,4 @@
-//========= Copyright � 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright � 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		Player for HL2.
 //
@@ -11,6 +11,7 @@
 #include "gamerules.h"
 #include "trains.h"
 #include "basehlcombatweapon_shared.h"
+#include "ammodef.h"
 #include "vcollide_parse.h"
 #include "in_buttons.h"
 #include "ai_interactions.h"
@@ -47,6 +48,8 @@
 #include "filters.h"
 #include "tier0/icommandline.h"
 
+#include "underhell/uh_weapons.h"
+
 #ifdef HL2_EPISODIC
 #include "npc_alyx_episodic.h"
 #endif
@@ -56,6 +59,7 @@
 
 extern ConVar weapon_showproficiency;
 extern ConVar autoaim_max_dist;
+extern ConVar uh_flashlight_battery_time;
 
 // Do not touch with without seeing me, please! (sjb)
 // For consistency's sake, enemy gunfire is traced against a scaled down
@@ -313,6 +317,35 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_ARRAY( m_iInventory, FIELD_INTEGER, UH_INVENTORY_SLOTS ),
 	DEFINE_FIELD( m_bShoulderFlashlight, FIELD_BOOLEAN ),
 
+	// Underhell endurance / hunger save data (names match the original save format).
+	DEFINE_FIELD( m_iEndurance, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iBleedCounter, FIELD_INTEGER ),
+	DEFINE_FIELD( m_flPseudoEndurance, FIELD_FLOAT ),
+	DEFINE_FIELD( m_flPseudoHealth, FIELD_FLOAT ),
+	DEFINE_FIELD( m_fEStaminaCount, FIELD_FLOAT ),
+	DEFINE_FIELD( m_flLastBleedTime, FIELD_TIME ),
+	DEFINE_FIELD( m_flLastBleedTickBase, FIELD_TIME ),
+	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
+	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
+	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
+	DEFINE_FIELD( m_bHavePistolSilencer, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bHaveRifleSilencer, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bLaserToggleState, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bHaveNightVision, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bHaveGasMask, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bNightVisionOn, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bGasMaskOn, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bNightVisionEnabled, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bGasMaskEnabled, FIELD_BOOLEAN ),
+	DEFINE_SOUNDPATCH( m_pGasMaskBreathLoop ),
+	DEFINE_FIELD( m_bLeftArmDeployed, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bHoldingFlare, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bFlareMarker, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bFlashlightHolstered, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bDisableWeaponDrop, FIELD_BOOLEAN ),
+
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeAllSuitDevicesOff, FIELD_TIME ),
 	DEFINE_FIELD( m_fIsSprinting, FIELD_BOOLEAN ),
@@ -348,6 +381,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flTargetFindTime, FIELD_TIME ),
 
 	DEFINE_FIELD( m_flAdmireGlovesAnimTime, FIELD_TIME ),
+	DEFINE_FIELD( m_iszKickViewModel, FIELD_STRING ),
 	DEFINE_FIELD( m_flNextFlashlightCheckTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flFlashlightPowerDrainScale, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bFlashlightDisabled, FIELD_BOOLEAN ),
@@ -365,6 +399,33 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_INPUTFUNC( FIELD_VOID, "DisableFlashlight", InputDisableFlashlight ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "EnableFlashlight", InputEnableFlashlight ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "ForceDropPhysObjects", InputForceDropPhysObjects ),
+
+	// Underhell: give/take the pistol & rifle silencer (original datamap inputs
+	// "SetPistolSilencer" / "SetRifleSilencer", decode sub_101F2D30).
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetPistolSilencer", InputSetPistolSilencer ),
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetRifleSilencer", InputSetRifleSilencer ),
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetNightVision", InputSetNightVision ),
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetGasMask", InputSetGasMask ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "DisableDropWeapon", InputDisableDropWeapon ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "EnableDropWeapon", InputEnableDropWeapon ),
+
+	// Underhell player model / skin / viewmodel skin inputs (decode sub_101F2D30).
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetPlayerModel", InputSetPlayerModel ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetPlayerSkin", InputSetPlayerSkin ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "ViewModelSkin", InputViewModelSkin ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetPlayerKickModel", InputSetPlayerKickModel ),
+
+	// Underhell "give" inputs (classname parameter).
+	DEFINE_INPUTFUNC( FIELD_STRING, "Give", InputGive ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "GiveInv", InputGiveInv ),
+
+	// Underhell kick (uh_jake_kick).
+	DEFINE_INPUTFUNC( FIELD_VOID, "DisableKick", InputDisableKick ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "EnableKick", InputEnableKick ),
+	DEFINE_FIELD( m_bKickMarker, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bKickActive, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bKickDisabled, FIELD_BOOLEAN ),
+	DEFINE_OUTPUT( m_OnDisabledKickAttempted, "OnDisabledKickAttempted" ),
 
 	DEFINE_SOUNDPATCH( m_sndLeeches ),
 	DEFINE_SOUNDPATCH( m_sndWaterSplashes ),
@@ -391,7 +452,28 @@ CHL2_Player::CHL2_Player()
 	m_flArmorReductionTime = 0.0f;
 	m_iArmorReductionFrom = 0;
 
+	// Underhell kick defaults.
+	m_bKickMarker = false;
+	m_bKickActive = false;
+	m_bKickDisabled = false;
+
+	// Underhell gear defaults (original sub_101F77C0 inits the enabled flags to 1).
+	m_bHaveNightVision = false;
+	m_bHaveGasMask = false;
+	m_bNightVisionOn = false;
+	m_bGasMaskOn = false;
+	m_bNightVisionEnabled = true;
+	m_bGasMaskEnabled = true;
+	m_pGasMaskBreathLoop = NULL;
+
+	// Underhell second hand defaults.
+	m_bLeftArmDeployed = false;
+	m_bHoldingFlare = false;
+	m_bFlareMarker = false;
+	m_bFlashlightHolstered = false;
+
 	UH_InitializeInventory();
+	UH_InitializeEndurance();
 }
 
 //
@@ -429,6 +511,24 @@ IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropInt( SENDINFO(m_iUHHermitTotalQuestCount) ),
 	SendPropBool( SENDINFO(m_bDisplayHermitCard) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_iInventory), SendPropInt( SENDINFO_ARRAY(m_iInventory) ) ),
+
+	// Underhell endurance / hunger props (order mirrors the client recv table).
+	SendPropInt( SENDINFO(m_iEndurance) ),
+	SendPropInt( SENDINFO(m_iBleedCounter) ),
+	SendPropFloat( SENDINFO(m_flUHBatteryCharge), 0, SPROP_NOSCALE ),
+	SendPropBool( SENDINFO(m_bIronSighted) ),
+	SendPropFloat( SENDINFO(m_fIronsightedTime), 0, SPROP_NOSCALE ),
+	SendPropBool( SENDINFO(m_bHavePistolSilencer) ),
+	SendPropBool( SENDINFO(m_bHaveRifleSilencer) ),
+	SendPropBool( SENDINFO(m_bLaserToggleState) ),
+	// Underhell kick marker (kick window active).
+	SendPropBool( SENDINFO(m_bKickMarker) ),
+	// Underhell night vision / gas mask active state (client overlay).
+	SendPropBool( SENDINFO(m_bNightVisionOn) ),
+	SendPropBool( SENDINFO(m_bGasMaskOn) ),
+	// Underhell second hand / left arm state.
+	SendPropBool( SENDINFO(m_bLeftArmDeployed) ),
+	SendPropBool( SENDINFO(m_bHoldingFlare) ),
 END_SEND_TABLE()
 
 
@@ -445,6 +545,40 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.TrainUse" );
 	PrecacheScriptSound( "HL2Player.Use" );
 	PrecacheScriptSound( "HL2Player.BurnPain" );
+
+	// Underhell eating / drinking sounds (original sub_102DA7B0 precache list).
+	PrecacheScriptSound( "Player.Eat" );
+	PrecacheScriptSound( "Player.Eat.Apple" );
+	PrecacheScriptSound( "Player.Drink" );
+
+	// Underhell ironsight sounds.
+	PrecacheScriptSound( "HL2Player.Ironsighton" );
+	PrecacheScriptSound( "HL2Player.Ironsightoff" );
+
+	// Underhell kick (uh_jake_kick) models + sounds.
+	PrecacheModel( "models/weapons/v_kick_jake_casual.mdl" );
+	PrecacheModel( "models/weapons/v_kick_jake_inmate.mdl" );
+	PrecacheModel( "models/weapons/v_kick_jake_pmc.mdl" );
+	PrecacheModel( "models/weapons/v_kick_jake_guard.mdl" );
+	PrecacheScriptSound( "HL2Player.kick_wall" );
+	PrecacheScriptSound( "HL2Player.kick_body" );
+	PrecacheScriptSound( "HL2Player.kick_fire" );
+	PrecacheScriptSound( "HL2Player.kick_fire_fly" );
+	PrecacheScriptSound( "Player.Voice.Kick" );
+	PrecacheScriptSound( "Player.Voice.Kick.Exhausted" );
+
+	// Underhell night vision + gas mask.
+	PrecacheScriptSound( "Player.nvon" );
+	PrecacheScriptSound( "Player.nvoff" );
+	PrecacheScriptSound( "Player.GasMaskOn" );
+	PrecacheScriptSound( "Player.GasMaskOff" );
+	PrecacheScriptSound( "GasMask.Breath.Normal" );
+
+	// Underhell second hand / left arm viewmodels + flare prop.
+	PrecacheModel( "models/weapons/v_grenade.mdl" );
+	PrecacheModel( "models/weapons/v_flashlight_pg.mdl" );
+	PrecacheModel( "models/weapons/v_flare_pg.mdl" );
+	PrecacheModel( "models/PG_props/pg_obj/pg_flare.mdl" );
 }
 
 //-----------------------------------------------------------------------------
@@ -744,6 +878,9 @@ void CHL2_Player::PreThink(void)
 	CheckFlashlight();
 #endif	// HL2_EPISODIC
 
+	// Underhell: drain the flashlight battery while the light is on.
+	UH_UpdateFlashlightBattery();
+
 	// So the correct flags get sent to client asap.
 	//
 	if ( m_afPhysicsFlags & PFLAG_DIROVERRIDE )
@@ -912,6 +1049,9 @@ void CHL2_Player::PostThink( void )
 	{
 		 HandleAdmireGlovesAnimation();
 	}
+
+	// Underhell: bleeding drain + passive hunger decay.
+	UH_UpdateBleeding();
 }
 
 void CHL2_Player::StartAdmireGlovesAnimation( void )
@@ -1143,6 +1283,19 @@ void CHL2_Player::Spawn(void)
 	m_pPlayerAISquad = g_AI_SquadManager.FindCreateSquad(AllocPooledString(PLAYER_SQUADNAME));
 
 	InitSprinting();
+
+	// Underhell: create the kick viewmodel (index 2) and the second-hand /
+	// left-arm viewmodel (index 1). "SetPlayerKickModel" swaps index 2 per
+	// outfit; index 1 holds the flashlight / flare / grenade.
+	CreateViewModel( 1 );
+	CreateViewModel( 2 );
+	UH_SetKickViewModel( "models/weapons/v_kick_jake_casual.mdl" );
+
+	// Underhell: reset gear on (re)spawn — the original zeroes the night vision
+	// and gas mask "on" flags and stops their sounds (sub_101F77C0).
+	UH_StopGasMaskBreath();
+	m_bNightVisionOn = false;
+	m_bGasMaskOn = false;
 
 	// Setup our flashlight values
 #ifdef HL2_EPISODIC
@@ -1756,6 +1909,18 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 		break;
 	}
 
+	case 101:
+	{
+		// Underhell impulse 101: the full Underhell weapon set + ammo. This
+		// REPLACES the vanilla HL2 weapon set (the base class is not called).
+		// The one-weapon-per-bucket logic in BumpWeapon throws any displaced
+		// same-bucket weapon forward onto the floor (the "weapon scatter"
+		// behaviour), so impulse 101 drops the old weapons rather than
+		// silently stripping them.
+		UH_GiveAllWeapons( this );
+		break;
+	}
+
 	default:
 		BaseClass::CheatImpulseCommands( iImpulse );
 	}
@@ -1796,7 +1961,10 @@ void CHL2_Player::SuitPower_Update( void )
 {
 	if( SuitPower_ShouldRecharge() )
 	{
-		SuitPower_Charge( SUITPOWER_CHARGE_RATE * gpGlobals->frametime );
+		// Underhell: recharge rate is gated by endurance (the hunger meter).
+		// The vanilla constant rate is replaced by the endurance-scaled charge
+		// which also consumes endurance as it runs (see UH_UpdateEndurance).
+		UH_UpdateEndurance();
 	}
 	else if( m_HL2Local.m_bitsActiveDevices )
 	{
@@ -2038,18 +2206,40 @@ void CHL2_Player::FlashlightTurnOn( void )
 	if( m_bFlashlightDisabled )
 		return;
 
-	if ( Flashlight_UseLegacyVersion() )
+	// Underhell: the hand-held flashlight is held in the left hand, which only
+	// works when the left arm is free — no weapon, a one-handed weapon (pistol)
+	// or melee. A shoulder-mounted flashlight (item_shoulderflashlight) works
+	// with any weapon.
+	if ( !m_bShoulderFlashlight )
 	{
-		if( !SuitPower_AddDevice( SuitDeviceFlashlight ) )
+		CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+		bool bLeftArmFree = !pWeapon || pWeapon->GetWpnData().m_bOneHanded || pWeapon->GetWpnData().m_bMeleeWeapon;
+		if ( !bLeftArmFree )
+		{
+			EmitSound( "HL2Player.UseDeny" );
 			return;
+		}
 	}
-#ifdef HL2_DLL
-	if( !IsSuitEquipped() )
+
+	// Underhell: the flashlight runs on batteries (m_iUHBatteryCount), not on
+	// suit power like vanilla HL2.
+	if ( UH_GetBatteryCount() <= 0 )
+	{
+		EmitSound( "HL2Player.UseDeny" );
 		return;
-#endif
+	}
 
 	AddEffects( EF_DIMLIGHT );
 	EmitSound( "HL2Player.FlashLightOn" );
+
+	// Underhell: raise the left-arm flashlight viewmodel.
+	UH_UpdateLeftArm();
+
+	// Start draining the current battery.
+	if ( m_flUHBatteryCharge <= 0.0f )
+	{
+		m_flUHBatteryCharge = 100.0f;
+	}
 
 	variant_t flashlighton;
 	flashlighton.SetFloat( m_HL2Local.m_flSuitPower / 100.0f );
@@ -2061,14 +2251,11 @@ void CHL2_Player::FlashlightTurnOn( void )
 //-----------------------------------------------------------------------------
 void CHL2_Player::FlashlightTurnOff( void )
 {
-	if ( Flashlight_UseLegacyVersion() )
-	{
-		if( !SuitPower_RemoveDevice( SuitDeviceFlashlight ) )
-			return;
-	}
-
 	RemoveEffects( EF_DIMLIGHT );
 	EmitSound( "HL2Player.FlashLightOff" );
+
+	// Underhell: holster the left-arm flashlight viewmodel.
+	UH_UpdateLeftArm();
 
 	variant_t flashlightoff;
 	flashlightoff.SetFloat( m_HL2Local.m_flSuitPower / 100.0f );
@@ -2388,6 +2575,12 @@ int CHL2_Player::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		EmitSound( "HL2Player.BurnPain" );
 	}
 
+	// Underhell: taking damage can open a bleeding wound.
+	if ( info.GetDamage() > 0.0f )
+	{
+		UH_StartBleeding( info.GetDamage() );
+	}
+
 
 	if( (info.GetDamageType() & DMG_SLASH) && hl2_episodic.GetBool() )
 	{
@@ -2472,6 +2665,11 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 void CHL2_Player::Event_Killed( const CTakeDamageInfo &info )
 {
 	BaseClass::Event_Killed( info );
+
+	// Underhell: drop the gear visuals / loop sound on death.
+	UH_StopGasMaskBreath();
+	m_bNightVisionOn = false;
+	m_bGasMaskOn = false;
 
 	FirePlayerProxyOutput( "PlayerDied", variant_t(), this, this );
 	NotifyScriptsOfDeath();
@@ -2657,15 +2855,10 @@ bool CHL2_Player::Weapon_CanUse( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 void CHL2_Player::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 {
-#if	HL2_SINGLE_PRIMARY_WEAPON_MODE
-
-	if ( pWeapon->GetSlot() == WEAPON_PRIMARY_SLOT )
-	{
-		Weapon_DropSlot( WEAPON_PRIMARY_SLOT );
-	}
-
-#endif
-
+	// The original does NOT restrict weapons to one per slot — multiple weapons
+	// can share a slot (ordered by bucket_position), exactly like vanilla HL2.
+	// An earlier "one weapon per slot" override here was dropping everything
+	// given by impulse 101. Restore vanilla multi-weapon-per-slot behaviour.
 	if( GetActiveWeapon() == NULL )
 	{
 		m_HL2Local.m_bWeaponLowered = false;
@@ -2681,80 +2874,53 @@ void CHL2_Player::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 {
-
-#if	HL2_SINGLE_PRIMARY_WEAPON_MODE
-
-	CBaseCombatCharacter *pOwner = pWeapon->GetOwner();
-
-	// Can I have this weapon type?
-	if ( pOwner || !Weapon_CanUse( pWeapon ) || !g_pGameRules->CanHavePlayerItem( this, pWeapon ) )
+	// Underhell: grenades (weapon_frag) are ammo pickups, not weapons — give a
+	// grenade (max 4) and remove the frag, without touching the BFG / other
+	// slot-5 weapon (decode sub_100D02C0).
+	if ( FClassnameIs( pWeapon, "weapon_frag" ) )
 	{
-		if ( gEvilImpulse101 )
+		int iGrenadeAmmo = GetAmmoDef()->Index( "grenade" );
+		int nGrenades = GetAmmoCount( iGrenadeAmmo );
+		if ( nGrenades < 4 )
 		{
+			GiveAmmo( 1, iGrenadeAmmo, false );
+			if ( nGrenades <= 0 )
+				UTIL_HudHintText( this, "#Valve_Hint_Frag" );
 			UTIL_Remove( pWeapon );
 		}
-		return false;
-	}
-
-	// ----------------------------------------
-	// If I already have it just take the ammo
-	// ----------------------------------------
-	if (Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType())) 
-	{
-		//Only remove the weapon if we attained ammo from it
-		if ( Weapon_EquipAmmoOnly( pWeapon ) == false )
-			return false;
-
-		// Only remove me if I have no ammo left
-		// Can't just check HasAnyAmmo because if I don't use clips, I want to be removed, 
-		if ( pWeapon->UsesClipsForAmmo1() && pWeapon->HasPrimaryAmmo() )
-			return false;
-
-		UTIL_Remove( pWeapon );
-		return false;
-	}
-	// -------------------------
-	// Otherwise take the weapon
-	// -------------------------
-	else 
-	{
-		//Make sure we're not trying to take a new weapon type we already have
-		if ( Weapon_SlotOccupied( pWeapon ) )
-		{
-			CBaseCombatWeapon *pActiveWeapon = Weapon_GetSlot( WEAPON_PRIMARY_SLOT );
-
-			if ( pActiveWeapon != NULL && pActiveWeapon->HasAnyAmmo() == false && Weapon_CanSwitchTo( pWeapon ) )
-			{
-				Weapon_Equip( pWeapon );
-				return true;
-			}
-
-			//Attempt to take ammo if this is the gun we're holding already
-			if ( Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
-			{
-				Weapon_EquipAmmoOnly( pWeapon );
-			}
-
-			return false;
-		}
-
-		pWeapon->CheckRespawn();
-
-		pWeapon->AddSolidFlags( FSOLID_NOT_SOLID );
-		pWeapon->AddEffects( EF_NODRAW );
-
-		Weapon_Equip( pWeapon );
-
-		EmitSound( "HL2Player.PickupWeapon" );
-		
 		return true;
 	}
-#else
+
+	// Underhell: one weapon per bucket. Picking up a weapon whose bucket is
+	// already occupied throws the current weapon in that bucket forward
+	// (decode sub_100D02C0: Weapon_Drop with forward * 300) before equipping the
+	// new one. During impulse 101 the old weapon is silently removed instead.
+	if ( !Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
+	{
+		int slot = pWeapon->GetSlot();
+		CBaseCombatWeapon *pOld = Weapon_GetSlot( slot );
+		if ( pOld != NULL )
+		{
+			if ( gEvilImpulse101 )
+			{
+				for ( int i = 0; i < MAX_WEAPONS; i++ )
+				{
+					CBaseCombatWeapon *pW = GetWeapon( i );
+					if ( pW && pW->GetSlot() == slot )
+						UTIL_Remove( pW );
+				}
+			}
+			else
+			{
+				Vector vecForward;
+				AngleVectors( EyeAngles(), &vecForward );
+				Vector vecVel = vecForward * 300.0f;
+				Weapon_Drop( pOld, NULL, &vecVel );
+			}
+		}
+	}
 
 	return BaseClass::BumpWeapon( pWeapon );
-
-#endif
-
 }
 
 //-----------------------------------------------------------------------------
@@ -2792,6 +2958,76 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	// Underhell inventory commands (switch / dropitem / useitem).
 	if ( UH_HandleInventoryCommand( args ) )
 		return true;
+
+	// Underhell ironsight toggle (original sub_101F11D0 dispatch).
+	if ( !Q_stricmp( args[0], "ironsight_toggle" ) )
+	{
+		UH_ToggleIronsight();
+		return true;
+	}
+
+	// Underhell silencer toggle (original sub_101F11D0 -> sub_101E2F50).
+	if ( !Q_stricmp( args[0], "silencer_toggle" ) )
+	{
+		UH_ToggleSilencer();
+		return true;
+	}
+
+	// Underhell fire-mode toggle (original sub_101F11D0 -> weapon vtable+840,
+	// sub_102B0D10): full-auto <-> semi-auto on the active gun.
+	if ( !Q_stricmp( args[0], "firemode_toggle" ) )
+	{
+		CUHGunWeapon *pWeapon = dynamic_cast<CUHGunWeapon *>( GetActiveWeapon() );
+		if ( pWeapon )
+			pWeapon->UH_ToggleFireMode();
+		return true;
+	}
+
+	// Underhell laser-sight toggle (state only; the original toggles
+	// m_bLaserToggleState — the exact command name is unknown, this is a
+	// reasonable stand-in; TODO: recover the original binding).
+	if ( !Q_stricmp( args[0], "laser_toggle" ) )
+	{
+		UH_ToggleLaser();
+		return true;
+	}
+
+	// Underhell: throw the active weapon (original "DropWeapon" dispatch).
+	if ( !Q_stricmp( args[0], "DropWeapon" ) )
+	{
+		UH_DropWeapon();
+		return true;
+	}
+
+	// Underhell: throw a grenade (original "Throw_Nade" dispatch).
+	if ( !Q_stricmp( args[0], "Throw_Nade" ) )
+	{
+		UH_ThrowNade();
+		return true;
+	}
+
+	// Underhell: night vision toggle (original "NightVision_Toggle" dispatch ->
+	// vtable 404 = sub_102E19B0).
+	if ( !Q_stricmp( args[0], "NightVision_Toggle" ) )
+	{
+		UH_ToggleNightVision();
+		return true;
+	}
+
+	// Underhell: gas mask toggle (original "GasMask_Toggle" dispatch ->
+	// sub_101ED380).
+	if ( !Q_stricmp( args[0], "GasMask_Toggle" ) )
+	{
+		UH_ToggleGasMask();
+		return true;
+	}
+
+	// Underhell: kick attack (original "uh_jake_kick" dispatch, sub_101F11D0).
+	if ( !Q_stricmp( args[0], "uh_jake_kick" ) )
+	{
+		UH_Kick();
+		return true;
+	}
 
 	// Underhell objective / signaling commands (DispObj / GiveSign / SkipScene).
 	// Separated from inventory for code quality & portability — see
@@ -3351,6 +3587,13 @@ bool CHL2_Player::Weapon_Switch( CBaseCombatWeapon *pWeapon, int viewmodelindex 
 	{
 		StopZooming();
 	}
+
+	// Underhell: leaving ironsight when switching weapons (the viewmodel
+	// resets to hip anyway; keep the authoritative flag + FOV in sync).
+	UH_DisableIronsight();
+
+	// Underhell: re-evaluate the left-arm flashlight (one-handed vs two-handed).
+	UH_UpdateLeftArm();
 
 	return BaseClass::Weapon_Switch( pWeapon, viewmodelindex );
 }

@@ -9,6 +9,8 @@
 //=============================================================================//
 
 #include "cbase.h"
+#include "ammodef.h"
+#include "gamerules.h"
 #include "hl2_player.h"
 #include "uh_items.h"
 
@@ -24,6 +26,41 @@ static void UH_PrecacheItemSounds( void )
 {
 	// Free function — must qualify; PrecacheScriptSound is CBaseEntity::.
 	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupItems" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupArmor" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupBuckShotAmmo" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupPistolAmmoBox" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.Pickup357AmmoBox" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupSMGAmmoBox" );
+	CBaseEntity::PrecacheScriptSound( "HL2Player.PickupRifleAmmoBox" );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Underhell items are taken with +use, not by walking over them.
+// The vanilla CItem::Spawn installs ItemTouch (auto-pickup); clear it here so
+// the item only responds to +use.
+//-----------------------------------------------------------------------------
+void CUHItem::Spawn( void )
+{
+	BaseClass::Spawn();
+
+	// No auto-pickup: disable the touch handler installed by CItem::Spawn.
+	SetTouch( NULL );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: +use on a world item picks it up into the player's inventory.
+//
+// Consumable subclasses (food/health) override Use() for their effect but
+// forward here when the call isn't the inventory "useitem" (USE_ON) path, so
+// +use always picks the item up rather than applying its effect in the world.
+//-----------------------------------------------------------------------------
+void CUHItem::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	CBasePlayer *pPlayer = ToBasePlayer( pActivator );
+	if ( pPlayer )
+	{
+		MyTouch( pPlayer );
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -54,6 +91,73 @@ bool CUHItem::MyTouch( CBasePlayer *pPlayer )
 }
 
 //-----------------------------------------------------------------------------
+// Item consumption gate (matches the original per-item Use() handlers): the
+// activator must be a living CHL2_Player that isn't wearing a gas mask
+// (original checks player offset 3370 = m_bGasMaskOn).
+//-----------------------------------------------------------------------------
+static CHL2_Player *UH_GetItemConsumer( CBaseEntity *pActivator )
+{
+	if ( !pActivator )
+		return NULL;
+
+	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player *>( pActivator );
+	if ( !pPlayer || !pPlayer->IsAlive() )
+		return NULL;
+
+	// Can't eat / drink through a gas mask.
+	if ( pPlayer->UH_IsGasMaskOn() )
+		return NULL;
+
+	return pPlayer;
+}
+
+//-----------------------------------------------------------------------------
+// CUHFoodItem::Use — eating from the inventory restores endurance + health,
+// plays the eat sound, then consumes the item entity.
+//-----------------------------------------------------------------------------
+void CUHFoodItem::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the eat effect.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	pPlayer->UH_Eat( GetEnduranceGain(), GetHealthGain(), GetEatSound() );
+	UTIL_Remove( this );
+}
+
+//-----------------------------------------------------------------------------
+// CItemUHSoda::Use — drinking restores endurance + health. The flavour is the
+// item id (value); Mega Soda (flavour 5) is handled inside UH_Drink.
+//-----------------------------------------------------------------------------
+void CItemUHSoda::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the drink effect.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	// Original sub_101772F0: flavour = item id - 7 (0..5).
+	int iFlavor = (int)value - UH_ITEM_SODA_FIRST;
+	pPlayer->UH_Drink( 10.0f, 1.0f, iFlavor );
+	UTIL_Remove( this );
+}
+
+//-----------------------------------------------------------------------------
 // Shared Spawn/Precache for simple items. Model names come from Underhell.fgd.
 //-----------------------------------------------------------------------------
 #define UH_DEFINE_ITEM( _className, _entityName, _modelName )		\
@@ -69,6 +173,27 @@ bool CUHItem::MyTouch( CBasePlayer *pPlayer )
 		Precache();													\
 		SetModel( _modelName );										\
 		BaseClass::Spawn();											\
+	}
+
+//-----------------------------------------------------------------------------
+// Armour items (helmets / respirator / gasmask). They inherit CItemArmor (so
+// MyTouch grants 10 armour), but must NOT run CItemArmor::Spawn (it re-sets the
+// model to kevlar.mdl) — Spawn sets its own model and falls straight through to
+// CUHItem::Spawn for the vphysics setup.
+//-----------------------------------------------------------------------------
+#define UH_DEFINE_ARMOR_ITEM( _className, _entityName, _modelName )	\
+	LINK_ENTITY_TO_CLASS( _entityName, _className );					\
+	void _className::Precache( void )									\
+	{																	\
+		BaseClass::Precache();											\
+		PrecacheModel( _modelName );									\
+		UH_PrecacheItemSounds();										\
+	}																	\
+	void _className::Spawn( void )										\
+	{																	\
+		Precache();														\
+		SetModel( _modelName );											\
+		CUHItem::Spawn();												\
 	}
 
 //-----------------------------------------------------------------------------
@@ -164,7 +289,9 @@ bool CItemUHSoda::MyTouch( CBasePlayer *pPlayer )
 
 //-----------------------------------------------------------------------------
 // Glowsticks: five colours, ids 14..18.
-// TODO: verify the colour source (spawn skin vs pickup roll).
+// Glowsticks light up when used from the inventory (slot becomes the lit id,
+// a lit glowstick prop is strapped to the player). Decoded from the original
+// item_glowstick Use() (sub_101742D0).
 //-----------------------------------------------------------------------------
 LINK_ENTITY_TO_CLASS( item_glowstick, CItemGlowStick );
 
@@ -172,7 +299,9 @@ void CItemGlowStick::Precache( void )
 {
 	BaseClass::Precache();
 	PrecacheModel( "models/pg_props/pg_obj/pg_glow_stick_pack.mdl" );
+	PrecacheModel( "models/pg_props/pg_obj/pg_glow_stick.mdl" );
 	UH_PrecacheItemSounds();
+	PrecacheScriptSound( "glowstick.crack" );
 }
 
 void CItemGlowStick::Spawn( void )
@@ -201,14 +330,154 @@ bool CItemGlowStick::MyTouch( CBasePlayer *pPlayer )
 }
 
 //-----------------------------------------------------------------------------
-// Underhell ammo pickups (boxed). Models from Underhell.fgd.
-// TODO: ammo auto-add semantics (amounts per weapon type).
+// Purpose: Light the glowstick — strap a lit prop to the player and remember
+// it so the lit slot can remove it later. The temporary item entity is
+// consumed here; UH_ItemAction turns the inventory slot into the lit id.
+//-----------------------------------------------------------------------------
+void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path lights it.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	int iItem = (int)value;
+	Color glowColor = UH_GetGlowstickColor( iItem );
+
+	// Replace any existing lit glowstick with the new one.
+	CBaseEntity *pOldGlow = pPlayer->UH_GetActiveGlowStick();
+	if ( pOldGlow )
+	{
+		UTIL_Remove( pOldGlow );
+		pPlayer->UH_SetActiveGlowStick( NULL );
+	}
+
+	// The original uses a prop_physics (sub_101742D0) and lights it via
+	// EF_BRIGHTLIGHT (dlight tinted by m_clrRender) + EF_NOSHADOW + a glow
+	// render mode, then straps it to the player. Match that: prop_dynamic has
+	// no physics/dlight path and produced no visible light.
+	CBaseEntity *pGlow = CreateEntityByName( "prop_physics" );
+	if ( !pGlow )
+		return;
+
+	pGlow->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
+	static_cast<CBaseAnimating *>( pGlow )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
+
+	pGlow->SetAbsOrigin( pPlayer->GetAbsOrigin() + Vector( 0, 0, 36 ) );
+	pGlow->SetAbsAngles( pPlayer->GetAbsAngles() );
+
+	pGlow->Spawn();
+
+	// It rides on the player's waist and must not collide: drop the physics
+	// object prop_physics created and make it non-solid (keeps the dlight).
+	pGlow->SetSolid( SOLID_NONE );
+	pGlow->AddSolidFlags( FSOLID_NOT_SOLID );
+	pGlow->VPhysicsDestroyObject();
+
+	pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
+	pGlow->SetRenderMode( kRenderGlow );
+	pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
+
+	// Follow the player (strapped to the waist).
+	pGlow->SetParent( pPlayer );
+	pGlow->SetLocalOrigin( Vector( 0, 0, 36 ) );
+
+	pPlayer->UH_SetActiveGlowStick( pGlow );
+	pPlayer->EmitSound( "glowstick.crack" );
+
+	UTIL_Remove( this );
+}
+
+//-----------------------------------------------------------------------------
+// Underhell ammo pickups (boxed). Models + amounts + pickup sounds decoded from
+// the original per-item MyTouch (sub_10171670 / sub_101716F0 / sub_10171780 /
+// sub_10171820 / sub_101718B0).
 //-----------------------------------------------------------------------------
 UH_DEFINE_ITEM( CItem_UHPistolAmmo,	item_box_pistol_ammo,	"models/pg_props/pg_weapons/pg_pistol_ammo.mdl" )
 UH_DEFINE_ITEM( CItem_UH357Ammo,	item_box_357_ammo,		"models/pg_props/pg_weapons/pg_357_ammo.mdl" )
 UH_DEFINE_ITEM( CItem_UHSMG1Ammo,	item_box_smg1_ammo,		"models/pg_props/pg_weapons/pg_smg_ammo.mdl" )
 UH_DEFINE_ITEM( CItem_UHRifleAmmo,	item_box_rifle_ammo,	"models/pg_props/pg_weapons/pg_rifle_ammo.mdl" )
 UH_DEFINE_ITEM( CItem_UHBuckShot,	item_ammo_buckshot,		"models/items/buckshot.mdl" )
+
+// Give an ammo pickup's rounds to the player (skill-scaled, like the original
+// sub_102EC5A0 / ITEM_GiveAmmo) and play its pickup sound.
+static bool UH_GiveAmmoPickup( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName, const char *pszPickupSound )
+{
+	int iAmmoType = GetAmmoDef()->Index( pszAmmoName );
+	if ( iAmmoType == -1 )
+	{
+		Msg( "ERROR: Attempting to give unknown ammo type (%s)\n", pszAmmoName );
+		return false;
+	}
+
+	flCount = max( 1.0f, flCount * g_pGameRules->GetAmmoQuantityScale( iAmmoType ) );
+	int nGiven = pPlayer->GiveAmmo( (int)flCount, iAmmoType );
+	if ( nGiven > 0 )
+		pPlayer->EmitSound( pszPickupSound );
+	return nGiven > 0;
+}
+
+bool CItem_UHPistolAmmo::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	UH_GiveAmmoPickup( pPlayer, 30.0f, "Pistol", "HL2Player.PickupPistolAmmoBox" );
+	UTIL_Remove( this );
+	return true;
+}
+
+bool CItem_UH357Ammo::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	UH_GiveAmmoPickup( pPlayer, 20.0f, "357", "HL2Player.Pickup357AmmoBox" );
+	UTIL_Remove( this );
+	return true;
+}
+
+bool CItem_UHSMG1Ammo::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	UH_GiveAmmoPickup( pPlayer, 50.0f, "SMG1", "HL2Player.PickupSMGAmmoBox" );
+	UTIL_Remove( this );
+	return true;
+}
+
+bool CItem_UHRifleAmmo::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	UH_GiveAmmoPickup( pPlayer, 50.0f, "AR2", "HL2Player.PickupRifleAmmoBox" );
+	UTIL_Remove( this );
+	return true;
+}
+
+bool CItem_UHBuckShot::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	UH_GiveAmmoPickup( pPlayer, 6.0f, "Buckshot", "HL2Player.PickupBuckShotAmmo" );
+	UTIL_Remove( this );
+	return true;
+}
 
 //-----------------------------------------------------------------------------
 // Equipment
@@ -217,14 +486,158 @@ UH_DEFINE_ITEM( CItem_UHBuckShot,	item_ammo_buckshot,		"models/items/buckshot.md
 // Both classnames registered so old maps keep working.
 LINK_ENTITY_TO_CLASS( item_batterypack, CItemBatteryPack );
 UH_DEFINE_ITEM( CItemBatteryPack,	item_battery_pack,	"models/pg_props/pg_obj/pg_battery_pack.mdl" )
+
+// A battery pack grants two flashlight batteries (original sub_101727F0:
+// +2, max 20).
+#define UH_BATTERY_PACK_COUNT 2
+#define UH_MAX_BATTERIES 20
+
+bool CItemBatteryPack::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	if ( pHL2Player->UH_GetBatteryCount() >= UH_MAX_BATTERIES )
+		return false;
+
+	pHL2Player->UH_AddBattery( UH_BATTERY_PACK_COUNT );
+
+	pHL2Player->EmitSound( "ItemBattery.Touch" );
+	UTIL_Remove( this );
+
+	return true;
+}
 UH_DEFINE_ITEM( CItemHeavyArmor,	item_heavyarmor,	"models/items/kevlar.mdl" )
 UH_DEFINE_ITEM( CItemFlashlight,	item_flashlight,	"models/pg_props/pg_obj/pg_flashlight.mdl" )
 UH_DEFINE_ITEM( CItemNightVision,	item_nightvision,	"models/items/nightvision.mdl" )
 UH_DEFINE_ITEM( CItemGasMask,		item_gasmask,		"models/items/gasmask.mdl" )
-UH_DEFINE_ITEM( CItemHelmetGuard,	item_helmet_guard,	"models/items/helmet_visor.mdl" )
-UH_DEFINE_ITEM( CItemHelmetPrison,	item_helmet_prison,	"models/items/helmet.mdl" )
-UH_DEFINE_ITEM( CItemHelmetPMC,		item_helmet_pmc,	"models/items/pmc_helmet.mdl" )
-UH_DEFINE_ITEM( CItemHelmetWorker,	item_helmet_worker,	"models/items/worker_helmet.mdl" )
+
+//-----------------------------------------------------------------------------
+// Heavy armour — same pickup as item_armor but a bigger grant (original
+// sub_10174730: 45 armour, max 200).
+//-----------------------------------------------------------------------------
+bool CItemHeavyArmor::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	if ( pHL2Player->ArmorValue() >= 200 )
+		return false;
+
+	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
+	SetOwnerEntity( pHL2Player );
+
+	pHL2Player->IncrementArmorValue( 45, 200 );
+	UTIL_Remove( this );
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Gear pickups — grant the piece and consume the item. The night-vision / gas
+// mask usage (m_bNightVisionOn / m_bGasMaskOn toggles + client overlay) is still
+// TODO, but ownership is tracked here so the pickups work end-to-end.
+//-----------------------------------------------------------------------------
+bool CItemFlashlight::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	pHL2Player->UH_SetFlashlightOn( true );
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	SetOwnerEntity( pHL2Player );
+	UTIL_Remove( this );
+
+	return true;
+}
+
+bool CItemNightVision::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	pHL2Player->UH_SetHaveNightVision( true );
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	SetOwnerEntity( pHL2Player );
+	UTIL_Remove( this );
+
+	return true;
+}
+
+bool CItemGasMask::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	pHL2Player->UH_SetHaveGasMask( true );
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	SetOwnerEntity( pHL2Player );
+	UTIL_Remove( this );
+
+	return true;
+}
+
+bool CItemShoulderFlashlight::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	pHL2Player->UH_SetShoulderFlashlight( true );
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	SetOwnerEntity( pHL2Player );
+	UTIL_Remove( this );
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Shield / PMC cap / PMC headset — wearable armour pieces. The original grants
+// them as equipment (the shield in particular has a full block mechanic that is
+// still TODO); here they grant armour like the helmets so they are at least
+// functional pickups.
+//-----------------------------------------------------------------------------
+static bool UH_GiveArmorPickup( CBasePlayer *pPlayer, CBaseEntity *pItem, int iAmount, int iMax )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	if ( pHL2Player->ArmorValue() >= iMax )
+		return false;
+
+	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
+	pItem->SetOwnerEntity( pHL2Player );
+	pHL2Player->IncrementArmorValue( iAmount, iMax );
+	UTIL_Remove( pItem );
+
+	return true;
+}
+
+bool CItemShield::MyTouch( CBasePlayer *pPlayer )
+{
+	return UH_GiveArmorPickup( pPlayer, this, 10, 100 );
+}
+
+bool CItemCapPMC::MyTouch( CBasePlayer *pPlayer )
+{
+	return UH_GiveArmorPickup( pPlayer, this, 10, 100 );
+}
+
+bool CItemHeadsetPMC::MyTouch( CBasePlayer *pPlayer )
+{
+	return UH_GiveArmorPickup( pPlayer, this, 10, 100 );
+}
+
+UH_DEFINE_ARMOR_ITEM( CItemHelmetGuard,	item_helmet_guard,	"models/items/helmet_visor.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemHelmetPrison,	item_helmet_prison,	"models/items/helmet.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemHelmetPMC,		item_helmet_pmc,	"models/items/pmc_helmet.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemHelmetWorker,	item_helmet_worker,	"models/items/worker_helmet.mdl" )
 UH_DEFINE_ITEM( CItemFlarePack,		item_flarepack,		"models/pg_props/pg_obj/pg_flare_pack.mdl" )
 UH_DEFINE_ITEM( CItemFMRadio,		item_fmradio,		"models/items/fmradio.mdl" )
 UH_DEFINE_ITEM( CItemRadioCracker,	item_radiocracker,	"models/items/fmradio.mdl" )
@@ -276,10 +689,47 @@ bool CItemArmor::MyTouch( CBasePlayer *pPlayer )
 UH_DEFINE_ITEM( CItemPainkillers,	item_painkillers,	"models/healthvial.mdl" )
 UH_DEFINE_ITEM( CItemSyringe,		item_syringe,		"models/healthvial.mdl" )
 
+// Painkillers / syringe heal on use. The original class names have no RTTI
+// dump, so the heal amounts are a reconstruction (TODO: verify against the
+// original player inputs "Syringe" / "PainKillers").
+void CItemPainkillers::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the heal effect.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	pPlayer->TakeHealth( 10.0f, DMG_GENERIC );
+	UTIL_Remove( this );
+}
+
+void CItemSyringe::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the heal effect.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	pPlayer->TakeHealth( 15.0f, DMG_GENERIC );
+	UTIL_Remove( this );
+}
+
 // Bandages: original gates the pickup on the player being hurt or bleeding
 // (sub_101725C0) and plays its own pickup sound.
-// TODO: port the bleed-stop effect (player bleed state, offset 547 in the
-// original — the SDK has no equivalent member yet).
 LINK_ENTITY_TO_CLASS( item_bandages, CItemBandages );
 
 void CItemBandages::Precache( void )
@@ -304,8 +754,7 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 		return false;
 
 	// Original gate: only while hurt or bleeding.
-	// TODO: bleeding check once the bleed system is ported.
-	if ( pHL2Player->GetHealth() >= 100 )
+	if ( pHL2Player->GetHealth() >= 100 && pHL2Player->UH_GetBleedCounter() <= 0 )
 		return false;
 
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
@@ -320,15 +769,54 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 }
 
 //-----------------------------------------------------------------------------
+// CItemBandages::Use — stop bleeding and heal. Original sub_101725C0: usable
+// while hurt or bleeding; heals 5 while bleeding (and stops the bleed), else
+// heals 1. Plays "HL2Player.PickupBandages".
+//-----------------------------------------------------------------------------
+void CItemBandages::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the bandage effect.
+	if ( useType != USE_ON )
+	{
+		BaseClass::Use( pActivator, pCaller, useType, value );
+		return;
+	}
+
+	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	// Original gate: only usable while hurt or bleeding.
+	if ( pPlayer->GetHealth() >= 100 && pPlayer->UH_GetBleedCounter() <= 0 )
+		return;
+
+	if ( pPlayer->UH_GetBleedCounter() > 0 )
+	{
+		// Stop the bleed and heal more.
+		pPlayer->UH_SetBleedCounter( 0 );
+		pPlayer->UH_SetLastBleedTime( gpGlobals->curtime );
+		pPlayer->TakeHealth( 5.0f, DMG_GENERIC );
+	}
+	else
+	{
+		pPlayer->TakeHealth( 1.0f, DMG_GENERIC );
+	}
+
+	pPlayer->EmitSound( "HL2Player.PickupBandages" );
+	UTIL_Remove( this );
+}
+
+//-----------------------------------------------------------------------------
 // Classnames from the original serveror.dll string table; models TODO.
 // item_sodacan stays vanilla (CItemSoda in effects.cpp) — do not re-link it.
 //-----------------------------------------------------------------------------
-UH_DEFINE_ITEM( CItemShield,			item_shield,			"models/error.mdl" )	// TODO: model
-UH_DEFINE_ITEM( CItemShoulderFlashlight, item_shoulderflashlight, "models/error.mdl" )	// TODO: model
-UH_DEFINE_ITEM( CItemCapPMC,			item_cap_pmc,			"models/error.mdl" )	// TODO: model
-UH_DEFINE_ITEM( CItemHeadsetPMC,		item_headset_pmc,		"models/error.mdl" )	// TODO: model
-UH_DEFINE_ITEM( CItemRespiratorGuard,	item_respirator_guard,	"models/error.mdl" )	// TODO: model
-UH_DEFINE_ITEM( CItemGasmaskGuard,		item_gasmask_guard,		"models/error.mdl" )	// TODO: model
+UH_DEFINE_ITEM( CItemShield,			item_shield,			"models/items/riotshield.mdl" )
+UH_DEFINE_ITEM( CItemShoulderFlashlight, item_shoulderflashlight, "models/nh2_gmn/flashlight.mdl" )
+UH_DEFINE_ITEM( CItemCapPMC,			item_cap_pmc,			"models/items/pmc_cap.mdl" )
+UH_DEFINE_ITEM( CItemHeadsetPMC,		item_headset_pmc,		"models/items/pmc_headset.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemRespiratorGuard,	item_respirator_guard,	"models/items/respirator.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemGasmaskGuard,		item_gasmask_guard,		"models/items/gasmask.mdl" )
 
 //-----------------------------------------------------------------------------
 // item_random
@@ -341,9 +829,9 @@ UH_DEFINE_ITEM( CItemGasmaskGuard,		item_gasmask_guard,		"models/error.mdl" )	//
 LINK_ENTITY_TO_CLASS( item_random, CItemRandom );
 
 // Skill multipliers for the "nothing" chance (original convar names).
-static ConVar sk_itemrandom1( "sk_itemrandom1", "1", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Easy" );
-static ConVar sk_itemrandom2( "sk_itemrandom2", "1", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Normal" );
-static ConVar sk_itemrandom3( "sk_itemrandom3", "1", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Hard" );
+static ConVar sk_itemrandom1( "sk_itemrandom1", "0.75", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Easy" );
+static ConVar sk_itemrandom2( "sk_itemrandom2", "1.00", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Normal" );
+static ConVar sk_itemrandom3( "sk_itemrandom3", "1.50", FCVAR_ARCHIVE, "Item random: nothing-chance multiplier on Hard" );
 
 static float UH_GetItemRandomSkillMultiplier( void )
 {
@@ -596,9 +1084,15 @@ void CItemRandom::SpawnRandomItem( void )
 	if ( !pItem )
 		return;
 
-	// Original copies the spawnflags onto the spawned item and carries
-	// EF_NOSHADOW ("disableshadows") over.
+	// Original copies the spawnflags + targetname onto the spawned item
+	// (the "Item_Random for Random Loot" tutorial: "The name of the Item_Random
+	// is passed to the Item it will create") and carries EF_NOSHADOW
+	// ("disableshadows") over.
 	pItem->AddSpawnFlags( m_spawnflags );
+	if ( GetEntityName() != NULL_STRING )
+	{
+		pItem->SetName( GetEntityName() );
+	}
 	if ( m_bDisableShadows )
 	{
 		pItem->AddEffects( EF_NOSHADOW );

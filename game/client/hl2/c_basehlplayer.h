@@ -1,4 +1,4 @@
-//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -45,7 +45,7 @@ public:
 	LadderMove_t		*GetLadderMove() { return &m_HL2Local.m_LadderMove; }
 	virtual void		ExitLadder();
 	bool				IsSprinting() const { return m_fIsSprinting; }
-	
+
 	// Input handling
 	virtual bool	CreateMove( float flInputSampleTime, CUserCmd *pCmd );
 	void			PerformClientSideObstacleAvoidance( float flFrameTime, CUserCmd *pCmd );
@@ -68,12 +68,27 @@ public:
 	// Underhell flags/counters (networked, see DT_HL2_Player recv table).
 	bool						m_bShoulderFlashlight;				// shoulder-mounted flashlight fitted
 	bool						m_bFlashlightOn;					// inventory flashlight state
-	bool						m_bDisplayHermitCard;				// TODO: hermit card system
-	bool						m_bInventoryEnabled;				// inventory system enabled
-	int							m_iUHBatteryCount;					// battery items held
-	int							m_iUHHermitCardsCount;				// TODO: hermit card system
-	int							m_iUHHermitCurrentQuestCount;		// TODO: hermit card system
-	int							m_iUHHermitTotalQuestCount;			// TODO: hermit card system
+	bool							m_bDisplayHermitCard;				// hermit card deck shown
+	bool							m_bInventoryEnabled;				// inventory system enabled
+	int								m_iUHBatteryCount;					// battery items held
+	int								m_iUHHermitCardsCount;				// collected hermit cards
+	int								m_iUHHermitCurrentQuestCount;		// current hermit quest progress
+	int								m_iUHHermitTotalQuestCount;			// total hermit quest progress
+
+	// Underhell endurance / hunger state (networked; drawn by CHudEndurance).
+	int								m_iEndurance;						// "hunger" meter, 0..100
+	int								m_iBleedCounter;					// bleeding state (0 = clean)
+	float							m_flUHBatteryCharge;				// 0..100 current battery charge
+	bool								m_bIronSighted;						// ironsight active
+	float								m_fIronsightedTime;					// last ironsight toggle time
+	bool								m_bHavePistolSilencer;				// silencer gear (client mirror)
+	bool								m_bHaveRifleSilencer;
+	bool								m_bLaserToggleState;
+	bool								m_bKickMarker;						// kick window active
+	bool								m_bNightVisionOn;					// night vision overlay active
+	bool								m_bGasMaskOn;						// gas mask overlay active
+	bool								m_bLeftArmDeployed;					// left arm raised (second hand)
+	bool								m_bHoldingFlare;					// holding a flare
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible

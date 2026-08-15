@@ -49,6 +49,9 @@ public:
 	bool	Deploy( void );
 	bool	Holster( CBaseCombatWeapon *pSwitchingTo = NULL );
 
+	// Underhell "Throw_Nade": throw a normal grenade immediately (no pull-back).
+	void	ThrowNow( void );
+
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 	
 	bool	Reload( void );
@@ -478,3 +481,29 @@ void CWeaponFrag::RollGrenade( CBasePlayer *pPlayer )
 	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
 }
 
+
+//-----------------------------------------------------------------------------
+// Purpose: Underhell "Throw_Nade" — throw a normal grenade immediately, without
+// the pull-back animation (which normally waits for the player to release
+// +attack).
+//-----------------------------------------------------------------------------
+void CWeaponFrag::ThrowNow( void )
+{
+	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
+	if ( !pOwner )
+		return;
+
+	ThrowGrenade( pOwner );
+	DecrementAmmo( pOwner );
+}
+
+//-----------------------------------------------------------------------------
+// Free-function wrapper so uh_ironsight.cpp can use the throw without seeing
+// the (translation-unit-local) CWeaponFrag class.
+//-----------------------------------------------------------------------------
+void WeaponFrag_ThrowNow( CBaseCombatWeapon *pWeapon )
+{
+	CWeaponFrag *pFrag = dynamic_cast<CWeaponFrag *>( pWeapon );
+	if ( pFrag )
+		pFrag->ThrowNow();
+}

@@ -53,8 +53,19 @@ public:
 
 	virtual void	ItemHolsterFrame( void );
 
+	// Underhell silencer. Networked so the client viewmodel selects the
+	// silenced fire/draw activities (ACT_VM_*_SILENCED). "silencer_toggle"
+	// (server) flips it for the active weapon; vanilla weapons keep it false.
+	virtual Activity GetPrimaryAttackActivity( void );
+	virtual Activity GetDrawActivity( void );
+
+	bool			IsSilenced( void ) const { return m_bSilenced; }
+	void			SetSilenced( bool bSilenced ) { m_bSilenced = bSilenced; }
+
 	int				m_iPrimaryAttacks;		// # of primary attacks performed with this weapon
 	int				m_iSecondaryAttacks;	// # of secondary attacks performed with this weapon
+
+	CNetworkVar( bool, m_bSilenced );		// silencer fitted (Underhell)
 
 protected:
 

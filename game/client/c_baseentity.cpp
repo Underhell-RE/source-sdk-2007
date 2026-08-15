@@ -44,6 +44,10 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+// Underhell: gate for mirror/monitor-only rendering (matches the original
+// client convar cl_player_render_mirror, FCVAR_CHEAT).
+ConVar cl_player_render_mirror( "cl_player_render_mirror", "1", FCVAR_CHEAT, "Enable or disable player mirror/monitor rendering" );
+
 
 #ifdef INTERPOLATEDVAR_PARANOID_MEASUREMENT
 	int g_nInterpolatedVarsChanged = 0;
@@ -473,6 +477,8 @@ BEGIN_RECV_TABLE_NOBASE(C_BaseEntity, DT_BaseEntity)
 	RecvPropInt		( RECVINFO( m_bSimulatedEveryTick ), 0, RecvProxy_InterpolationAmountChanged ),
 	RecvPropInt		( RECVINFO( m_bAnimatedEveryTick ), 0, RecvProxy_InterpolationAmountChanged ),
 	RecvPropBool	( RECVINFO( m_bAlternateSorting ) ),
+	// Underhell: mirror/monitor-only rendering flag.
+	RecvPropBool	( RECVINFO( m_bIsMirrorOnly ) ),
 
 END_RECV_TABLE()
 
@@ -897,6 +903,7 @@ C_BaseEntity::C_BaseEntity() :
 
 	m_bSimulatedEveryTick = false;
 	m_bAnimatedEveryTick = false;
+	m_bIsMirrorOnly = false;
 	m_pPhysicsObject = NULL;
 
 #ifdef _DEBUG
@@ -1912,6 +1919,13 @@ int C_BaseEntity::DrawBrushModel( bool bSort, bool bShadowDepth )
 int C_BaseEntity::DrawModel( int flags )
 {
 	if ( !m_bReadyToDraw )
+		return 0;
+
+	// Underhell: mirror/monitor-only entities stay visible (in the leaf system)
+	// but are only actually drawn during the reflective/refractive glass pass,
+	// gated by cl_player_render_mirror. This is what hides the player model /
+	// ghost apparitions from the normal first-person world view.
+	if ( m_bIsMirrorOnly && ( !cl_player_render_mirror.GetBool() || !g_bRenderingReflectiveGlass ) )
 		return 0;
 
 	int drawn = 0;

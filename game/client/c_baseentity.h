@@ -35,6 +35,12 @@
 #include "toolframework/itoolentity.h"
 #include "tier0/threadtools.h"
 
+// Underhell: true while the reflective/refractive glass view is rendering.
+// Mirror-only entities (m_bIsMirrorOnly) are drawn only during this pass.
+extern bool g_bRenderingReflectiveGlass;
+// Underhell: master enable for mirror/monitor-only rendering (FCVAR_CHEAT).
+extern ConVar cl_player_render_mirror;
+
 class C_Team;
 class IPhysicsObject;
 class IClientVehicle;
@@ -1575,6 +1581,13 @@ private:
 	CNetworkVar( bool, m_bSimulatedEveryTick );
 	CNetworkVar( bool, m_bAnimatedEveryTick );
 	CNetworkVar( bool, m_bAlternateSorting );
+	// Underhell: render this entity ONLY in mirror/monitor render targets.
+	CNetworkVar( bool, m_bIsMirrorOnly );
+
+public:
+	// Underhell: query the mirror-only rendering flag.
+	bool	IsMirrorOnly( void ) const { return m_bIsMirrorOnly; }
+private:
 
 	//Adrian
 	unsigned char					m_iTextureFrameIndex;

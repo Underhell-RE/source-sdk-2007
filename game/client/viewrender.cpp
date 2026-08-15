@@ -163,6 +163,9 @@ IntroData_t *g_pIntroData = NULL;
 static bool	g_bRenderingView = false;			// For debugging...
 static int g_CurrentViewID = VIEW_NONE;
 bool g_bRenderingScreenshot = false;
+// Underhell: set while the reflective/refractive glass view draws, so
+// mirror-only entities (C_BaseEntity::m_bIsMirrorOnly) render only here.
+bool g_bRenderingReflectiveGlass = false;
 
 
 #define FREEZECAM_SNAPSHOT_FADE_SPEED 340
@@ -5632,8 +5635,12 @@ void CReflectiveGlassView::Draw()
 	// Disable occlusion visualization in reflection
 	bool bVisOcclusion = r_visocclusion.GetInt();
 	r_visocclusion.SetValue( 0 );
-				   
+		   
+	// Underhell: mirror-only entities (player model, ghost apparitions) draw
+	// only during this reflective pass.
+	g_bRenderingReflectiveGlass = true;
 	BaseClass::Draw();
+	g_bRenderingReflectiveGlass = false;
 
 	r_visocclusion.SetValue( bVisOcclusion );
 
@@ -5698,7 +5705,10 @@ void CRefractiveGlassView::Draw()
 	CMatRenderContextPtr pRenderContext( materials );
 	PIXEVENT( pRenderContext, "CRefractiveGlassView::Draw" );
 
+	// Underhell: mirror-only entities draw only during this refractive pass.
+	g_bRenderingReflectiveGlass = true;
 	BaseClass::Draw();
+	g_bRenderingReflectiveGlass = false;
 
 	pRenderContext->ClearColor4ub( 0, 0, 0, 255 );
 	pRenderContext->Flush();

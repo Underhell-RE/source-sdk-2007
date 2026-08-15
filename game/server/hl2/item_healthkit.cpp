@@ -11,6 +11,8 @@
 #include "items.h"
 #include "in_buttons.h"
 #include "engine/IEngineSound.h"
+#include "hl2_player.h"						// Underhell: CHL2_Player inventory access
+#include "underhell/uh_inventory.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -20,7 +22,31 @@ ConVar	sk_healthvial( "sk_healthvial","0" );
 ConVar	sk_healthcharger( "sk_healthcharger","0" );		
 
 //-----------------------------------------------------------------------------
-// Small health kit. Heals the player when picked up.
+// Underhell: stash a health pickup into the player's inventory for later use.
+// Always stashes while there is a free slot, regardless of current health (a
+// hurt player can hoard kits for later). Returns true when the item was
+// consumed.
+//-----------------------------------------------------------------------------
+static bool UH_TryInventoryHealthPickup( CItem *pItem, CBasePlayer *pPlayer, int iItem )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player )
+		return false;
+
+	if ( pHL2Player->UH_FindFreeSlot() < 0 )
+		return false;	// inventory full — caller falls back to heal-on-touch
+
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	pItem->SetOwnerEntity( pHL2Player );
+	pHL2Player->UH_GiveItem( iItem );
+	UTIL_Remove( pItem );
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Small health kit. Heals the player when picked up (or, under Underhell,
+// stashes into the player's inventory for later use).
 //-----------------------------------------------------------------------------
 class CHealthKit : public CItem
 {
@@ -30,6 +56,7 @@ public:
 	void Spawn( void );
 	void Precache( void );
 	bool MyTouch( CBasePlayer *pPlayer );
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 };
 
 LINK_ENTITY_TO_CLASS( item_healthkit, CHealthKit );
@@ -45,6 +72,9 @@ void CHealthKit::Spawn( void )
 	SetModel( "models/items/healthkit.mdl" );
 
 	BaseClass::Spawn();
+
+	// Underhell: items are taken with +use, not by walking over them.
+	SetTouch( NULL );
 }
 
 
@@ -56,6 +86,7 @@ void CHealthKit::Precache( void )
 	PrecacheModel("models/items/healthkit.mdl");
 
 	PrecacheScriptSound( "HealthKit.Touch" );
+	PrecacheScriptSound( "HL2Player.PickupItems" );
 }
 
 
@@ -66,6 +97,11 @@ void CHealthKit::Precache( void )
 //-----------------------------------------------------------------------------
 bool CHealthKit::MyTouch( CBasePlayer *pPlayer )
 {
+	// Underhell: stash into the inventory when there's room, otherwise fall
+	// back to the vanilla heal-on-touch behaviour.
+	if ( UH_TryInventoryHealthPickup( this, pPlayer, UH_ITEM_HEALTHKIT ) )
+		return true;
+
 	if ( pPlayer->TakeHealth( sk_healthkit.GetFloat(), DMG_GENERIC ) )
 	{
 		CSingleUserRecipientFilter user( pPlayer );
@@ -94,6 +130,37 @@ bool CHealthKit::MyTouch( CBasePlayer *pPlayer )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Using a healthkit from the Underhell inventory heals and stops
+// bleeding (original sub_102F07A0).
+//-----------------------------------------------------------------------------
+void CHealthKit::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the heal effect.
+	if ( useType != USE_ON )
+	{
+		CBasePlayer *pPlayer = ToBasePlayer( pActivator );
+		if ( pPlayer )
+		{
+			MyTouch( pPlayer );
+		}
+		return;
+	}
+
+	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player *>( pActivator );
+	if ( !pPlayer )
+		return;
+
+	pPlayer->TakeHealth( sk_healthkit.GetFloat(), DMG_GENERIC );
+
+	// Healthkit completely stops bleeding.
+	pPlayer->UH_SetBleedCounter( 0 );
+
+	pPlayer->EmitSound( "HealthKit.Touch" );
+	UTIL_Remove( this );
+}
+
+//-----------------------------------------------------------------------------
 // Small dynamically dropped health kit
 //-----------------------------------------------------------------------------
 
@@ -108,6 +175,9 @@ public:
 		SetModel( "models/healthvial.mdl" );
 
 		BaseClass::Spawn();
+
+		// Underhell: items are taken with +use, not by walking over them.
+		SetTouch( NULL );
 	}
 
 	void Precache( void )
@@ -115,10 +185,16 @@ public:
 		PrecacheModel("models/healthvial.mdl");
 
 		PrecacheScriptSound( "HealthVial.Touch" );
+		PrecacheScriptSound( "HL2Player.PickupItems" );
 	}
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
+		// Underhell: stash into the inventory when there's room, otherwise fall
+		// back to the vanilla heal-on-touch behaviour.
+		if ( UH_TryInventoryHealthPickup( this, pPlayer, UH_ITEM_HEALTH_VIAL ) )
+			return true;
+
 		if ( pPlayer->TakeHealth( sk_healthvial.GetFloat(), DMG_GENERIC ) )
 		{
 			CSingleUserRecipientFilter user( pPlayer );
@@ -137,15 +213,50 @@ public:
 			}
 			else
 			{
-				UTIL_Remove(this);	
-			}
-
-			return true;
+			UTIL_Remove(this);	
 		}
 
-		return false;
+		return true;
 	}
+
+	return false;
+	}
+
+	// Underhell: inventory use (heals + slows bleeding).
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 };
+
+//-----------------------------------------------------------------------------
+// Purpose: Using a healthvial from the Underhell inventory heals and slows
+// bleeding (original sub_102F08D0: halves the bleed counter).
+//-----------------------------------------------------------------------------
+void CHealthVial::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
+	// path applies the heal effect.
+	if ( useType != USE_ON )
+	{
+		CBasePlayer *pPlayer = ToBasePlayer( pActivator );
+		if ( pPlayer )
+		{
+			MyTouch( pPlayer );
+		}
+		return;
+	}
+
+	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player *>( pActivator );
+	if ( !pPlayer )
+		return;
+
+	pPlayer->TakeHealth( sk_healthvial.GetFloat(), DMG_GENERIC );
+
+	// Healthvial slows bleeding: halve the bleed counter.
+	int iBleed = pPlayer->UH_GetBleedCounter();
+	pPlayer->UH_SetBleedCounter( ( iBleed >= 20 ) ? ( iBleed / 2 ) : 0 );
+
+	pPlayer->EmitSound( "HealthVial.Touch" );
+	UTIL_Remove( this );
+}
 
 LINK_ENTITY_TO_CLASS( item_healthvial, CHealthVial );
 PRECACHE_REGISTER( item_healthvial );

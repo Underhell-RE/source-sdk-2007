@@ -78,6 +78,10 @@ public:
 
 	bool	IsRunningEnterExitAnim( void ) { return m_bEnterAnimOn || m_bExitAnimOn; }
 
+	// Underhell: gunner-seat view uses "vehicle_gunner_eyes" instead of
+	// "vehicle_driver_eyes".
+	bool	IsPlayerAtGun( void ) const { return m_bPlayerAtGun; }
+
 protected:
 
 	virtual void OnEnteredVehicle( C_BaseCombatCharacter *pPassenger );
@@ -117,6 +121,7 @@ protected:
 	CInterpolatedVar<Vector>	m_iv_vecGunCrosshair;
 	Vector						m_vecEyeExitEndpoint;
 	bool						m_bHasGun;
+	bool						m_bPlayerAtGun;
 	bool						m_bUnableToFire;
 
 	// Used to smooth view entry

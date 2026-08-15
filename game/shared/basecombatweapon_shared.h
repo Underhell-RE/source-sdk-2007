@@ -163,6 +163,7 @@ public:
 	// Weapon Pickup For Player
 	virtual void			SetPickupTouch( void );
 	virtual void 			DefaultTouch( CBaseEntity *pOther );	// default weapon touch
+	virtual void 			AmmoScavengeTouch( CBaseEntity *pOther );	// Underhell: take clip ammo, weapon stays
 
 	// HUD Hints
 	virtual bool			ShouldDisplayAltFireHUDHint();

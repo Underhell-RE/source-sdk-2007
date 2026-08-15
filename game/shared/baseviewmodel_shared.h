@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -51,13 +51,36 @@ public:
 	virtual void			SendViewModelMatchingSequence( int sequence );
 	virtual void			SetWeaponModel( const char *pszModelname, CBaseCombatWeapon *weapon );
 
-	virtual void			CalcViewModelLag( Vector& origin, QAngle& angles, QAngle& original_angles );
-	virtual void			CalcViewModelView( CBasePlayer *owner, const Vector& eyePosition, 
+	virtual void				CalcViewModelLag( Vector& origin, QAngle& angles, QAngle& original_angles );
+	virtual void				CalcViewModelView( CBasePlayer *owner, const Vector& eyePosition, 
 								const QAngle& eyeAngles );
-	virtual void			AddViewModelBob( CBasePlayer *owner, Vector& eyePosition, QAngle& eyeAngles ) {};
+	virtual void				AddViewModelBob( CBasePlayer *owner, Vector& eyePosition, QAngle& eyeAngles ) {};
 
-	// Initializes the viewmodel for use							
-	void					SetOwner( CBaseEntity *pEntity );
+	// Underhell ironsight interpolation (VDC "Adding Ironsights", jorg40/Cin).
+	// CalcViewModelView slides the viewmodel up to the eye by the weapon's
+	// ExpOffset; m_expFactor interpolates 0 (hip) -> 1 (fully sighted). The
+	// target state is the networked m_bExpSighted below, which the server
+	// toggles (hexrays sub_101ECF40 writes it through the network layer) and
+	// the client reads each frame. This matches the original: DT_BaseViewModel
+	// carries m_bExpSighted (server @1120, client @1960).
+	//
+	// NOTE: m_expFactor is NOT networked (not in DT_BaseViewModel). It is
+	// declared on BOTH client and server (no #if CLIENT_DLL) because this
+	// class is shared (DECLARE_NETWORKCLASS / DECLARE_PREDICTABLE): a
+	// client-only member here would shift every CNetworkVar below it and make
+	// the client's network-var / prediction offsets diverge from the server's,
+	// corrupting memory. m_expFactor is simply unused on the server.
+	float						m_expFactor;
+
+	// Server-side toggle entry point: the ironsight command flips this flag
+	// (which is networked) so the client viewmodel can slide to the eye.
+	// CBaseViewModel::CalcViewModelView reads it directly (member access), so
+	// the client needs no accessor; the server needs these two.
+	void						SetExpSighted( bool bSighted ) { m_bExpSighted = bSighted; }
+	bool						IsExpSighted( void ) const { return m_bExpSighted; }
+
+	// Initializes the viewmodel for use			
+	void						SetOwner( CBaseEntity *pEntity );
 	void					SetIndex( int nIndex );
 	// Returns which viewmodel it is
 	int						ViewModelIndex( ) const;
@@ -174,6 +197,11 @@ private:
 #endif
 
 private:
+	// Underhell ironsight: networked flag toggled by the server (matches the
+	// original DT_BaseViewModel, which carries m_bExpSighted before
+	// m_nViewModelIndex â€” server sendtable sub_100F8EA0, client sub_10015160).
+	CNetworkVar( bool, m_bExpSighted );
+
 	CNetworkVar( int, m_nViewModelIndex );		// Which viewmodel is it?
 	CNetworkHandle( CBaseEntity, m_hOwner );				// Player or AI carrying this weapon
 

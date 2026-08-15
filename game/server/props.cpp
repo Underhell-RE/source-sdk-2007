@@ -1821,6 +1821,7 @@ BEGIN_DATADESC( CDynamicProp )
 	// Outputs
 	DEFINE_OUTPUT( m_pOutputAnimBegun, "OnAnimationBegun" ),
 	DEFINE_OUTPUT( m_pOutputAnimOver, "OnAnimationDone" ),
+	DEFINE_OUTPUT( m_OnPlayerUse, "OnPlayerUse" ),
 
 	// Function Pointers
 	DEFINE_THINKFUNC( AnimThink ),
@@ -1844,6 +1845,27 @@ CDynamicProp::CDynamicProp()
 		UseClientSideAnimation();
 	}
 	m_iGoalSequence = -1;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Underhell — prop_dynamic_override responds to +use and fires
+// OnPlayerUse (used by pickup props like the prologue shotgun pd_shotgun).
+//-----------------------------------------------------------------------------
+void CDynamicProp::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	CBasePlayer *pPlayer = ToBasePlayer( pActivator );
+	if ( pPlayer )
+	{
+		m_OnPlayerUse.FireOutput( pActivator, this );
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Underhell — make prop_dynamic_override targetable by +use.
+//-----------------------------------------------------------------------------
+int CDynamicProp::ObjectCaps( void )
+{
+	return BaseClass::ObjectCaps() | FCAP_IMPULSE_USE;
 }
 
 

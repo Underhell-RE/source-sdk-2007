@@ -265,7 +265,31 @@
 				Name="underhell"
 				>
 				<File
+					RelativePath=".\underhell\npc_infected.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_ai.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\uh_items.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_gear.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_leftarm.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_player_endurance.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_ironsight.cpp"
 					>
 				</File>
 				<File
@@ -278,6 +302,22 @@
 				</File>
 				<File
 					RelativePath=".\underhell\uh_player_objectives.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_player_model.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_kick.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_weapons.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_weapons.h"
 					>
 				</File>
 				<File
