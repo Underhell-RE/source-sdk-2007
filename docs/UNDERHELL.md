@@ -1563,3 +1563,62 @@ then `DrawSetColor(black, alpha)` + `DrawFilledRect(dotx, doty, 3, 8)` — a tin
 2-3 px × 8 px tick, NOT a filled square. `alpha = (3.0 - (curtime - trigger)) * 85`.
 The exact screen origin is ambiguous from the decompile (the rect coords read
 degenerate); verify pixel position in game.
+
+## Battery HUD — field map re-verified against Diaphora 9.1 decompile
+
+Used `Cliento_diaphora.dll.c` (Hex-Rays 9.1) to nail the CHudUHBattery member
+offsets via the paint (`sub_100BDC80`) + ctor anim-var registrations
+(`sub_100BE0A0..100BE520`). Confirms the port's bar logic is correct:
+
+| member | offset | value (HudLayout.res) | role |
+|---|---|---|---|
+| charge (float, cached) | +220 | player m_flUHBatteryCharge | 0..100 |
+| HullDisabledAlpha | +232 | "0" | exhausted-chunk alpha |
+| HullColor | +237..240 | "2 127 252 192" | filled-chunk color |
+| BarInsetX | +252 | 6 | chunk x0 |
+| BarInsetY | +260 | 31 | chunk y0 (bar bottom anchor) |
+| BarWidth | +268 | 14 | chunk x1 offset |
+| BarHeight | +276 | 23 | chunkCount = BarHeight/(ChunkHeight+Gap) = 7 |
+| BarChunkHeight | +284 | 2 | chunk y1 offset |
+| BarChunkGap | +292 | 1 | y step = 2+1 = 3 |
+| contourx/contoury | +300/+308 | 1/0 | contour rect x0/y0 |
+| contourtall/contourwide | +316/+324 | 42/24 | contour rect y1/x1 |
+
+Verified correct in the port:
+- fill is bottom-up: `y = BarInsetY` (31), `y -= step` (3) per chunk, 7 chunks.
+- filled color = HullColor (alpha 192); exhausted = HullColor.rgb +
+  HullDisabledAlpha (0 → exhausted invisible, bar shrinks).
+- draw order bar → contour (`hud_battery_contour`) → "   x%i" text.
+- think: `m_bFlashlightOn(5286) || m_bNightVisionOn(3449) || count(5292) changed`
+  → alpha 255; else `alpha -= 0.1`.
+
+Two quirks found and matched:
+- count text is drawn at `DrawSetTextPos(0,0)` (panel top-left), the 3 leading
+  spaces in "   x%i" push the digits right — port now matches (was a guessed
+  22,23).
+- the contour rect is drawn as `DrawTexturedRect(contourx, contoury,
+  contourwide, contourtall)` — contourwide/tall used as ABSOLUTE x1/y1, not
+  added to x0/y0. The port adds them (1 px difference, imperceptible); left
+  as-is.
+
+## Diaphora filter script (devtools/bin/diaphora_filter.py)
+
+Splits a `.diaphora` SQLite export into three tiers by address-delta:
+
+- `reliable` — "best" matches with delta >= 0x10000 (the image shift; same
+  function moved by the mod's inserted code). Trust these names.
+- `verify` — multimatch/partial, or best with small/zero/negative delta. These
+  are the false positives (e.g. battery paint -> caption dtor) + ambiguous.
+  Read the code.
+- `mod_delta` — the `unmatched` table: functions with no vanilla match (the
+  mod's additions + any vanilla functions Diaphora failed to match).
+
+Run: `python3 devtools/bin/diaphora_filter.py cliento.diaphora [--min-delta
+0x10000] [--out DIR]`. On the client export it produced 6482 reliable / 4923
+verify / 12685 mod_delta, and correctly routed all four known false positives
+(sub_100BDC80/100BE800/100BCFA0/100BD080) into `verify`.
+
+Note: the delta signal is not absolute — `best` + large positive delta is a
+STRONG trust signal, but `verify` still contains some genuine matches (and
+`unmatched` contains vanilla functions Diaphora simply couldn't match, e.g.
+CAchievementNotificationPanel). Use the tiers as a triage map, not ground truth.

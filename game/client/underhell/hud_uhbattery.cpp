@@ -144,12 +144,13 @@ void CHudUHBattery::Paint()
 		(int)m_flContourX, (int)m_flContourY,
 		(int)( m_flContourX + m_flContourWide ), (int)( m_flContourY + m_flContourTall ) );
 
-	// Battery count: original prints "   x<N>" with the HudNumbers font.
+	// Battery count: original prints "   x<N>" (3 leading spaces, which push the
+	// digits right) at text position (0,0) — the panel's top-left. Match that.
 	wchar_t szText[16];
 	swprintf( szText, L"   x%i", m_iBatteryCount );
 
 	vgui::surface()->DrawSetTextFont( m_hNumberFont );
 	vgui::surface()->DrawSetTextColor( m_HullColor[0], m_HullColor[1], m_HullColor[2], (int)m_flAlpha );
-	vgui::surface()->DrawSetTextPos( (int)( m_flBarInsetX + m_flBarWidth + 2 ), (int)m_flBarInsetY - 8 );
+	vgui::surface()->DrawSetTextPos( 0, 0 );
 	vgui::surface()->DrawUnicodeString( szText );
 }
