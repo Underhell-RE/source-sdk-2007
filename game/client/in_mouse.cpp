@@ -586,12 +586,12 @@ void CInput::TryCursorMove( QAngle& viewangles, CUserCmd *cmd, float mouse_x, fl
 	if ( cam_ots_freeaim_interval_enable.GetInt() )
 	{
 		flTurnSpeed = cam_ots_freeaim_speed_turn.GetFloat() *
-			max( 0.0f, ( flLength - flMoveThreshold ) / ( flMoveMax - flMoveThreshold ) );
+			MAX( 0.0f, ( flLength - flMoveThreshold ) / ( flMoveMax - flMoveThreshold ) );
 		viewangles += QAngle( moveDir.y * flTurnSpeed, moveDir.x * -flTurnSpeed, 0 );
 	}
 	else
 	{
-		flTurnSpeed = max( 0.0f, flLength - flMoveMax );
+		flTurnSpeed = MAX( 0.0f, flLength - flMoveMax );
 		viewangles += QAngle( moveDir.y * flTurnSpeed * flFOV, moveDir.x * -flTurnSpeed * flFOV, 0 );
 	}
 
@@ -607,7 +607,7 @@ void CInput::TryCursorMove( QAngle& viewangles, CUserCmd *cmd, float mouse_x, fl
 		viewangles.y += 360.0f;
 
 	// Clamp the cursor magnitude.
-	flLength = min( flMoveMax, flLength );
+	flLength = MIN( flMoveMax, flLength );
 	m_vecFreeAimPos *= flLength;
 
 	cmd->mousedx = (int)mouse_x;
