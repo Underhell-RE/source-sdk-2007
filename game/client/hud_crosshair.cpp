@@ -13,6 +13,7 @@
 #include "vgui_controls/controls.h"
 #include "vgui/ISurface.h"
 #include "IVRenderView.h"
+#include "iinput.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -119,6 +120,15 @@ void CHudCrosshair::Paint( void )
 	float x, y;
 	x = ScreenWidth()/2;
 	y = ScreenHeight()/2;
+
+	// Underhell free-aim: draw the crosshair at the free-aim cursor
+	// (see CInput::TryCursorMove), not the fixed screen center.
+	if ( input->CAM_IsFreeAiming() )
+	{
+		Vector2D cursor = input->CAM_GetFreeAimCursor();
+		x *= cursor.x + 1.0f;
+		y *= cursor.y + 1.0f;
+	}
 
 	// MattB - m_vecCrossHairOffsetAngle is the autoaim angle.
 	// if we're not using autoaim, just draw in the middle of the 

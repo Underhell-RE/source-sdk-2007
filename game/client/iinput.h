@@ -94,6 +94,12 @@ public:
 	virtual	bool		CAM_IsOrthographic() const = 0;
 	virtual	void		CAM_OrthographicSize( float& w, float& h ) const = 0;
 
+	// Underhell free-aim (first-person: the crosshair decouples from the view
+	// and the weapon viewmodel tilts toward the mouse). Gated by
+	// cam_ots_freeaim_enable. See CInput::TryCursorMove.
+	virtual bool		CAM_IsFreeAiming( void ) = 0;
+	virtual Vector2D	CAM_GetFreeAimCursor( void ) = 0;
+
 #if defined( HL2_CLIENT_DLL )
 	// IK back channel info
 	virtual void		AddIKGroundContactInfo( int entindex, float minheight, float maxheight ) = 0;

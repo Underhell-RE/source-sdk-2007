@@ -60,6 +60,17 @@ ConVar in_joystick( "joystick","0", FCVAR_ARCHIVE );
 ConVar thirdperson_platformer( "thirdperson_platformer", "0", 0, "Player will aim in the direction they are moving." );
 ConVar thirdperson_screenspace( "thirdperson_screenspace", "0", 0, "Movement will be relative to the camera, eg: left means screen-left" );
 
+// Underhell free-aim (first-person: crosshair decouples from the view, weapon
+// viewmodel tilts toward the mouse). From the VDC "Over the Shoulder View"
+// OPTIONAL free-aim section; the mod ships these defaults in Cliento.dll.
+ConVar cam_ots_freeaim_enable( "cam_ots_freeaim_enable", "1", FCVAR_ARCHIVE, "Enable first-person free-aim (weapon tilts toward the mouse)." );
+ConVar cam_ots_freeaim_interval_enable( "cam_ots_freeaim_interval_enable", "0", FCVAR_ARCHIVE, "Use an interval for view turning while free-aiming." );
+ConVar cam_ots_freeaim_move_threshold( "cam_ots_freeaim_move_threshold", "0.05", FCVAR_ARCHIVE, "Free-aim cursor deadzone (past this the view turns)." );
+ConVar cam_ots_freeaim_move_max( "cam_ots_freeaim_move_max", "0.1", FCVAR_ARCHIVE, "Free-aim cursor clamp (max cursor magnitude)." );
+ConVar cam_ots_freeaim_speed_turn( "cam_ots_freeaim_speed_turn", "1", FCVAR_ARCHIVE, "Free-aim view turn speed." );
+ConVar cam_ots_freeaim_speed_evenyawspeed( "cam_ots_freeaim_speed_evenYawSpeed", "0", FCVAR_ARCHIVE, "Scale free-aim pitch by screen aspect ratio." );
+ConVar cam_ots_freeaim_autoturn_speed( "cam_ots_freeaim_autoturn_speed", "250", FCVAR_ARCHIVE, "Free-aim auto-turn rate." );
+
 ConVar sv_noclipduringpause( "sv_noclipduringpause", "0", FCVAR_REPLICATED | FCVAR_CHEAT, "If cheats are enabled, then you can noclip with the game paused (for doing screenshots, etc.)." );
 static ConVar cl_lagcomp_errorcheck( "cl_lagcomp_errorcheck", "0", 0, "Player index of other player to check for position errors." );
 
@@ -1489,6 +1500,9 @@ void CInput::Init_All (void)
 	m_fMouseParmsValid	= false;
 	m_fJoystickAdvancedInit = false;
 	m_flLastForwardMove = 0.0;
+
+	// Underhell free-aim cursor.
+	m_vecFreeAimPos.Init();
 
 	// Initialize inputs
 	if ( IsPC() )

@@ -24,6 +24,7 @@
 #include "cdll_client_int.h"
 #include "cdll_util.h"
 #include "tier1/convar_serverbounded.h"
+#include "c_baseplayer.h"
 
 #if defined( _X360 )
 #include "xbox/xbox_win32stubs.h"
@@ -552,6 +553,68 @@ void CInput::SetMousePos(int x, int y)
 }
 
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Purpose: Underhell free-aim — move the free-aim cursor instead of turning
+// the view. The cursor (m_vecFreeAimPos, clamped to cam_ots_freeaim_move_max)
+// drives the crosshair + weapon viewmodel tilt; the view only auto-turns when
+// the cursor leaves the deadzone (cam_ots_freeaim_move_threshold).
+// From the VDC "Over the Shoulder View" OPTIONAL free-aim section (the mod
+// ships these convars in Cliento.dll with the same defaults).
+//-----------------------------------------------------------------------------
+void CInput::TryCursorMove( QAngle& viewangles, CUserCmd *cmd, float mouse_x, float mouse_y )
+{
+	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
+	float flFOV = ( pPlayer ? pPlayer->GetFOV() : 1.0f );
+	float flScaleYaw = m_yaw.GetFloat() / flFOV;
+	float flScalePitch = m_pitch->GetFloat() / flFOV;
+
+	// Keep pitch/yaw cursor movement consistent with the screen aspect ratio.
+	float flScale_Pitch = 1.0f;
+	if ( cam_ots_freeaim_speed_evenyawspeed.GetInt() )
+		flScale_Pitch = engine->GetScreenAspectRatio();
+
+	m_vecFreeAimPos += Vector2D( mouse_x * flScaleYaw, mouse_y * flScale_Pitch * flScalePitch );
+	float flLength = m_vecFreeAimPos.NormalizeInPlace();
+
+	Vector2D moveDir = m_vecFreeAimPos;
+	moveDir.NormalizeInPlace();
+
+	float flMoveThreshold = cam_ots_freeaim_move_threshold.GetFloat();
+	float flMoveMax = cam_ots_freeaim_move_max.GetFloat();
+	float flTurnSpeed;
+
+	if ( cam_ots_freeaim_interval_enable.GetInt() )
+	{
+		flTurnSpeed = cam_ots_freeaim_speed_turn.GetFloat() *
+			MAX( 0.0f, ( flLength - flMoveThreshold ) / ( flMoveMax - flMoveThreshold ) );
+		viewangles += QAngle( moveDir.y * flTurnSpeed, moveDir.x * -flTurnSpeed, 0 );
+	}
+	else
+	{
+		flTurnSpeed = MAX( 0.0f, flLength - flMoveMax );
+		viewangles += QAngle( moveDir.y * flTurnSpeed * flFOV, moveDir.x * -flTurnSpeed * flFOV, 0 );
+	}
+
+	// Clamp pitch/yaw.
+	if ( viewangles.x > 89.0f )
+		viewangles.x = 89.0f;
+	else if ( viewangles.x < -89.0f )
+		viewangles.x = -89.0f;
+
+	if ( viewangles.y > 180.0f )
+		viewangles.y -= 360.0f;
+	else if ( viewangles.y < -180.0f )
+		viewangles.y += 360.0f;
+
+	// Clamp the cursor magnitude.
+	flLength = MIN( flMoveMax, flLength );
+	m_vecFreeAimPos *= flLength;
+
+	cmd->mousedx = (int)mouse_x;
+	cmd->mousedy = (int)mouse_y;
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: MouseMove -- main entry point for applying mouse
 // Input  : *cmd - 
 //-----------------------------------------------------------------------------
@@ -591,7 +654,10 @@ void CInput::MouseMove( CUserCmd *cmd )
 		g_pClientMode->OverrideMouseInput( &mouse_x, &mouse_y );
 
 		// Add mouse X/Y movement to cmd
-		ApplyMouse( viewangles, cmd, mouse_x, mouse_y );
+		if ( CAM_IsFreeAiming() )
+			TryCursorMove( viewangles, cmd, mouse_x, mouse_y );
+		else
+			ApplyMouse( viewangles, cmd, mouse_x, mouse_y );
 
 		// Re-center the mouse.
 		ResetMouse();
