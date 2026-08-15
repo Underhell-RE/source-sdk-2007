@@ -189,9 +189,11 @@ void CHL2_Player::UH_ThrowFlare( void )
 	pFlare->SetAbsAngles( GetAbsAngles() );
 	DispatchSpawn( pFlare );
 
-	// Light the flare: self-illuminated model + a dlight tint.
+	// Light the flare: glow render mode + a dlight tint so it actually emits
+	// light when thrown (matches the original's lit flare prop).
 	pFlare->SetRenderColor( 255, 200, 80 );
-	pFlare->AddEffects( EF_BRIGHTLIGHT );
+	pFlare->SetRenderMode( kRenderGlow );
+	pFlare->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
 
 	// Throw velocity (original: view direction * 200).
 	IPhysicsObject *pPhys = pFlare->VPhysicsGetObject();

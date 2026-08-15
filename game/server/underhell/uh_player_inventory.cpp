@@ -133,25 +133,24 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 	QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
 
 	// Per-id styling (original switch, sub_102E05F0 / sub_102DE310).
-	switch ( iItem )
+	// Glowsticks (unlit 14..18 AND lit 19..23) both drop as a coloured lit
+	// prop — the lit ids have no world classname ("nothing"), so handling
+	// them in the switch's default case dropped them to nothing and lost the
+	// item.
+	if ( UH_IsGlowstick( iItem ) || UH_IsLitGlowstick( iItem ) )
+	{
+		UTIL_Remove( pItem );
+		pItem = CreateEntityByName( "prop_physics" );
+		pItem->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
+		static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
+	}
+	else switch ( iItem )
 	{
 	case UH_ITEM_FLARE_PACK:
 		// Flare packs drop a lit flare prop instead of the pack model.
 		UTIL_Remove( pItem );
 		pItem = CreateEntityByName( "prop_physics" );
 		pItem->SetModel( "models/PG_props/pg_obj/pg_flare.mdl" );
-		break;
-
-	case UH_ITEM_GLOWSTICK_FIRST:
-	case UH_ITEM_GLOWSTICK_YELLOW:
-	case UH_ITEM_GLOWSTICK_GREEN:
-	case UH_ITEM_GLOWSTICK_BLUE:
-	case UH_ITEM_GLOWSTICK_LAST:
-		// Glowsticks drop as coloured lit props.
-		UTIL_Remove( pItem );
-		pItem = CreateEntityByName( "prop_physics" );
-		pItem->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
-		static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
 		break;
 
 	default:
