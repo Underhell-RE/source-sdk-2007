@@ -96,6 +96,24 @@
    которого у игрока никогда нет (граната = патроны). Теперь гейт по
    `GetAmmoCount("grenade")` + прямой спавн `Fraggrenade_Create` + `RemoveAmmo`.
 
+### Аудит VMF (карты) — нереализованные инпуты игрока
+
+Карт в SDK-репо нет — они в декомпиле (`klaxons1/underhell-hexrays` →
+`Underhell/maps/`, 5 шт.). Все 160 classname в картах зарегистрированы в нашей
+DLL (нет «unknown entity» при загрузке). Но карты жмут на `!player` инпуты,
+которых у нас **нет** (подтверждены в `serveror.dll`):
+
+`SetStatusVisibility` (20), `EnableInventory`/`DisableInventory` (6/5),
+`EmptyInventory` (4), `BleedPlayer` (10), `RemoveLitGlowstick` (8),
+`removeheldflare` (3), `SetEndurance` (2), `AddEndurance` (1), `SetBatteries` (2),
+`GiveShoulderFlashlight`/`RemoveShoulderFlashLight` (2/1), `SetHudVisibility` (3),
+`DisplayHermitCards` (1), `DisableBt`/`EnableBt` (1/1 — bullet-time, отдельный TODO).
+
+Плюс: 5 мели-записей пула `item_random` (`weapon_wrench/pipe/axe/hammer/shiv`)
+спавнят NULL — не совпадают с `weapon_melee_*`. Это 1:1 с оригиналом
+(`sub_101757D0`; сам FGD предупреждает «Melee weapons may not work with
+item_randoms»). Полная таблица — в `docs/UNDERHELL.md` (§ «VMF entity audit»).
+
 ### Известные места, где возможны баги
 - **Гранаты не подбираются** — проверить `sk_max_grenade` в консоли (должно быть `4`
   из `skill.cfg` мода; при `0` — `GiveAmmo` срезает до нуля и гранаты «не берутся»).

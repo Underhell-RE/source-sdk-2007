@@ -1214,3 +1214,102 @@ count — `sub_100CF610(a1, "grenade") > 0`, where `sub_100CF610` is
 
 `WeaponFrag_ThrowNow` / `CWeaponFrag::ThrowNow` are now unused (left in place,
 harmless) — the throw no longer needs a weapon_frag entity.
+
+## VMF entity audit (maps vs. SDK implementation)
+
+Audited the 5 compiled maps in `klaxons1/underhell-hexrays` → `Underhell/maps/`
+(`Uh_House_1_d.vmf`, `uh_prologue_1_d.vmf`, `uh_prologue_2_d.vmf`,
+`uh_chapter1_11_d.vmf`, `Uh_Chapter1_16_d.vmf`) — the SDK repo itself ships no
+`.vmf`. Cross-checked every `"classname"` against our server DLL registrations.
+
+### A. No missing entity classes
+
+160 unique classnames appear across the maps. All are registered (vanilla HL2
++ Underhell custom). No map would fail with "unknown entity" at load.
+
+Underhell-custom entities actually used by the maps, with status:
+
+| Entity | Count | Status |
+|---|---|---|
+| `item_random` | 175 | implemented (pool; see §C) |
+| `prop_dynamic_override` | 191 | implemented (+use / OnPlayerUse) |
+| `prop_physics_override` | 171 | vanilla (props.cpp) |
+| `env_message` | 17 | extended, implemented |
+| `env_hudhint` | 9 | implemented |
+| `env_global` | 6 | implemented |
+| `item_flashlight` / `item_battery_pack` / `item_uhsoda` | 4 | implemented |
+| `npc_infected` | 1 (point_template + npc_template_maker) | implemented — partial (climb/sprint/infection/gibs TODO) |
+| `weapon_pistol_python` / `weapon_rpg` | 2 | implemented |
+| `item_healthkit` / `item_healthvial` | 9 | vanilla modified (stash to inventory) |
+
+`npc_infected` spawns via `npc_template_maker` (`TemplateName
+Infected_Mainframe`), and the template sets body-variant keyvalues `Worker/
+Uniform/Rural/Inmate` (capitalised in the VMF vs. lowercase `worker/uniform/
+rural/inmate` in the FGD + our datamap — case-insensitive, so non-issue, but
+worth an in-game glance at the spawned variants).
+
+### B. `additionalequipment` on NPCs (Uh_Chapter1_16_d)
+
+`npc_combine_s` / `npc_citizen` carry `additionalequipment` lists
+(`weapon_smg_mp5, weapon_smg_mp5_eod, weapon_smg_mp7, weapon_rifle_g36k,
+weapon_shotgun_m3/m5/spas12/xm1014`) — all 8 classnames are registered in our
+SDK, so NPC weapon give works.
+
+### C. `item_random` melee pool — 5 entries spawn nothing (faithful to original)
+
+Our `s_ItemRandomPool` (and the original `sub_101757D0`) reference these
+classnames for pool entries 46–50, which do NOT match the registered melee
+classnames (`weapon_melee_wrench/pipe/axe`), or don't exist at all:
+
+| Pool id | Spawned classname | Reality |
+|---|---|---|
+| 46 | `weapon_wrench` | registered as `weapon_melee_wrench` → NULL |
+| 47 | `weapon_pipe` | registered as `weapon_melee_pipe` → NULL |
+| 48 | `weapon_axe` | registered as `weapon_melee_axe` → NULL |
+| 49 | `weapon_hammer` | not registered (no CWeaponHammer) |
+| 50 | `weapon_shiv` | not registered (no CWeaponShiv) |
+
+Confirmed in the decompile: `weapon_wrench`/`weapon_hammer`/`weapon_shiv`
+appear ONLY in `sub_101757D0` (item_random Spawn), while `weapon_melee_*`
+appear in the Precache registry `sub_101753E0` + the LINK_ENTITY_TO_CLASS
+functions. The FGD itself warns: "Melee weapons may not work with item_randoms".
+So these 5 entries silently spawn nothing in both the original and our port —
+a 1:1 reproduction of an original quirk, not a regression.
+
+### D. NOT-implemented player inputs fired by the maps (real gaps)
+
+The maps fire these inputs at `!player`; our `CHL2_Player` datamap does not
+register them. Every name below is confirmed present in the original
+`serveror.dll` (binary string table), so they are real Underhell inputs, not
+VMF typos. Usage counts across all 5 maps:
+
+| Input | Uses | What it does (string-level) |
+|---|---|---|
+| `SetStatusVisibility` | 20 | show/hide the HUD status panels |
+| `EnableInventory` / `DisableInventory` | 6 / 5 | toggle the inventory system |
+| `EmptyInventory` | 4 | clear all inventory slots |
+| `BleedPlayer` (fired `Bleedplayer`/`bleedplayer`) | 10 | force the bleed state |
+| `RemoveLitGlowstick` (also `Removelitglowstick`) | 8 | remove the lit glowstick strapped to the player |
+| `removeheldflare` | 3 | drop/remove the held flare (left hand) |
+| `SetEndurance` | 2 | set the hunger/endurance meter |
+| `AddEndurance` | 1 | add endurance |
+| `SetBatteries` | 2 | set the flashlight battery count |
+| `GiveShoulderFlashlight` / `RemoveShoulderFlashLight` | 2 / 1 | grant/remove the shoulder flashlight |
+| `SetHudVisibility` | 3 | HUD visibility (related to SetStatusVisibility) |
+| `DisplayHermitCards` | 1 | show the hermit-card deck HUD |
+| `DisableBt` / `EnableBt` | 1 / 1 | bullet-time off/on (bt_* TODO) |
+
+`SetStatusVisibility` / `SetHudVisibility` live in the CBasePlayer datamap
+builder `sub_101F2D30`. The rest are datamap inputs whose semantics need the
+same datamap + handler decode before porting (all still TODO).
+
+### Conclusion
+
+- **No missing entity classes** — nothing breaks at map load.
+- The only "not implemented" entity behaviour with visible in-game impact is
+  **§C** (5 `item_random` melee pool entries never roll a weapon) — which
+  matches the original exactly.
+- The substantive gaps are the **§D player inputs** — inventory/environment
+  control the maps rely on (`EmptyInventory`, `DisableInventory`,
+  `SetBatteries`, `BleedPlayer`, `SetStatusVisibility`, …), still TODO and the
+  next sensible porting target.
