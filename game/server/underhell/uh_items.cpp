@@ -19,6 +19,9 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+// skill convar used by the radiocracker detonation (defined in hl2_gamerules.cpp)
+extern ConVar sk_plr_dmg_smg1_grenade;
+
 IMPLEMENT_NULL_DATADESC( CUHItem );
 
 //-----------------------------------------------------------------------------
@@ -1177,7 +1180,7 @@ void CUHRadio::Spawn( void )
 
 	SetSolid( SOLID_VPHYSICS );
 	SetMoveType( MOVETYPE_VPHYSICS );
-	VPhysicsInitNormal( GetModel(), NULL, false );
+	VPhysicsInitNormal( SOLID_VPHYSICS, GetSolidFlags(), false );
 
 	// Not pickupable by default when active – player can +use to pick back into inventory
 	SetTouch( NULL );
@@ -1233,9 +1236,9 @@ void CUHRadio::RadioThink( void )
 	Q_snprintf( szSound, sizeof(szSound), "Radio.Track.%d", m_iTrack );
 	EmitSound( szSound );
 
-	// Attract NPCs – insert loud combat sound 1024 radius, like original sub_101737E0
-	// 0x20000 in original is custom, we use SOUND_COMBAT
-	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 1024, 1.0f, this );
+	// Attract NPCs – insert the Underhell radio attract sound (SOUND_FMRADIO = 0x20000),
+	// volume 1024 / duration 1.0, matching serveror.dll sub_101737E0 exactly.
+	CSoundEnt::InsertSound( SOUND_FMRADIO, GetAbsOrigin(), 1024, 1.0f, this );
 
 	// For cracker, count plays and explode after ~5 plays (~5 sec after start)
 	m_iPlays++;
@@ -1260,14 +1263,16 @@ void CUHRadio::ExplodeThink( void )
 
 void CUHRadio::Explode( void )
 {
-	// Explosion from original radiocracker – not fully decoded, using 150 dmg, 250 radius
-	EmitSound( "BaseGrenade.Explode" );
-
-	ExplosionCreate( GetAbsOrigin(), QAngle(0,0,0), this, 150, 250, false );
-
-	CTakeDamageInfo info( this, this, 150.0f, DMG_BLAST );
-	info.SetDamagePosition( GetAbsOrigin() );
-	RadiusDamage( info, GetAbsOrigin(), 250.0f, CLASS_NONE, NULL );
+	// Reconstructed 1:1 from serveror.dll sub_10173A20 (radiocracker detonation):
+	//   sub_1013D350( origin, angles, pOwner, iMagnitude, iRadiusOverride, nFlags, flForce, this, -1, this, 2 )
+	// iRadiusOverride = 256, nFlags = 1064 (SF_ENVEXPLOSION_NOSMOKE|NOSPARKS|NODAMAGE_FORCE),
+	// flForce = 50000.0. The original passed iMagnitude = 0; a vanilla env_explosion deals no
+	// damage at iMagnitude 0, so the real mod must have driven it from a skill convar. Per the
+	// "sk конвары" hint we use sk_plr_dmg_smg1_grenade (150). Radius/flags/force are verbatim.
+	// ExplosionCreate's internal CEnvExplosion already applies the radius damage, so no separate
+	// RadiusDamage call is needed (the decompile only calls sub_1013D350).
+	float flDamage = sk_plr_dmg_smg1_grenade.GetFloat();
+	ExplosionCreate( GetAbsOrigin(), QAngle(0,0,0), this, flDamage, 256, 1064, 50000.0f, this, -1 );
 
 	UTIL_Remove( this );
 }
