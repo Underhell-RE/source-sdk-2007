@@ -1313,3 +1313,102 @@ same datamap + handler decode before porting (all still TODO).
   control the maps rely on (`EmptyInventory`, `DisableInventory`,
   `SetBatteries`, `BleedPlayer`, `SetStatusVisibility`, …), still TODO and the
   next sensible porting target.
+
+## HUD audit (client panels vs. decompiled CHud* + HudLayout.res)
+
+Cross-checked our 5 Underhell HUD panels against the decompiled client
+(`Underhell/bin/client/sub_100BDF90` battery think / `sub_100BDC80` battery
+paint / `sub_100CAC10` stamina / `sub_100C8710` endurance / `sub_100BE800`
+bleeding / `sub_100BCFA0` + `sub_100BD080` hermit cards), the client recv table
+`sub_10043D70`, and `scripts/HudLayout.res` + `scripts/HudAnimations.txt` +
+`resource/ClientScheme.res`.
+
+### Client field offsets (recv table `sub_10043D70`, confirmed)
+
+| field | client offset |
+|---|---|
+| m_iEndurance | 3432 |
+| m_iBleedCounter | 3436 |
+| m_bNightVisionOn | **3449** |
+| m_bGasMaskOn | 3450 |
+| m_bLeftArmDeployed | 3451 |
+| m_bHoldingFlare | 3452 |
+| m_flSuitPower (in m_HL2Local) | 5168 |
+| m_bFlashlightOn | 5286 |
+| m_bDisplayHermitCard | 5287 |
+| m_iUHBatteryCount | 5292 |
+| m_iUHHermitCardsCount | 5296 |
+| m_iUHHermitCurrentQuestCount | 5300 |
+| m_iUHHermitTotalQuestCount | 5304 |
+| battery charge float (inside m_HL2Local @+48) | 5212 |
+
+### 1. Battery HUD — missing night-vision trigger (LOGIC BUG, fixed)
+
+`sub_100BDF90` lights the gauge when:
+`m_bFlashlightOn (5286) || m_bNightVisionOn (3449) || count changed (5292)`.
+
+The first port only checked `m_bFlashlightOn || count changed`. Night vision
+drains flashlight batteries (auto-off at empty, sub_102E3DE0), so the gauge
+must stay lit while NV is active — the original does this, ours didn't.
+
+Fixed: `CHudUHBattery::OnThink` now also checks `pPlayer->m_bNightVisionOn`.
+
+### 2. Battery bar was continuous, original is chunked (fixed)
+
+`sub_100BDC80` draws the charge bar as **discrete chunks**:
+`chunkCount = BarHeight / (BarChunkHeight + BarChunkGap)` (= 23 / 3 = 7),
+`enabledChunks = round(charge/100 * chunkCount)`, filled chunks at the bottom,
+exhausted above (bottom-up). The port drew one continuous filled rect.
+
+Fixed: `CHudUHBattery::Paint` now draws the chunked bar (7 × 2 px chunks,
+1 px gap, bottom-up), matching the decompile.
+
+### 3. Battery count text format (fixed)
+
+Original formats `"   x%i"` (3 leading spaces) with the HudNumbers font. The
+port printed `"x%i"`. Fixed to `"   x%i"`.
+
+Position: the original draws it at `DrawSetTextPos(0,0)` (panel-local top-left,
+overlapping the contour). The port draws at (BarInsetX+BarWidth+2, BarInsetY-8).
+Left as-is (the original's (0,0) placement looks like an oddity; the port's
+position is a sane interpretation). TODO if exact pixel parity is wanted.
+
+### 4. Hermit cards — fade model differs (documented, not changed)
+
+Original (`sub_100BCFA0` / `sub_100BD080`) is a **binary show/hide**: a show
+flag + `SetAlpha(255)` while "changed within the last 3 s", hidden (alpha 0)
+once stable 3 s. The port fades the panel gradually (`m_iAlpha -= 1` per think)
+after the 3 s window. Functionally equivalent (appears on change, gone after a
+few seconds); the port's crossfade is a minor visual divergence. Not a bug.
+
+### 5. Missing CHudDotReticle (TODO)
+
+The original client RTTI has `CHudDotReticle` (HudLayout.res `HudDotReticle`,
+dotx/doty 8, xpos `c-8` ypos `c-8` — a centered dot reticle). The port does not
+implement it. Out of scope for the inventory HUD work; note for later.
+
+### 6. Doc/code mismatch (stale docs)
+
+`docs/UNDERHELL.md` (battery stage 16) claims "our port fills one chunk per
+battery (count-capped)". The code actually fills from `m_flUHBatteryCharge`
+(the continuous 0..100 charge), which is what the original does too (offset
+5212). The docs were stale; the code was correct. (Now also chunked — see §2.)
+
+### Stamina / endurance — verified correct (no change)
+
+- `sub_100CAC10` (stamina): reads m_flSuitPower (5168); `>= 35` → "StaminaNormal",
+  `< 35 && > 0` → "StaminaLow", `<= 0` → no sequence. Port matches.
+- `sub_100C8710` (endurance): reads m_iEndurance (3432); `>= 50` → High,
+  `>= 20` → Medium, `> 0` → Low, `<= 0` → none. Port matches.
+- Both fire the animation sequence every think (no early-out), value cached at
+  `this[79]`. Port matches.
+- Colour: both bars draw with the panel `FgColor`, animated by
+  HudAnimations.txt (FgColor "0 128 255" blue ↔ "230 230 50" yellow ↔
+  "DamagedFg" "180 0 0" red). Port uses `GetFgColor()` — correct.
+- Fill direction: stamina horizontal left→right (BarChunkWidth 1, gap 0 → 210
+  chunks); endurance vertical bottom-up (BarChunkHeight 1, gap 0 → 84 chunks).
+  Port matches the vanilla CHudSuitPower chunk pattern.
+
+The only remaining stamina/endurance nit: the exhausted-portion alpha uses a
+`BarDisabledAlpha` default of 20 (the original modded panel used a
+"HullDisabledAlpha"; vanilla suit power uses 70). Cosmetic only.
