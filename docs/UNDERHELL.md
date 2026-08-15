@@ -923,3 +923,35 @@ on touch — the earlier "no auto pickup" change was wrong. Corrected 1:1:
 TODO: sk_plr_num_shotgun_pellets is hardcoded to 7 (its default) rather than
 read from the convar; shotgun pump animation delay (m_bNeedPump / SequenceDuration)
 is approximated by the 0.8 s fire rate.
+
+## Select fire (firemode_toggle) — ported
+
+Decoded from CHL2_Player::ClientCommand sub_101F11D0 -> the weapon method at
+vtable+840 (sub_102B0D10) -> CHLSelectFireMachineGun::PrimaryAttack sub_102B18E0
++ the trigger-latch re-arm in sub_10279A80.
+
+- The Underhell gun base derives from `CHLSelectFireMachineGun`, so `m_iFireMode`
+  lives on the weapon at offset 1404 (vanilla enum: FIREMODE_FULLAUTO=1,
+  FIREMODE_SEMI=2, FIREMODE_3RNDBURST=3). Default is full auto (1).
+- `firemode_toggle` (config.cfg binds it to "x") flips 1 <-> 2 and plays the
+  hard-coded `Weapon_Pistol.Empty` click. The original is asymmetric: full->semi
+  is silent, semi->full plays the click.
+- Semi mode is trigger-gated: a latch (`m_bFireOnEdge`, the CHLMachineGun byte at
+  offset 1388) is armed in `WeaponIdle()` when the attack button is released and
+  consumed by `PrimaryAttack()`, so a held trigger fires exactly one shot in
+  semi mode. Full auto keeps firing while held.
+
+Ported into CUHGunWeapon: m_iFireMode + m_bFireOnEdge + UH_ToggleFireMode() +
+WeaponIdle() override + a semi gate in PrimaryAttack.
+
+Divergence: the original restricts select-fire to the CHLSelectFireMachineGun
+subtree (G36K, the SMGs, BFG minigun — pistols/shotguns/sniper/BFG-MGL derive
+from CHLMachineGun and have no fire mode). Here every CUHGunWeapon gets the
+toggle for simplicity; behaviour is identical for the G36K (the only script
+that declares FireMode).
+
+TODO: the original maps fire mode to distinct viewmodel activities (semi vs
+full-auto vs shotgun, plus silenced variants — sub_10279580 returns 207/208/209
+etc.). Those enum entries don't exist in the vanilla activity list, so the
+animation mapping is left at ACT_VM_PRIMARYATTACK here.
+

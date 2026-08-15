@@ -11,6 +11,7 @@
 #include "gamerules.h"
 #include "trains.h"
 #include "basehlcombatweapon_shared.h"
+#include "ammodef.h"
 #include "vcollide_parse.h"
 #include "in_buttons.h"
 #include "ai_interactions.h"
@@ -2794,10 +2795,11 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 	// slot-5 weapon (decode sub_100D02C0).
 	if ( FClassnameIs( pWeapon, "weapon_frag" ) )
 	{
-		int nGrenades = GetAmmoCount( GetAmmoDef()->Index( "grenade" ) );
+		int iGrenadeAmmo = GetAmmoDef()->Index( "grenade" );
+		int nGrenades = GetAmmoCount( iGrenadeAmmo );
 		if ( nGrenades < 4 )
 		{
-			GiveAmmo( 1, "grenade" );
+			GiveAmmo( 1, iGrenadeAmmo, false );
 			if ( nGrenades <= 0 )
 				UTIL_HudHintText( this, "#Valve_Hint_Frag" );
 			UTIL_Remove( pWeapon );
@@ -2884,6 +2886,16 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	if ( !Q_stricmp( args[0], "silencer_toggle" ) )
 	{
 		UH_ToggleSilencer();
+		return true;
+	}
+
+	// Underhell fire-mode toggle (original sub_101F11D0 -> weapon vtable+840,
+	// sub_102B0D10): full-auto <-> semi-auto on the active gun.
+	if ( !Q_stricmp( args[0], "firemode_toggle" ) )
+	{
+		CUHGunWeapon *pWeapon = dynamic_cast<CUHGunWeapon *>( GetActiveWeapon() );
+		if ( pWeapon )
+			pWeapon->UH_ToggleFireMode();
 		return true;
 	}
 

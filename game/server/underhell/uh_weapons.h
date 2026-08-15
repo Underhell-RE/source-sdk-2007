@@ -94,11 +94,20 @@ public:
 	// CBaseHLCombatWeapon (networked, so the client viewmodel animates too).
 	virtual int		GetWeaponType( void ) { return m_iWeaponType; }
 
+	// Underhell select fire (decode sub_102B0D10 / sub_102B18E0). firemode_toggle
+	// flips full-auto <-> semi. m_bFireOnEdge is the semi-auto trigger latch: it
+	// is armed in WeaponIdle() (attack released) and consumed by PrimaryAttack()
+	// so a held trigger only fires one shot in semi mode.
+	void			UH_ToggleFireMode( void );
+	virtual void	WeaponIdle( void );
+
 	float			m_flFireRate;			// seconds between shots
 	ConVar			*m_pDamage;				// sk_plr_dmg_<weapon> (skill.cfg)
 	int				m_iWeaponType;			// 1 = pistol, 4 = rifle, 0 = other (silencer gating)
 	int				m_iShotsPerFire;		// pellets per shot (shotguns = sk_plr_num_shotgun_pellets, 7)
 	float			m_flAccuracyPenalty;	// grows per shot, decays over time
+	int				m_iFireMode;			// 1 = full auto, 2 = semi (FIREMODE_*)
+	bool			m_bFireOnEdge;			// semi-auto trigger latch
 };
 
 //-----------------------------------------------------------------------------

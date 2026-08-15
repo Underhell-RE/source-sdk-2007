@@ -116,6 +116,16 @@ void CUHGunWeapon::PrimaryAttack( void )
 	if ( !pPlayer )
 		return;
 
+	// Semi-auto gate (decode sub_102B18E0): in semi mode the shot is only fired
+	// while the trigger latch is set; PrimaryAttack consumes it so a held
+	// trigger fires a single shot. WeaponIdle() re-arms it on release.
+	if ( m_iFireMode == FIREMODE_SEMI )
+	{
+		if ( !m_bFireOnEdge )
+			return;
+		m_bFireOnEdge = false;
+	}
+
 	// Prevent aim drift from rapid fire (same as the vanilla pistol).
 	pPlayer->ViewPunchReset();
 
@@ -166,6 +176,43 @@ void CUHGunWeapon::PrimaryAttack( void )
 	// multipliers, not the penalty curve).
 	m_flAccuracyPenalty += 0.1f;
 	m_flAccuracyPenalty = clamp( m_flAccuracyPenalty, 0.0f, 1.0f );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: firemode_toggle (decode sub_102B0D10, the weapon method the client
+// command dispatches to at vtable+840). Flips full-auto <-> semi and plays the
+// hard-coded pistol-empty click. The original is asymmetric: full->semi is
+// silent, semi->full (and any other state) plays the click.
+//-----------------------------------------------------------------------------
+void CUHGunWeapon::UH_ToggleFireMode( void )
+{
+	if ( m_iFireMode == FIREMODE_FULLAUTO )
+	{
+		m_iFireMode = FIREMODE_SEMI;
+	}
+	else if ( m_iFireMode == FIREMODE_SEMI )
+	{
+		m_iFireMode = FIREMODE_FULLAUTO;
+		EmitSound( "Weapon_Pistol.Empty" );
+		return;
+	}
+
+	EmitSound( "Weapon_Pistol.Empty" );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Re-arm the semi-auto trigger latch when the attack button is
+// released (decode sub_10279A80). WeaponIdle() is reached from ItemPostFrame
+// only when no fire/reload buttons are held, so a released trigger always
+// passes through here before the next shot can be fired in semi mode.
+//-----------------------------------------------------------------------------
+void CUHGunWeapon::WeaponIdle( void )
+{
+	BaseClass::WeaponIdle();
+
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+	if ( pPlayer && !( pPlayer->m_nButtons & IN_ATTACK ) )
+		m_bFireOnEdge = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -455,7 +502,7 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; }
+	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; }
 
 #define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
 	acttable_t _className::m_acttable[] = \
