@@ -737,7 +737,7 @@ public:
 	{
 		if ( gpGlobals->curtime < m_flNextScan )
 			return;
-		m_flNextScan = gpGlobals->curtime + 0.5f;
+		m_flNextScan = gpGlobals->curtime + 0.25f;
 
 		// Keep the LRU cap in sync (convar may change at runtime).
 		s_RagdollLRU.SetMaxRagdollCount( uh_maxseragdolls.GetInt() );
@@ -753,22 +753,31 @@ public:
 				// prop_ragdolls have no owner and are excluded, per the tutorial.
 				if ( pRagdoll->GetOwnerEntity() )
 				{
-					// Blood trail while dragged. (The ragdoll itself stays
-					// COLLISION_GROUP_INTERACTIVE_DEBRIS so it is pickable by the
-					// physcannon; uh_ragdollcollisiontype is registered but not
-					// force-applied, since overriding it to a debris group made
-					// bodies un-pickable.)
+					// sub_101CCD80 (DraggedThink): a held corpse leaves a blood
+					// decal only after it has moved more than four units in XY, then
+					// updates its anchor every 0.25 s. The former implementation
+					// sprayed a decal continuously even while the body was stationary.
 					IPhysicsObject *pPhys = pRagdoll->VPhysicsGetObject();
-					if ( pPhys && ( pPhys->GetGameFlags() & FVPHYSICS_PLAYER_HELD ) )
+					bool bHeld = pPhys && ( pPhys->GetGameFlags() & FVPHYSICS_PLAYER_HELD );
+					Vector vecPos = pRagdoll->GetAbsOrigin();
+					if ( bHeld )
 					{
-						Vector vecPos = pRagdoll->GetAbsOrigin();
-						Vector vecDown = vecPos - Vector( 0, 0, 32.0f );
-						trace_t tr;
-						UTIL_TraceLine( vecPos, vecDown, MASK_SOLID_BRUSHONLY, pRagdoll, COLLISION_GROUP_NONE, &tr );
-						if ( tr.fraction < 1.0f )
+						if ( pRagdoll->m_bUHDragged &&
+							( fabs( vecPos.x - pRagdoll->m_vecUHDraggedLastPos.x ) > 4.0f ||
+							  fabs( vecPos.y - pRagdoll->m_vecUHDraggedLastPos.y ) > 4.0f ) )
 						{
-							UTIL_DecalTrace( &tr, "blood_drop" );
+							Vector vecDown = vecPos - Vector( 0, 0, 32.0f );
+							trace_t tr;
+							UTIL_TraceLine( vecPos, vecDown, MASK_SOLID_BRUSHONLY, pRagdoll, COLLISION_GROUP_NONE, &tr );
+							if ( tr.fraction < 1.0f )
+								UTIL_DecalTrace( &tr, "blood_drop" );
 						}
+						pRagdoll->m_bUHDragged = true;
+						pRagdoll->m_vecUHDraggedLastPos = vecPos;
+					}
+					else
+					{
+						pRagdoll->m_bUHDragged = false;
 					}
 				}
 			}

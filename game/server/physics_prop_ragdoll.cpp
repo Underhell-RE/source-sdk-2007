@@ -93,8 +93,10 @@ BEGIN_DATADESC(CRagdollProp)
 	DEFINE_FIELD( m_hUnragdoll, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_bFirstCollisionAfterLaunch, FIELD_BOOLEAN ),
 
-	// Underhell dismemberment damage accumulation.
+	// Underhell dismemberment damage accumulation / dragged-body trail state.
 	DEFINE_ARRAY( m_flGibDamage, FIELD_FLOAT, 5 ),
+	DEFINE_FIELD( m_vecUHDraggedLastPos, FIELD_POSITION_VECTOR ),
+	DEFINE_FIELD( m_bUHDragged, FIELD_BOOLEAN ),
 
 	DEFINE_FIELD( m_flBlendWeight, FIELD_FLOAT ),
 	DEFINE_FIELD( m_nOverlaySequence, FIELD_INTEGER ),
@@ -204,6 +206,23 @@ void CRagdollProp::Spawn( void )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Underhell lets the player drag a corpse with +use. The stock pickup
+// controller supplies the constraint and release behaviour; bypassing its
+// normal prop mass limit is deliberate for server ragdolls.
+//-----------------------------------------------------------------------------
+void CRagdollProp::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	if ( useType == USE_OFF )
+		return;
+
+	CBasePlayer *pPlayer = ToBasePlayer( pActivator );
+	if ( !pPlayer || pPlayer->GetGroundEntity() == this || HasNPCsOnIt() )
+		return;
+
+	pPlayer->PickupObject( this, false );
+}
+
 void CRagdollProp::SetSourceClassName( const char *pClassname )
 {
 	m_strSourceClassName = MAKE_STRING( pClassname );
@@ -281,6 +300,8 @@ CRagdollProp::CRagdollProp( void )
 
 	for ( int i = 0; i < 5; i++ )
 		m_flGibDamage[i] = 0.0f;
+	m_vecUHDraggedLastPos.Init();
+	m_bUHDragged = false;
 }
 
 CRagdollProp::~CRagdollProp( void )

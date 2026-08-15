@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -28,6 +28,8 @@ public:
 	~CRagdollProp( void );
 
 	virtual void UpdateOnRemove( void );
+	virtual int ObjectCaps( void ) { return BaseClass::ObjectCaps() | FCAP_IMPULSE_USE; }
+	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	void DrawDebugGeometryOverlays();
 
@@ -88,6 +90,8 @@ public:
 	// dead body can be shot apart, and accumulate per-hitgroup gib damage.
 	void			UH_SeverLimb( int iPhysicsBone );
 	float			m_flGibDamage[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
+	Vector			m_vecUHDraggedLastPos;		// original DraggedThink trail anchor
+	bool			m_bUHDragged;
 
 	// Purpose: CDefaultPlayerPickupVPhysics
 	virtual void VPhysicsCollision( int index, gamevcollisionevent_t *pEvent );

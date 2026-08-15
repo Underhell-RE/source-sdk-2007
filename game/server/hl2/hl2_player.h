@@ -421,6 +421,7 @@ public:
 	// / sub_101F0C60 (flashlight deploy) / sub_101E9580 (flare throw).
 	void				UH_ThrowNade( void );		// "Throw_Nade" — staged throw (grenade or flare)
 	void				UH_LeftArmContextThink( void );	// the delayed grenade throw
+	void				UH_FlashlightViewModelThink( void );	// finish flashlight holster anim
 	void				UH_ThrowFlare( void );		// throw the held flare
 	void				UH_UpdateLeftArm( void );	// sync left-arm viewmodel with weapon + flashlight
 	void				UH_EquipFlare( void );		// put a flare in the left hand (flare pack use)

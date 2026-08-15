@@ -762,9 +762,10 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->GetHealth() >= 100 && pHL2Player->UH_GetBleedCounter() <= 0 )
 		return false;
 
-	if ( pHL2Player->UH_FindFreeSlot() < 0 )
-		return false;
-
+	// Unlike the generic inventory pickups, bandages do not reject the touch
+	// merely because every slot is occupied. UH_GiveItem owns the full-inventory
+	// fallback and recreates the world item when required, matching the original
+	// item's pickup route.
 	pHL2Player->EmitSound( "HL2Player.PickupBandages" );
 	SetOwnerEntity( pHL2Player );
 	pHL2Player->UH_GiveItem( UH_ITEM_BANDAGES );
