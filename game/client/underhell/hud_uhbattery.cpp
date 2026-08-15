@@ -35,11 +35,6 @@ CHudUHBattery::CHudUHBattery( const char *pElementName ) : CHudElement( pElement
 	SetParent( pParent );
 
 	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
-	// Fully custom-painted: disable the default vgui background/border, else
-	// the .res PaintBackgroundType 2 draws a grey rounded box over the panel.
-	SetPaintBackgroundEnabled( false );
-	SetPaintBorderEnabled( false );
-
 
 	m_iBatteryCount = -1;
 	m_iContourTexture = -1;

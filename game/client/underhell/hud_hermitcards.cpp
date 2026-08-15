@@ -38,11 +38,6 @@ CHudUHHermitCards::CHudUHHermitCards( const char *pElementName ) : CHudElement( 
 	SetParent( pParent );
 
 	SetHiddenBits( HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
-	// Fully custom-painted: disable the default vgui background/border, else
-	// the .res PaintBackgroundType 2 draws a grey rounded box over the panel.
-	SetPaintBackgroundEnabled( false );
-	SetPaintBorderEnabled( false );
-
 
 	m_iCardsCount = -1;
 	m_iQuestCurrent = 0;

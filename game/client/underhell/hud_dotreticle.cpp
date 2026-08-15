@@ -53,11 +53,6 @@ CHudDotReticle::CHudDotReticle( const char *pElementName ) : CHudElement( pEleme
 	SetParent( pParent );
 
 	SetHiddenBits( HIDEHUD_UH_RETICLE );
-	// Fully custom-painted: disable the default vgui background/border, else
-	// the .res PaintBackgroundType 2 draws a grey rounded box over the panel.
-	SetPaintBackgroundEnabled( false );
-	SetPaintBorderEnabled( false );
-
 
 	m_flTriggerTime = -100.0f;
 	m_bUseHeld = false;
@@ -75,6 +70,20 @@ void CHudDotReticle::Init( void )
 void CHudDotReticle::Reset( void )
 {
 	Init();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Fully custom-painted: disable the default vgui background/border so
+// the .res PaintBackgroundType 2 (grey rounded box) is never drawn. Must run in
+// ApplySchemeSettings — LoadControlSettings("scripts/HudLayout.res") re-applies
+// the .res AFTER the constructor and would otherwise re-enable the background.
+//-----------------------------------------------------------------------------
+void CHudDotReticle::ApplySchemeSettings( vgui::IScheme *scheme )
+{
+	BaseClass::ApplySchemeSettings( scheme );
+
+	SetPaintBackgroundEnabled( false );
+	SetPaintBorderEnabled( false );
 }
 
 //-----------------------------------------------------------------------------

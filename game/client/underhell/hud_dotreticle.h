@@ -35,6 +35,7 @@ public:
 	CHudDotReticle( const char *pElementName );
 	virtual void	Init( void );
 	virtual void	Reset( void );
+	virtual void	ApplySchemeSettings( vgui::IScheme *scheme );
 	virtual void	OnThink( void );
 	bool			ShouldDraw( void );
 
