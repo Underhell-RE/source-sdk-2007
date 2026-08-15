@@ -109,6 +109,7 @@ public:
 	float			m_flAccuracyPenalty;	// grows per shot, decays over time
 	int				m_iFireMode;			// 1 = full auto, 2 = semi (FIREMODE_*)
 	bool			m_bFireOnEdge;			// semi-auto trigger latch
+	bool			m_bFireModeInitialized;	// weapon-script FireMode applied once
 	bool			m_bNeedPump;				// pending shotgun pump animation
 	float			m_flPumpTime;				// time to play the pump after firing
 };

@@ -105,6 +105,18 @@ void CUHMeleeWeapon::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatC
 //-----------------------------------------------------------------------------
 void CUHGunWeapon::PrimaryAttack( void )
 {
+	// Constructors run before weapon-script data is available. Apply the
+	// original UH_Weapon_Special FireMode on the first real attack instead of
+	// leaving every thin weapon class in full-auto (the cause of automatic
+	// Beretta/Glock/SOCOM fire while the trigger is held).
+	if ( !m_bFireModeInitialized )
+	{
+		int iScriptFireMode = GetWpnData().m_iFireMode;
+		if ( iScriptFireMode == FIREMODE_FULLAUTO || iScriptFireMode == FIREMODE_SEMI || iScriptFireMode == FIREMODE_3RNDBURST )
+			m_iFireMode = iScriptFireMode;
+		m_bFireModeInitialized = true;
+	}
+
 	// If the clip is empty (and we use clips), start a reload.
 	if ( UsesClipsForAmmo1() && !m_iClip1 )
 	{
@@ -525,7 +537,7 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bNeedPump = false; m_flPumpTime = 0.0f; }
+	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bFireModeInitialized = false; m_bNeedPump = false; m_flPumpTime = 0.0f; }
 
 #define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
 	acttable_t _className::m_acttable[] = \
