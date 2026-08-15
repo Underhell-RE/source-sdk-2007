@@ -42,6 +42,11 @@ CHudEndurance::CHudEndurance( const char *pElementName ) : CHudElement( pElement
 	// Hidden with the health cluster, when the player is dead, or when no suit
 	// is equipped (the original bars only exist once the suit is on).
 	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
+	// Fully custom-painted: disable the default vgui background/border, else
+	// the .res PaintBackgroundType 2 draws a grey rounded box over the panel.
+	SetPaintBackgroundEnabled( false );
+	SetPaintBorderEnabled( false );
+
 
 	m_iIconTexture = -1;
 }

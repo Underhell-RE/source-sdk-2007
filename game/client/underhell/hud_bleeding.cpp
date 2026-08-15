@@ -33,6 +33,11 @@ CHudBleeding::CHudBleeding( const char *pElementName ) : CHudElement( pElementNa
 	SetParent( pParent );
 
 	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
+	// Fully custom-painted: disable the default vgui background/border, else
+	// the .res PaintBackgroundType 2 draws a grey rounded box over the panel.
+	SetPaintBackgroundEnabled( false );
+	SetPaintBorderEnabled( false );
+
 
 	m_iBleedCounter = 0;
 	m_iBloodTexture = -1;

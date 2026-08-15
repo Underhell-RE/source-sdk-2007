@@ -53,6 +53,11 @@ CHudDotReticle::CHudDotReticle( const char *pElementName ) : CHudElement( pEleme
 	SetParent( pParent );
 
 	SetHiddenBits( HIDEHUD_UH_RETICLE );
+	// Fully custom-painted: disable the default vgui background/border, else
+	// the .res PaintBackgroundType 2 draws a grey rounded box over the panel.
+	SetPaintBackgroundEnabled( false );
+	SetPaintBorderEnabled( false );
+
 
 	m_flTriggerTime = -100.0f;
 	m_bUseHeld = false;
@@ -123,14 +128,14 @@ void CHudDotReticle::Paint()
 
 	// The original (sub_100BC870) draws two small filled rects — a 3x8 black
 	// tick with a 2x8 white tick on top — a tiny crosshair caret, NOT a filled
-	// square. dotx/doty are the tick's top-left (8,8 in the 16x16 centred
-	// panel). Reproduce that: black outline tick, then white tick.
-	int x = (int)m_fdotx;
-	int y = (int)m_fdoty;
+	// square. dotx/doty (8,8) mark the CENTER of the 16x16 panel; draw the
+	// caret centered on them. Black outline tick first, then white tick.
+	int cx = (int)m_fdotx;
+	int cy = (int)m_fdoty;
 
 	vgui::surface()->DrawSetColor( 0, 0, 0, iAlpha );
-	vgui::surface()->DrawFilledRect( x, y, x + 3, y + 8 );
+	vgui::surface()->DrawFilledRect( cx - 1, cy - 4, cx + 2, cy + 4 );
 
 	vgui::surface()->DrawSetColor( 255, 255, 255, iAlpha );
-	vgui::surface()->DrawFilledRect( x, y, x + 2, y + 8 );
+	vgui::surface()->DrawFilledRect( cx - 1, cy - 4, cx + 1, cy + 4 );
 }
