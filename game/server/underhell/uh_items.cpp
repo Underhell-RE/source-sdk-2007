@@ -295,20 +295,6 @@ bool CItemUHSoda::MyTouch( CBasePlayer *pPlayer )
 //-----------------------------------------------------------------------------
 LINK_ENTITY_TO_CLASS( item_glowstick, CItemGlowStick );
 
-// Light colour per glowstick (red/yellow/green/blue/purple).
-static Color UH_GetGlowstickColor( int iItem )
-{
-	switch ( UH_GetGlowstickBodyGroup( iItem ) )
-	{
-	case 0:		return Color( 255, 40, 40, 255 );	// red
-	case 2:		return Color( 255, 255, 60, 255 );	// yellow
-	case 4:		return Color( 60, 255, 60, 255 );	// green
-	case 6:		return Color( 60, 120, 255, 255 );	// blue
-	case 8:		return Color( 200, 60, 255, 255 );	// purple
-	default:	return Color( 255, 40, 40, 255 );
-	}
-}
-
 void CItemGlowStick::Precache( void )
 {
 	BaseClass::Precache();
@@ -388,6 +374,12 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	pGlow->SetAbsAngles( pPlayer->GetAbsAngles() );
 
 	pGlow->Spawn();
+
+	// It rides on the player's waist and must not collide: drop the physics
+	// object prop_physics created and make it non-solid (keeps the dlight).
+	pGlow->SetSolid( SOLID_NONE );
+	pGlow->AddSolidFlags( FSOLID_NOT_SOLID );
+	pGlow->VPhysicsDestroyObject();
 
 	pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
 	pGlow->SetRenderMode( kRenderGlow );

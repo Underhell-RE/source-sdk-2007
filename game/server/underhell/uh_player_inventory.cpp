@@ -117,6 +117,37 @@ void CHL2_Player::UH_InitializeInventory( void )
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 {
+	// Original: origin = eye + forward*56 + up*64 (sub_102DE310).
+	Vector vecForward;
+	EyeVectors( &vecForward );
+
+	Vector vecOrigin = EyePosition() + vecForward * 56.0f + Vector( 0, 0, 64.0f );
+	QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
+
+	// Glowsticks (unlit 14..18 AND lit 19..23) drop as a coloured lit prop.
+	// The lit ids have classname "nothing" (no world entity), so they must be
+	// spawned as a glowstick prop directly instead of going through
+	// CreateEntityByName("nothing"), which returns NULL and lost the item.
+	if ( UH_IsGlowstick( iItem ) || UH_IsLitGlowstick( iItem ) )
+	{
+		CBaseEntity *pGlow = CreateEntityByName( "prop_physics" );
+		if ( !pGlow )
+			return;
+
+		pGlow->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
+		static_cast<CBaseAnimating *>( pGlow )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
+
+		Color glowColor = UH_GetGlowstickColor( iItem );
+		pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
+		pGlow->SetRenderMode( kRenderGlow );
+		pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
+
+		pGlow->SetAbsOrigin( vecOrigin );
+		pGlow->SetAbsAngles( angItem );
+		pGlow->Spawn();
+		return;
+	}
+
 	const char *pszClass = UH_GetInventoryItemClass( iItem );
 	CBaseEntity *pItem = CreateEntityByName( pszClass );
 	if ( !pItem )
@@ -125,26 +156,8 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 		return;
 	}
 
-	// Original: origin = eye + forward*56 + up*64 (sub_102DE310).
-	Vector vecForward;
-	EyeVectors( &vecForward );
-
-	Vector vecOrigin = EyePosition() + vecForward * 56.0f + Vector( 0, 0, 64.0f );
-	QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
-
 	// Per-id styling (original switch, sub_102E05F0 / sub_102DE310).
-	// Glowsticks (unlit 14..18 AND lit 19..23) both drop as a coloured lit
-	// prop — the lit ids have no world classname ("nothing"), so handling
-	// them in the switch's default case dropped them to nothing and lost the
-	// item.
-	if ( UH_IsGlowstick( iItem ) || UH_IsLitGlowstick( iItem ) )
-	{
-		UTIL_Remove( pItem );
-		pItem = CreateEntityByName( "prop_physics" );
-		pItem->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
-		static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
-	}
-	else switch ( iItem )
+	switch ( iItem )
 	{
 	case UH_ITEM_FLARE_PACK:
 		// Flare packs drop a lit flare prop instead of the pack model.

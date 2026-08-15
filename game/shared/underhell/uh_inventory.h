@@ -19,6 +19,8 @@
 #pragma once
 #endif
 
+#include "Color.h"
+
 // Number of slots in the player inventory. Hard-coded 28 in the original.
 #define UH_INVENTORY_SLOTS 28
 
@@ -145,6 +147,21 @@ inline const char *UH_GetInventoryItemClass( int iItem )
 inline const char *UH_GetInventoryItemName( int iItem )
 {
 	return UH_GetInventoryItemInfo( iItem )->pszPrintName;
+}
+
+// Light colour per glowstick (red/yellow/green/blue/purple). Shared between the
+// lit-glowstick pickup (uh_items.cpp) and the dropped glowstick prop.
+inline Color UH_GetGlowstickColor( int iItem )
+{
+	switch ( UH_GetGlowstickBodyGroup( iItem ) )
+	{
+	case 0:		return Color( 255, 40, 40, 255 );	// red
+	case 2:		return Color( 255, 255, 60, 255 );	// yellow
+	case 4:		return Color( 60, 255, 60, 255 );	// green
+	case 6:		return Color( 60, 120, 255, 255 );	// blue
+	case 8:		return Color( 200, 60, 255, 255 );	// purple
+	default:	return Color( 255, 40, 40, 255 );
+	}
 }
 
 #endif // UH_INVENTORY_H
