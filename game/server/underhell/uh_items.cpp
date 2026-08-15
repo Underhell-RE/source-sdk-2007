@@ -13,6 +13,8 @@
 #include "gamerules.h"
 #include "hl2_player.h"
 #include "uh_items.h"
+#include "explode.h"
+#include "soundent.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -1125,3 +1127,148 @@ void CItemRandom::InputRespawn( inputdata_t &inputdata )
 
 	SpawnRandomItem();
 }
+
+// ---------------------------------------------------------------------------
+// Active radio – world prop that plays music and attracts NPCs
+// ---------------------------------------------------------------------------
+
+LINK_ENTITY_TO_CLASS( uh_radio, CUHRadio );
+
+BEGIN_DATADESC( CUHRadio )
+	DEFINE_FIELD( m_bIsCracker, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bIsActive, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_iTrack, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iPlays, FIELD_INTEGER ),
+	DEFINE_FIELD( m_flExplodeTime, FIELD_TIME ),
+
+	DEFINE_THINKFUNC( RadioThink ),
+	DEFINE_THINKFUNC( ExplodeThink ),
+END_DATADESC()
+
+CUHRadio::CUHRadio()
+{
+	m_bIsCracker = false;
+	m_bIsActive = false;
+	m_iTrack = 1;
+	m_iPlays = 0;
+	m_flExplodeTime = 0.0f;
+}
+
+void CUHRadio::Precache( void )
+{
+	BaseClass::Precache();
+
+	PrecacheModel( "models/items/FMRadio.mdl" );
+	PrecacheScriptSound( "Radio.Track.1" );
+	PrecacheScriptSound( "Radio.Track.2" );
+	PrecacheScriptSound( "Radio.Track.3" );
+	PrecacheScriptSound( "Radio.Track.4" );
+	PrecacheScriptSound( "Radio.Track.5" );
+	PrecacheScriptSound( "Radio.Track.6" );
+	PrecacheScriptSound( "Radio.Track.7" );
+	PrecacheScriptSound( "BaseGrenade.Explode" );
+}
+
+void CUHRadio::Spawn( void )
+{
+	Precache();
+	SetModel( "models/items/FMRadio.mdl" );
+	BaseClass::Spawn();
+
+	SetSolid( SOLID_VPHYSICS );
+	SetMoveType( MOVETYPE_VPHYSICS );
+	VPhysicsInitNormal( GetModel(), NULL, false );
+
+	// Not pickupable by default when active – player can +use to pick back into inventory
+	SetTouch( NULL );
+
+	m_bIsActive = false;
+	m_iPlays = 0;
+	m_iTrack = random->RandomInt( 1, 7 );
+
+	// If placed by map as item_fmradio, it should be pickupable until used.
+	// For active version (uh_radio), start thinking after 5 sec like original sub_10173790
+}
+
+void CUHRadio::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	CBasePlayer *pPlayer = ToBasePlayer( pActivator );
+	if ( !pPlayer )
+		return;
+
+	// If already active, +use picks it back into inventory
+	if ( m_bIsActive )
+	{
+		CHL2_Player *pHL2 = dynamic_cast<CHL2_Player *>( pPlayer );
+		if ( pHL2 && pHL2->UH_FindFreeSlot() >= 0 )
+		{
+			if ( m_bIsCracker )
+				pHL2->UH_GiveItem( UH_ITEM_RADIO_CRACKER );
+			else
+				pHL2->UH_GiveItem( UH_ITEM_FM_RADIO );
+
+			EmitSound( "HL2Player.PickupItems" );
+			UTIL_Remove( this );
+		}
+		return;
+	}
+
+	// Activate: start playing after 5 sec (original sets think +5)
+	m_bIsActive = true;
+	SetThink( &CUHRadio::RadioThink );
+	SetNextThink( gpGlobals->curtime + 5.0f );
+
+	// Prevent immediate pickup
+	SetTouch( NULL );
+}
+
+void CUHRadio::RadioThink( void )
+{
+	if ( !m_bIsActive )
+		return;
+
+	// Play random track
+	m_iTrack = random->RandomInt( 1, 7 );
+	char szSound[32];
+	Q_snprintf( szSound, sizeof(szSound), "Radio.Track.%d", m_iTrack );
+	EmitSound( szSound );
+
+	// Attract NPCs – insert loud combat sound 1024 radius, like original sub_101737E0
+	// 0x20000 in original is custom, we use SOUND_COMBAT
+	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 1024, 1.0f, this );
+
+	// For cracker, count plays and explode after ~5 plays (~5 sec after start)
+	m_iPlays++;
+	if ( m_bIsCracker )
+	{
+		if ( m_iPlays >= 5 )
+		{
+			// Schedule explosion think shortly
+			SetThink( &CUHRadio::ExplodeThink );
+			SetNextThink( gpGlobals->curtime + 0.5f );
+			return;
+		}
+	}
+
+	SetNextThink( gpGlobals->curtime + 1.0f );
+}
+
+void CUHRadio::ExplodeThink( void )
+{
+	Explode();
+}
+
+void CUHRadio::Explode( void )
+{
+	// Explosion from original radiocracker – not fully decoded, using 150 dmg, 250 radius
+	EmitSound( "BaseGrenade.Explode" );
+
+	ExplosionCreate( GetAbsOrigin(), QAngle(0,0,0), this, 150, 250, false );
+
+	CTakeDamageInfo info( this, this, 150.0f, DMG_BLAST );
+	info.SetDamagePosition( GetAbsOrigin() );
+	RadiusDamage( info, GetAbsOrigin(), 250.0f, CLASS_NONE, NULL );
+
+	UTIL_Remove( this );
+}
+

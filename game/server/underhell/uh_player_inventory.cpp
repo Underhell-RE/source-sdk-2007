@@ -14,6 +14,7 @@
 #include "hl2_player.h"
 
 #include "underhell/uh_inventory.h"
+#include "underhell/uh_items.h"
 
 //-----------------------------------------------------------------------------
 // Console commands.
@@ -288,6 +289,31 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 		UH_RemoveInventoryItem( iSlot );
 		engine->ClientCommand( edict(), "UpdateInventory" );
 		return true;
+
+	// FM radio / radio cracker – spawn active radio prop that attracts infected (sub_10173790/ sub_101737E0)
+	if ( bUse && ( iItem == UH_ITEM_FM_RADIO || iItem == UH_ITEM_RADIO_CRACKER ) )
+	{
+		Vector vecForward;
+		EyeVectors( &vecForward );
+		Vector vecOrigin = EyePosition() + vecForward * 56.0f + Vector( 0, 0, 64.0f );
+		QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
+		CBaseEntity *pRadio = CreateEntityByName( "uh_radio" );
+		if ( pRadio )
+		{
+			pRadio->SetAbsOrigin( vecOrigin );
+			pRadio->SetAbsAngles( angItem );
+			CUHRadio *pUHRadio = dynamic_cast<CUHRadio *>( pRadio );
+			if ( pUHRadio )
+				pUHRadio->SetIsCracker( iItem == UH_ITEM_RADIO_CRACKER );
+			pRadio->Spawn();
+			// Activate – sets think +5 sec, then every 1 sec emits SOUND_COMBAT 1024 radius
+			pRadio->Use( this, this, USE_ON, 0 );
+		}
+		UH_RemoveInventoryItem( iSlot );
+		engine->ClientCommand( edict(), "UpdateInventory" );
+		return true;
+	}
+
 	}
 
 	if ( !bUse )

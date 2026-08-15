@@ -38,6 +38,8 @@
 #include "props.h"
 #include "physics_npc_solver.h"
 #include "basepropdoor.h"
+#include "doors.h"
+#include "underhell/uh_items.h"
 #include "physics_prop_ragdoll.h"
 #include "basecombatcharacter.h"
 #include "ammodef.h"
@@ -622,10 +624,14 @@ void CNPC_UH_Infected::GiveAdditionalEquipment( void )
 	if ( !pszChosen )
 		return;
 
-	// Clean up: if it's "weapon_melee_pipe,weapon_melee_wrench,weapon_melee_axe,weapon_melee_baton" expanded already,
-	// our split will have handled.
-
-	GiveNamedItem( pszChosen );
+	CBaseCombatWeapon *pWeapon = static_cast<CBaseCombatWeapon *>( CreateEntityByName( pszChosen ) );
+	if ( pWeapon )
+	{
+		pWeapon->SetAbsOrigin( GetAbsOrigin() );
+		pWeapon->SetAbsAngles( GetAbsAngles() );
+		DispatchSpawn( pWeapon );
+		Weapon_Equip( pWeapon );
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -827,6 +833,40 @@ void CNPC_UH_Infected::GatherConditions( void )
 	{
 		SetCondition( COND_UH_INFECTED_RANDOMRUN );
 	}
+
+	// Scan for active radio (uh_radio or item_fmradio that is active)
+	// Original used CSoundEnt + COND_HEAR_FMRADIO, we approximate by distance check
+	if ( !HasCondition( COND_SEE_ENEMY ) )
+	{
+		CBaseEntity *pRadio = gEntList.FindEntityByClassname( NULL, "uh_radio" );
+		while ( pRadio )
+		{
+			if ( (pRadio->GetAbsOrigin() - GetAbsOrigin()).Length() < 1024.0f )
+			{
+				SetCondition( COND_UH_INFECTED_GRENADE );
+				// Remember radio as target for investigate schedule
+				SetTarget( pRadio );
+				break;
+			}
+			pRadio = gEntList.FindEntityByClassname( pRadio, "uh_radio" );
+		}
+
+		if ( !HasCondition( COND_UH_INFECTED_GRENADE ) )
+		{
+			// Also check world item_fmradio that is active (has m_bIsActive)
+			CBaseEntity *pItemRadio = gEntList.FindEntityByClassname( NULL, "item_fmradio" );
+			while ( pItemRadio )
+			{
+				if ( (pItemRadio->GetAbsOrigin() - GetAbsOrigin()).Length() < 1024.0f )
+				{
+					SetCondition( COND_UH_INFECTED_GRENADE );
+					SetTarget( pItemRadio );
+					break;
+				}
+				pItemRadio = gEntList.FindEntityByClassname( pItemRadio, "item_fmradio" );
+			}
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1019,10 +1059,18 @@ void CNPC_UH_Infected::StartTask( const Task_t *pTask )
 					m_hBlockingDoor->TakeDamage( info );
 
 					// If door is still blocked, try to open
-					CBasePropDoor *pDoor = dynamic_cast<CBasePropDoor *>( m_hBlockingDoor.Get() );
-					if ( pDoor )
+					CBasePropDoor *pPropDoor = dynamic_cast<CBasePropDoor *>( m_hBlockingDoor.Get() );
+					if ( pPropDoor )
 					{
-						pDoor->DoorOpen( NULL );
+						pPropDoor->NPCOpenDoor( this );
+					}
+					else
+					{
+						CBaseDoor *pDoor = dynamic_cast<CBaseDoor *>( m_hBlockingDoor.Get() );
+						if ( pDoor )
+						{
+							pDoor->Use( this, this, USE_ON, 0 );
+						}
 					}
 				}
 				TaskComplete();
@@ -1031,8 +1079,10 @@ void CNPC_UH_Infected::StartTask( const Task_t *pTask )
 
 		case TASK_UH_RADIO_PICKUP:
 			{
-				// Find nearest fmradio
-				CBaseEntity *pRadio = gEntList.FindEntityByClassname( NULL, "item_fmradio" );
+				// Find nearest fmradio (including active uh_radio)
+				CBaseEntity *pRadio = gEntList.FindEntityByClassname( NULL, "uh_radio" );
+				if ( !pRadio )
+					pRadio = gEntList.FindEntityByClassname( NULL, "item_fmradio" );
 				if ( !pRadio )
 					pRadio = gEntList.FindEntityByClassname( NULL, "item_radiocracker" );
 				if ( pRadio )
@@ -1050,10 +1100,39 @@ void CNPC_UH_Infected::StartTask( const Task_t *pTask )
 		case TASK_UH_DESTROY_RADIO:
 			{
 				CBaseEntity *pTarget = GetTarget();
-				if ( pTarget && ( FClassnameIs( pTarget, "item_fmradio" ) || FClassnameIs( pTarget, "item_radiocracker" ) ) )
+				if ( pTarget && ( FClassnameIs( pTarget, "item_fmradio" ) || FClassnameIs( pTarget, "item_radiocracker" ) || FClassnameIs( pTarget, "uh_radio" ) ) )
 				{
 					EmitSound( "NPC_FastZombie.Attack" );
-					UTIL_Remove( pTarget );
+
+					// If it's a radio cracker (either classname item_radiocracker or uh_radio with cracker flag), explode
+					bool bIsCracker = false;
+					if ( FClassnameIs( pTarget, "item_radiocracker" ) )
+						bIsCracker = true;
+					else
+					{
+						CUHRadio *pRadio = dynamic_cast<CUHRadio *>( pTarget );
+						if ( pRadio && pRadio->IsCracker() )
+							bIsCracker = true;
+					}
+
+					if ( bIsCracker )
+					{
+						CUHRadio *pRadio = dynamic_cast<CUHRadio *>( pTarget );
+						if ( pRadio )
+							pRadio->Explode();
+						else
+						{
+							// Fallback: generic explosion for item_radiocracker
+							CTakeDamageInfo info( this, this, 150.0f, DMG_BLAST );
+							ExplosionCreate( pTarget->GetAbsOrigin(), QAngle(0,0,0), this, 150, 250, false );
+							RadiusDamage( info, pTarget->GetAbsOrigin(), 250.0f, CLASS_NONE, NULL );
+							UTIL_Remove( pTarget );
+						}
+					}
+					else
+					{
+						UTIL_Remove( pTarget );
+					}
 				}
 				TaskComplete();
 				break;
