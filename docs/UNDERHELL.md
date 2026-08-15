@@ -1412,3 +1412,48 @@ battery (count-capped)". The code actually fills from `m_flUHBatteryCharge`
 The only remaining stamina/endurance nit: the exhausted-portion alpha uses a
 `BarDisabledAlpha` default of 20 (the original modded panel used a
 "HullDisabledAlpha"; vanilla suit power uses 70). Cosmetic only.
+
+## Dot reticle (CHudDotReticle) + battery fade — implemented
+
+### Battery fade — matched to decompile
+
+`CHudUHBattery::OnThink` faded the gauge at 1 unit per think (int); the
+original `sub_100BDF90` fades `GetAlpha() - 0.1` per think (float). Changed
+`m_iAlpha` (int) → `m_flAlpha` (float) and the fade to `- 0.1f`, so the gauge
+lingers the same way as the original instead of snapping away in ~4 s.
+
+### CHudDotReticle — the "+use" dot
+
+New client element `game/client/underhell/hud_dotreticle.{h,cpp}`, panel
+"`HudDotReticle`". Decoded from the original:
+
+- **Constructor** `sub_100BCC90`: registers the panel, 4 animation vars
+  (`dotx`/`doty`/`dottall`/`dotwide`), `SetAlpha(128)`, `SetHiddenBits(4096)`.
+- **Paint** `sub_100BC870`: draws the dot with
+  `alpha = (3.0 - (curtime - flTriggerTime)) * 85` — full (255) at the trigger,
+  linear fade to 0 over **3.0 s**; skipped while iron-sighted
+  (`m_bIronSighted` @4140).
+- **Trigger timestamp** is a client-local float at player offset **3456**,
+  stamped by the free-aim input path (`update_freeaim %f %f %f` engine cmd in
+  the same paint). The free-aim camera is still TODO.
+
+HudLayout.res `HudDotReticle [$WIN32]`: `xpos c-8 ypos c-8 wide 16 tall 16`
+(centred 16x16), `dotx 8 doty 8`, `PaintBackgroundType 2`, visible/enabled.
+
+Port behaviour (self-contained, documented divergence): the +use press edge is
+detected in `OnThink` (`m_nButtons & IN_USE`, latched) and stamps a panel-local
+`m_flTriggerTime`; `Paint` draws a small centred dot (4x4 by default) fading
+over 3.0 s and hidden while iron-sighted. The original's free-aim dependency
+(`update_freeaim`, player-offset-3456 timestamp) is intentionally not ported —
+the free-aim camera is a separate tracked TODO.
+
+- `SetHiddenBits(1<<12)` = 4096: an Underhell custom hide bit beyond the
+  vanilla `HIDEHUD_BITCOUNT` (12). Toggled by the mod's `SetStatusVisibility` /
+  `SetHudVisibility` player inputs (also TODO — see VMF audit §D).
+- The `hud_reticle_scale/minalpha/maxalpha/alpha_speed` ConVars
+  (`sub_102B6B30/60/90/BC0`, defaults 1.0/125/255/700) belong to a *different*
+  reticle (the zoom/crossbow reticle, `ZoomReticleColor`); the dot reticle's
+  fade is hard-coded (85.0, 3.0 s) and does not use them.
+- `dotwide`/`dottall` default to "1" in the original (the `.res` only sets
+  `dotx`/`doty`; the paint's exact rect size is ambiguous in the decompile).
+  The port defaults them to 4 for a visible dot — tune via the `.res` if needed.

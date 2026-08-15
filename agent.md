@@ -116,6 +116,21 @@ HudLayout.res/HudAnimations.txt/ClientScheme.res.
   плавный фейд; пропущен `CHudDotReticle`; позиция текста счёта батареи.
 Полная таблица оффсетов + разбор — в `docs/UNDERHELL.md` (§ «HUD audit»).
 
+### Точка-прицел (CHudDotReticle) + фейд батареи — реализовано
+
+- **Батарея**: фейд приведён к декомпилу — `GetAlpha() - 0.1` за тик (float),
+  а не 1 за тик (раньше шкала гасла за ~4с вместо медленного затухания
+  оригинала). `m_iAlpha` → `m_flAlpha`.
+- **CHudDotReticle** (новый: `hud_dotreticle.{h,cpp}`): точка по центру,
+  загорается при нажатии **+use** и линейно гаснет за **3.0 с**
+  (`alpha = (3.0 - elapsed) * 85`, декомпил `sub_100BC870`); скрыта при
+  прицеливании (ironsight). Триггер — фронт +use в OnThink (расхождение с
+  оригиналом задокументировано: оригинал штампует timestamp на игроке offset
+  3456 через free-aim-ввод; free-aim пока TODO).
+- `SetHiddenBits(4096)` = 1<<12 — кастомный бит Underhell (за пределами
+  ванильного HIDEHUD_BITCOUNT), управляется SetStatusVisibility/SetHudVisibility.
+Полный разбор — в `docs/UNDERHELL.md` (§ «Dot reticle»).
+
 ### Аудит VMF (карты) — нереализованные инпуты игрока
 
 Карт в SDK-репо нет — они в декомпиле (`klaxons1/underhell-hexrays` →

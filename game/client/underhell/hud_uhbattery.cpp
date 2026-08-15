@@ -38,7 +38,7 @@ CHudUHBattery::CHudUHBattery( const char *pElementName ) : CHudElement( pElement
 
 	m_iBatteryCount = -1;
 	m_iContourTexture = -1;
-	m_iAlpha = 0;
+	m_flAlpha = 0.0f;
 }
 
 //-----------------------------------------------------------------------------
@@ -47,7 +47,7 @@ CHudUHBattery::CHudUHBattery( const char *pElementName ) : CHudElement( pElement
 void CHudUHBattery::Init( void )
 {
 	m_iBatteryCount = -1;
-	m_iAlpha = 0;
+	m_flAlpha = 0.0f;
 }
 
 void CHudUHBattery::Reset( void )
@@ -80,11 +80,13 @@ void CHudUHBattery::OnThink( void )
 	// while it is active (this condition was missing from the first port).
 	if ( pPlayer->m_bFlashlightOn || pPlayer->m_bNightVisionOn || pPlayer->m_iUHBatteryCount != m_iBatteryCount )
 	{
-		m_iAlpha = 255;
+		m_flAlpha = 255.0f;
 	}
 	else
 	{
-		m_iAlpha = max( 0, m_iAlpha - 1 );
+		// Original fades GetAlpha() - 0.1 per think (sub_100BDF90) — a slow float
+		// fade, not the fast 1-unit-per-think used by the first port.
+		m_flAlpha = max( 0.0f, m_flAlpha - 0.1f );
 	}
 
 	m_iBatteryCount = pPlayer->m_iUHBatteryCount;
@@ -95,7 +97,7 @@ void CHudUHBattery::OnThink( void )
 //-----------------------------------------------------------------------------
 void CHudUHBattery::Paint()
 {
-	vgui::surface()->DrawSetColor( 255, 255, 255, m_iAlpha );
+	vgui::surface()->DrawSetColor( 255, 255, 255, (int)m_flAlpha );
 
 	// Battery outline (contour sprite).
 	if ( m_iContourTexture < 0 )
@@ -122,7 +124,7 @@ void CHudUHBattery::Paint()
 	int enabledChunks = (int)( (float)chunkCount * ( flCharge / 100.0f ) + 0.5f );
 
 	// Filled chunks (bottom-up).
-	vgui::surface()->DrawSetColor( m_HullColor[0], m_HullColor[1], m_HullColor[2], m_HullColor[3] * m_iAlpha / 255 );
+	vgui::surface()->DrawSetColor( m_HullColor[0], m_HullColor[1], m_HullColor[2], m_HullColor[3] * (int)m_flAlpha / 255 );
 	int y = (int)m_flBarInsetY;
 	for ( int i = 0; i < enabledChunks; i++ )
 	{
@@ -147,7 +149,7 @@ void CHudUHBattery::Paint()
 	swprintf( szText, L"   x%i", m_iBatteryCount );
 
 	vgui::surface()->DrawSetTextFont( m_hNumberFont );
-	vgui::surface()->DrawSetTextColor( m_HullColor[0], m_HullColor[1], m_HullColor[2], m_iAlpha );
+	vgui::surface()->DrawSetTextColor( m_HullColor[0], m_HullColor[1], m_HullColor[2], (int)m_flAlpha );
 	vgui::surface()->DrawSetTextPos( (int)( m_flBarInsetX + m_flBarWidth + 2 ), (int)m_flBarInsetY - 8 );
 	vgui::surface()->DrawUnicodeString( szText );
 }
