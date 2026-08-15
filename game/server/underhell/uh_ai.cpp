@@ -133,7 +133,13 @@ static int UH_DestroyedHeadBodygroup( CBaseAnimating *pBody )
 	if ( V_stristr( pszModel, "combine_soldier_prisonguard" ) )
 		return 1;
 	if ( V_stristr( pszModel, "combine_soldier" ) )
-		return 9;
+	{
+		// CNPC_CombineS path in sub_10031BF0: normal combine variants use
+		// destroyed head 10, or 11 when their current head is already one of
+		// the high (helmet/gear) variants. Value 9 belongs to other NPC types.
+		int iHead = pBody->FindBodygroupByName( "head" );
+		return ( iHead >= 0 && pBody->GetBodygroup( iHead ) >= 9 ) ? 11 : 10;
+	}
 	return 1;
 }
 
