@@ -482,10 +482,14 @@ The mod author (Mxthe) documented his sources in `notes/`:
   by `m_expFactor` over `gMoveTime`. The port parses these into
   `FileWeaponInfo_t::m_expOffset` / `m_expOriOffset` / `m_flAccuracy`.
 - **`Over the Shoulder View - Valve Developer Community.html`** — the VDC
-  **"Over the Shoulder View"** tutorial. Its "OPTIONAL: Adding free aim"
-  section is the "свободная камера" feature: the mouse moves the crosshair on
+  **"Over the Shoulder View"** tutorial. Its MAIN body is a THIRD-PERSON
+  over-the-shoulder camera (the `cam_ots_*` convars: offset, offset_lag,
+  origin_lag, shake_*, translucencyThreshold). Its "OPTIONAL: Adding free aim"
+  section is a SEPARATE FIRST-PERSON feature: the mouse moves the crosshair on
   screen (deadzone + auto-turn past the edge), decoupling the aim point from
-  the view — i.e. the viewmodel no longer tracks the crosshair 1:1.
+  the view, and the weapon VIEWMODEL tilts/rolls toward the crosshair — the
+  "weapon sways toward the mouse when not aiming" behaviour. Do NOT conflate
+  the two: OTS = third person; free-aim = first person.
 
 ### One-handed weapons & the flashlight (user-confirmed + decoded)
 
@@ -660,8 +664,9 @@ Decoded from `sub_101E2F50` (toggle) + `sub_101F11D0` (ClientCommand dispatch)
 
 ### TODO (ironsight / weapons)
 
-- Free-aim (over-the-shoulder) camera still TODO — first-person only, and the
-  original gates it behind the one third-person location.
+- Free-aim (first-person: crosshair decouples from the view, weapon viewmodel
+  tilts toward the mouse) still TODO — see the dedicated section below. It is
+  NOT the same as the third-person over-the-shoulder (OTS) camera.
 - Shotgun multi-pellet fire (skill.cfg `sk_plr_num_shotgun_pellets = 12`):
   the port fires a single shot per trigger pull; the original fires 12 pellets.
 - Exact fire rate for SMG / shotgun / sniper / BFG (recover from each weapon's
@@ -1622,3 +1627,66 @@ Note: the delta signal is not absolute — `best` + large positive delta is a
 STRONG trust signal, but `verify` still contains some genuine matches (and
 `unmatched` contains vanilla functions Diaphora simply couldn't match, e.g.
 CAchievementNotificationPanel). Use the tiers as a triage map, not ground truth.
+
+## Free-aim (weapon tilts toward the mouse) — decoded, not yet ported
+
+The "weapon sways/tilts toward the mouse when not aiming" is **free-aim**, the
+"OPTIONAL: Adding free aim" section of the VDC "Over the Shoulder View" tutorial
+(the mod author's `notes/Over the Shoulder View - Valve Developer Community.html`).
+It is FIRST-PERSON and separate from the third-person OTS camera.
+
+### Architecture (tutorial + Underhell binary)
+
+1. **Input decoupling** (`in_mouse.cpp`): when free-aiming, `CInput::MouseMove`
+   routes to `TryCursorMove(m_angViewAngle, cmd, x, y)` instead of
+   `ApplyMouse(...)` — the mouse moves a free-aim CURSOR (`m_vecFreeAimPos`,
+   Vector2D in [-1,1]) on screen; only when the cursor leaves the deadzone
+   (`cam_ots_freeaim_move_threshold`/`move_max`) does the view auto-turn
+   (`cam_ots_freeaim_autoturn_speed`, `cam_ots_TurnAuto`).
+2. **Crosshair** (`hud_crosshair.cpp`): drawn at
+   `x = ScreenWidth()/2 * (m_vecFreeAimPos.x + 1)` — i.e. at the cursor.
+3. **Viewmodel tilt**: the weapon viewmodel re-orients toward the cursor (the
+   observable "roll toward the mouse").
+4. **Server sync** (`serveror.dll`): `update_freeaim %f %f %f` is a server
+   ConCommand (client → server, via the engine command route); the client's
+   dot-reticle paint `sub_100BC870` computes the free-aim world target every
+   frame via `ScreenToWorld` (`sub_10070AD0`) and sends it. The server tracks
+   the free-aim aim direction for networked aim/prediction.
+
+### ConVars (client, from `Cliento.dll` + tutorial)
+
+| ConVar | default | purpose |
+|---|---|---|
+| `cam_ots_freeaim_enable` | 1 | master toggle (FCVAR_ARCHIVE) |
+| `cam_ots_freeaim_interval_enable` | 0 | use an interval for view turning |
+| `cam_ots_freeaim_move_threshold` | 0.05 | deadzone (cursor past this turns the view) |
+| `cam_ots_freeaim_move_max` | 0.1 | cursor clamp |
+| `cam_ots_freeaim_speed_turn` | 1 | turn speed |
+| `cam_ots_freeaim_speed_evenYawSpeed` | 0 | even yaw speed |
+| `cam_ots_freeaim_autoturn_speed` | 250 | auto-turn rate |
+
+Commands: `cam_ots_TurnAuto` (→ `CAM_UpdateAngleByFreeAiming(true)`),
+`cam_ots_Turn180` (→ `CAM_UpdateAngle180`).
+
+### Where the tilt is applied in our SDK
+
+`CBaseViewModel::CalcViewModelView` (`baseviewmodel_shared.cpp`) already hosts
+the ironsight `ExpOffset`/`m_expFactor` slide — free-aim's viewmodel roll is the
+same kind of client-side `vmangles`/`vmorigin` offset, driven by the free-aim
+cursor instead of `m_bExpSighted`.
+
+### Port plan (staged)
+
+1. `iinput.h` / `input.h` / `input.cpp` / `in_mouse.cpp`: add `m_vecFreeAimPos`
+   + `TryCursorMove` + `CAM_IsFreeAiming`/`CAM_GetFreeAimCursor` and route
+   `MouseMove` through it (the input-decoupling core — highest risk, needs
+   in-game testing).
+2. `hud_crosshair.cpp`: draw the crosshair at the free-aim cursor.
+3. `baseviewmodel_shared.cpp` `CalcViewModelView`: tilt `vmangles` toward the
+   cursor (the observable weapon roll).
+4. Server: `update_freeaim` ConCommand + free-aim aim tracking (needed only for
+   network/prediction parity; the visual roll is client-side).
+5. Register the 7 `cam_ots_freeaim_*` ConVars.
+
+TODO until then — see "Free-aim (first-person …)" in the ironsight/weapons
+TODO list.
