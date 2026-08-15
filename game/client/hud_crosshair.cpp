@@ -1,4 +1,4 @@
-//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -123,10 +123,9 @@ void CHudCrosshair::Paint( void )
 
 	// Underhell free-aim: draw the crosshair at the free-aim cursor
 	// (see CInput::TryCursorMove), not the fixed screen center.
-	// NB: ::input disambiguates the global IInput* from vgui::input().
-	if ( ::input->CAM_IsFreeAiming() )
+	if ( input->CAM_IsFreeAiming() )
 	{
-		Vector2D cursor = ::input->CAM_GetFreeAimCursor();
+		Vector2D cursor = input->CAM_GetFreeAimCursor();
 		x *= cursor.x + 1.0f;
 		y *= cursor.y + 1.0f;
 	}
