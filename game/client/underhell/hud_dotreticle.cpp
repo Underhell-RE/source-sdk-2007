@@ -121,15 +121,16 @@ void CHudDotReticle::Paint()
 	if ( iAlpha <= 0 )
 		return;
 
-	// dotx/doty are the dot's centre (8,8 in the 16x16 centred panel = screen
-	// centre); dotwide/dottall are its size. Draw a small centred square.
-	int cx = (int)m_fdotx;
-	int cy = (int)m_fdoty;
-	int hw = (int)m_fdotwide / 2;
-	int hh = (int)m_fdottall / 2;
+	// The original (sub_100BC870) draws two small filled rects — a 3x8 black
+	// tick with a 2x8 white tick on top — a tiny crosshair caret, NOT a filled
+	// square. dotx/doty are the tick's top-left (8,8 in the 16x16 centred
+	// panel). Reproduce that: black outline tick, then white tick.
+	int x = (int)m_fdotx;
+	int y = (int)m_fdoty;
+
+	vgui::surface()->DrawSetColor( 0, 0, 0, iAlpha );
+	vgui::surface()->DrawFilledRect( x, y, x + 3, y + 8 );
 
 	vgui::surface()->DrawSetColor( 255, 255, 255, iAlpha );
-	vgui::surface()->DrawFilledRect(
-		cx - hw, cy - hh,
-		cx + hw, cy + hh );
+	vgui::surface()->DrawFilledRect( x, y, x + 2, y + 8 );
 }

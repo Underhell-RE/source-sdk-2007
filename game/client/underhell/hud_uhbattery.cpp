@@ -97,20 +97,6 @@ void CHudUHBattery::OnThink( void )
 //-----------------------------------------------------------------------------
 void CHudUHBattery::Paint()
 {
-	vgui::surface()->DrawSetColor( 255, 255, 255, (int)m_flAlpha );
-
-	// Battery outline (contour sprite).
-	if ( m_iContourTexture < 0 )
-	{
-		m_iContourTexture = vgui::surface()->CreateNewTextureID();
-		vgui::surface()->DrawSetTextureFile( m_iContourTexture, "sprites/hud/hud_battery_contour", 1, false );
-	}
-
-	vgui::surface()->DrawSetTexture( m_iContourTexture );
-	vgui::surface()->DrawTexturedRect(
-		(int)m_flContourX, (int)m_flContourY,
-		(int)( m_flContourX + m_flContourWide ), (int)( m_flContourY + m_flContourTall ) );
-
 	// Charge bar: discrete chunks filling bottom-up from m_flUHBatteryCharge
 	// (0..100), exactly like the original sub_100BDC80 — chunkCount =
 	// BarHeight / (BarChunkHeight + BarChunkGap), enabledChunks =
@@ -143,6 +129,20 @@ void CHudUHBattery::Paint()
 			(int)( m_flBarInsetX + m_flBarWidth ), y + (int)m_flBarChunkHeight );
 		y -= (int)flChunkStep;
 	}
+
+	// Contour outline (drawn ON TOP of the bar, matching sub_100BDC80 which
+	// draws the chunked bar first and the hud_battery_contour texture last).
+	if ( m_iContourTexture < 0 )
+	{
+		m_iContourTexture = vgui::surface()->CreateNewTextureID();
+		vgui::surface()->DrawSetTextureFile( m_iContourTexture, "sprites/hud/hud_battery_contour", 1, false );
+	}
+
+	vgui::surface()->DrawSetColor( 255, 255, 255, (int)m_flAlpha );
+	vgui::surface()->DrawSetTexture( m_iContourTexture );
+	vgui::surface()->DrawTexturedRect(
+		(int)m_flContourX, (int)m_flContourY,
+		(int)( m_flContourX + m_flContourWide ), (int)( m_flContourY + m_flContourTall ) );
 
 	// Battery count: original prints "   x<N>" with the HudNumbers font.
 	wchar_t szText[16];

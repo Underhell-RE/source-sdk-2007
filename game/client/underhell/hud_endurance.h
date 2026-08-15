@@ -54,7 +54,15 @@ private:
 	// Exhausted portion is drawn with the foreground colour at this alpha.
 	CPanelAnimationVar( int, m_iBarDisabledAlpha, "BarDisabledAlpha", "20" );
 
+	// Icon sprite (scripts/HudLayout.res "HudEndurance": iconx 2, icony 116,
+	// iconwide 16, icontall 134 — the vertical gauge outline behind the bar).
+	CPanelAnimationVarAliasType( float, m_fIconX, "iconx", "2", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_fIconY, "icony", "116", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_fIconWide, "iconwide", "16", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_fIconTall, "icontall", "134", "proportional_float" );
+
 	float	m_flEndurance;
+	int		m_iIconTexture;
 };
 
 #endif // HUD_ENDURANCE_H

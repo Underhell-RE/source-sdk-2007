@@ -1457,3 +1457,55 @@ the free-aim camera is a separate tracked TODO.
 - `dotwide`/`dottall` default to "1" in the original (the `.res` only sets
   `dotx`/`doty`; the paint's exact rect size is ambiguous in the decompile).
   The port defaults them to 4 for a visible dot — tune via the `.res` if needed.
+
+## Reticle + battery/stamina/endurance fixes (decompile-verified, round 2)
+
+### Dot reticle — it is a caret, not a square
+
+The first reticle port drew a filled 4x4 square (the "semi-transparent square"
+seen in game). Decoding `sub_100BC870` carefully, the original draws **two
+filled rects**:
+
+- `DrawSetColor(255,255,255,alpha)` then a **2x8** rect, then
+  `DrawSetColor(0,0,0,alpha)` then a **3x8** rect at the same origin — i.e. a
+  small crosshair caret (white 2x8 with a black 1px outline), not a square.
+
+The fade is `alpha = (3.0 - (curtime - trigger)) * 85` (full at trigger, 0 at
+3.0 s). Fixed to match: black 3x8 tick + white 2x8 tick at dotx/doty (8,8).
+
+Reference cross-check: `eXeC64/NightmareHouse` (`src/game/client/hud_crosshair.cpp`)
+implements the same "+use reticle" family — alpha ramping with
+`hud_reticle_alpha_speed` (700/s), lit on `IN_USE` + a linger window. Underhell
+keeps the same ConVars (`sub_102B6B30/60/90/BC0`: scale/minalpha/maxalpha/
+alpha_speed) but its `CHudDotReticle` fade is the hard-coded 3.0 s / 85.0 ramp,
+not the convar-driven one — the convars belong to the zoom/crosshair reticle
+(`ZoomReticleColor`).
+
+### Battery — contour drawn ON TOP of the bar
+
+`sub_100BDC80` order: (1) chunked bar (filled HullColor + exhausted at
+HullDisabledAlpha, bottom-up), (2) `hud_battery_contour` textured rect ON TOP,
+(3) "   x<N>" count text. The first port drew the contour FIRST then the bar,
+so the bar could overdraw the frame. Reordered to bar → contour → text.
+
+### Stamina / endurance — missing icon sprites (added)
+
+The ctors precache icon textures the first port never drew:
+`sub_100CB4C0` (stamina) loads `sprites/hud/hud_stamina`; `sub_100C8F40`
+(endurance) loads `sprites/hud/hud_endurance`. Both are the gauge outline art
+drawn behind the chunked bar. Added:
+
+- `CHudStamina`: `hud_stamina` at iconx 1 / icony -6 / iconwide 24 / icontall 24.
+- `CHudEndurance`: `hud_endurance` at iconx 2 / icony 116 / iconwide 16 /
+  icontall 134 (per HudLayout.res — the endurance icon is a tall vertical
+  outline; exact placement needs an in-game glance since icontall 134 > panel
+  height, the mod ships it that way).
+
+### Sprite inventory (materials/Sprites/Hud/)
+
+`hud_battery_contour`, `hud_battery_meter`, `hud_blooddrop`, `hud_endurance`,
+`hud_flashlight`, `hud_hermitcards`, `hud_shoulderflashlight`, `hud_stamina`.
+Note `hud_battery_meter` + `hud_flashlight` + `hud_shoulderflashlight` are not
+referenced by the HUD ctors in the decompile (the battery bar is drawn as
+chunks, not the meter texture) — `hud_flashlight` / `hud_shoulderflashlight`
+belong to the (TODO) shoulder-flashlight viewmodel HUD.
