@@ -100,6 +100,7 @@ public:
 	// so a held trigger only fires one shot in semi mode.
 	void			UH_ToggleFireMode( void );
 	virtual void	WeaponIdle( void );
+	virtual void	ItemPostFrame( void );
 
 	float			m_flFireRate;			// seconds between shots
 	ConVar			*m_pDamage;				// sk_plr_dmg_<weapon> (skill.cfg)
@@ -108,6 +109,8 @@ public:
 	float			m_flAccuracyPenalty;	// grows per shot, decays over time
 	int				m_iFireMode;			// 1 = full auto, 2 = semi (FIREMODE_*)
 	bool			m_bFireOnEdge;			// semi-auto trigger latch
+	bool			m_bNeedPump;				// pending shotgun pump animation
+	float			m_flPumpTime;				// time to play the pump after firing
 };
 
 //-----------------------------------------------------------------------------

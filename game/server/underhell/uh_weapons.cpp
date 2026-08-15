@@ -163,6 +163,14 @@ void CUHGunWeapon::PrimaryAttack( void )
 
 	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
 
+	// Underhell shotguns are pump-action. The old thin gun base used their
+	// 0.8 s refire time but never sent the intervening pump sequence.
+	if ( m_iShotsPerFire > 1 )
+	{
+		m_bNeedPump = true;
+		m_flPumpTime = gpGlobals->curtime + 0.4f;
+	}
+
 	// Out of ammo indicator.
 	if ( !m_iClip1 && pPlayer->GetAmmoCount( m_iPrimaryAmmoType ) <= 0 )
 	{
@@ -213,6 +221,21 @@ void CUHGunWeapon::WeaponIdle( void )
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 	if ( pPlayer && !( pPlayer->m_nButtons & IN_ATTACK ) )
 		m_bFireOnEdge = true;
+}
+
+void CUHGunWeapon::ItemPostFrame( void )
+{
+	// sub_1027F4E0's pump sits between the fire event and the 0.8 s refire
+	// window. Run it from ItemPostFrame so it also happens while IN_ATTACK is
+	// held; WeaponIdle alone is skipped during sustained fire.
+	if ( m_bNeedPump && gpGlobals->curtime >= m_flPumpTime )
+	{
+		m_bNeedPump = false;
+		WeaponSound( SPECIAL1 );
+		SendWeaponAnim( ACT_SHOTGUN_PUMP );
+	}
+
+	BaseClass::ItemPostFrame();
 }
 
 //-----------------------------------------------------------------------------
@@ -502,7 +525,7 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; }
+	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bNeedPump = false; m_flPumpTime = 0.0f; }
 
 #define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
 	acttable_t _className::m_acttable[] = \

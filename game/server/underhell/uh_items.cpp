@@ -758,9 +758,8 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
-	// Original gate: only while hurt or bleeding.
-	if ( pHL2Player->GetHealth() >= 100 && pHL2Player->UH_GetBleedCounter() <= 0 )
-		return false;
+	// A bandage is always collectable. Its health/bleeding condition belongs to
+	// the consumption path below, not to the inventory pickup path.
 
 	// Unlike the generic inventory pickups, bandages do not reject the touch
 	// merely because every slot is occupied. UH_GiveItem owns the full-inventory
