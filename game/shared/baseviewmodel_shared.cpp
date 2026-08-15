@@ -13,6 +13,10 @@
 #include "prediction.h"
 #include "weapon_parse.h"
 #include "basecombatweapon_shared.h"
+#include "underhell/uh_freeaim.h"
+
+void ScreenToWorld( int mousex, int mousey, float fov, const Vector& vecRenderOrigin,
+	const QAngle& vecRenderAngles, Vector& vecPickingRay );
 #else
 #include "vguiscreen.h"
 #endif
@@ -458,6 +462,24 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 	// Scale the offset from the hip position toward the eye position.
 	Vector difPos = vmorigin - eyePosition;
 	vmorigin = eyePosition + difPos * m_expFactor;
+
+	// sub_10014D80: point the unsighted model through the normalized free-aim
+	// cursor. Its origin remains unchanged and the real camera still turns.
+	Vector2D vecCursor;
+	if ( !m_bExpSighted && UH_FreeAimGetCursor( vecCursor ) )
+	{
+		int nScreenWide = 0, nScreenTall = 0;
+		engine->GetScreenSize( nScreenWide, nScreenTall );
+		if ( nScreenWide > 0 && nScreenTall > 0 )
+		{
+			Vector vecPickingRay;
+			ScreenToWorld(
+				(int)( ( vecCursor.x * 0.25f + 0.5f ) * nScreenWide ),
+				(int)( ( vecCursor.y * 0.25f + 0.5f ) * nScreenTall ),
+				owner->GetFOV(), eyePosition, eyeAngles, vecPickingRay );
+			VectorAngles( vecPickingRay, vmangles );
+		}
+	}
 #endif
 
 	SetLocalOrigin( vmorigin );
