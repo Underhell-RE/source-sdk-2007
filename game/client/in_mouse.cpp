@@ -9,7 +9,6 @@
 #if !defined( _X360 )
 #include <windows.h>
 #endif
-#include "cbase.h"
 #include "hud.h"
 #include "cdll_int.h"
 #include "kbutton.h"
@@ -25,6 +24,7 @@
 #include "cdll_client_int.h"
 #include "cdll_util.h"
 #include "tier1/convar_serverbounded.h"
+#include "c_baseplayer.h"
 
 #if defined( _X360 )
 #include "xbox/xbox_win32stubs.h"
