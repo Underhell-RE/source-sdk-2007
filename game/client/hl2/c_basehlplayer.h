@@ -81,10 +81,12 @@ public:
 	float							m_flUHBatteryCharge;				// 0..100 current battery charge
 	bool								m_bIronSighted;						// ironsight active
 	float								m_fIronsightedTime;					// last ironsight toggle time
-	bool									m_bHavePistolSilencer;				// silencer gear (client mirror)
-	bool									m_bHaveRifleSilencer;
-	bool									m_bLaserToggleState;
-	bool									m_bKickMarker;						// kick window active
+	bool								m_bHavePistolSilencer;				// silencer gear (client mirror)
+	bool								m_bHaveRifleSilencer;
+	bool								m_bLaserToggleState;
+	bool								m_bKickMarker;						// kick window active
+	bool								m_bNightVisionOn;					// night vision overlay active
+	bool								m_bGasMaskOn;						// gas mask overlay active
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible

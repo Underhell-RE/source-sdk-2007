@@ -335,6 +335,11 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_bLaserToggleState, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bHaveNightVision, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bHaveGasMask, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bNightVisionOn, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bGasMaskOn, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bNightVisionEnabled, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bGasMaskEnabled, FIELD_BOOLEAN ),
+	DEFINE_SOUNDPATCH( m_pGasMaskBreathLoop ),
 	DEFINE_FIELD( m_bDisableWeaponDrop, FIELD_BOOLEAN ),
 
 	DEFINE_FIELD( m_bSprintEnabled, FIELD_BOOLEAN ),
@@ -395,6 +400,8 @@ BEGIN_DATADESC( CHL2_Player )
 	// "SetPistolSilencer" / "SetRifleSilencer", decode sub_101F2D30).
 	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetPistolSilencer", InputSetPistolSilencer ),
 	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetRifleSilencer", InputSetRifleSilencer ),
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetNightVision", InputSetNightVision ),
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetGasMask", InputSetGasMask ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "DisableDropWeapon", InputDisableDropWeapon ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "EnableDropWeapon", InputEnableDropWeapon ),
 
@@ -445,6 +452,15 @@ CHL2_Player::CHL2_Player()
 	m_bKickMarker = false;
 	m_bKickActive = false;
 	m_bKickDisabled = false;
+
+	// Underhell gear defaults (original sub_101F77C0 inits the enabled flags to 1).
+	m_bHaveNightVision = false;
+	m_bHaveGasMask = false;
+	m_bNightVisionOn = false;
+	m_bGasMaskOn = false;
+	m_bNightVisionEnabled = true;
+	m_bGasMaskEnabled = true;
+	m_pGasMaskBreathLoop = NULL;
 
 	UH_InitializeInventory();
 	UH_InitializeEndurance();
@@ -497,6 +513,9 @@ IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropBool( SENDINFO(m_bLaserToggleState) ),
 	// Underhell kick marker (kick window active).
 	SendPropBool( SENDINFO(m_bKickMarker) ),
+	// Underhell night vision / gas mask active state (client overlay).
+	SendPropBool( SENDINFO(m_bNightVisionOn) ),
+	SendPropBool( SENDINFO(m_bGasMaskOn) ),
 END_SEND_TABLE()
 
 
@@ -534,6 +553,13 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.kick_fire_fly" );
 	PrecacheScriptSound( "Player.Voice.Kick" );
 	PrecacheScriptSound( "Player.Voice.Kick.Exhausted" );
+
+	// Underhell night vision + gas mask.
+	PrecacheScriptSound( "Player.nvon" );
+	PrecacheScriptSound( "Player.nvoff" );
+	PrecacheScriptSound( "Player.GasMaskOn" );
+	PrecacheScriptSound( "Player.GasMaskOff" );
+	PrecacheScriptSound( "GasMask.Breath.Normal" );
 }
 
 //-----------------------------------------------------------------------------
@@ -1243,6 +1269,12 @@ void CHL2_Player::Spawn(void)
 	// model. "SetPlayerKickModel" swaps it per outfit.
 	CreateViewModel( 2 );
 	UH_SetKickViewModel( "models/weapons/v_kick_jake_casual.mdl" );
+
+	// Underhell: reset gear on (re)spawn — the original zeroes the night vision
+	// and gas mask "on" flags and stops their sounds (sub_101F77C0).
+	UH_StopGasMaskBreath();
+	m_bNightVisionOn = false;
+	m_bGasMaskOn = false;
 
 	// Setup our flashlight values
 #ifdef HL2_EPISODIC
@@ -2594,6 +2626,11 @@ void CHL2_Player::Event_Killed( const CTakeDamageInfo &info )
 {
 	BaseClass::Event_Killed( info );
 
+	// Underhell: drop the gear visuals / loop sound on death.
+	UH_StopGasMaskBreath();
+	m_bNightVisionOn = false;
+	m_bGasMaskOn = false;
+
 	FirePlayerProxyOutput( "PlayerDied", variant_t(), this, this );
 	NotifyScriptsOfDeath();
 }
@@ -2926,6 +2963,22 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	if ( !Q_stricmp( args[0], "Throw_Nade" ) )
 	{
 		UH_ThrowNade();
+		return true;
+	}
+
+	// Underhell: night vision toggle (original "NightVision_Toggle" dispatch ->
+	// vtable 404 = sub_102E19B0).
+	if ( !Q_stricmp( args[0], "NightVision_Toggle" ) )
+	{
+		UH_ToggleNightVision();
+		return true;
+	}
+
+	// Underhell: gas mask toggle (original "GasMask_Toggle" dispatch ->
+	// sub_101ED380).
+	if ( !Q_stricmp( args[0], "GasMask_Toggle" ) )
+	{
+		UH_ToggleGasMask();
 		return true;
 	}
 

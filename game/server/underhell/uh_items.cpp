@@ -92,8 +92,8 @@ bool CUHItem::MyTouch( CBasePlayer *pPlayer )
 
 //-----------------------------------------------------------------------------
 // Item consumption gate (matches the original per-item Use() handlers): the
-// activator must be a living CHL2_Player that isn't wearing a gas mask. The
-// gas-mask check is a TODO until the gear system is ported.
+// activator must be a living CHL2_Player that isn't wearing a gas mask
+// (original checks player offset 3370 = m_bGasMaskOn).
 //-----------------------------------------------------------------------------
 static CHL2_Player *UH_GetItemConsumer( CBaseEntity *pActivator )
 {
@@ -104,8 +104,9 @@ static CHL2_Player *UH_GetItemConsumer( CBaseEntity *pActivator )
 	if ( !pPlayer || !pPlayer->IsAlive() )
 		return NULL;
 
-	// TODO: refuse when the gas mask is worn (original checks player offset
-	// 3370 = m_bGasMaskOn).
+	// Can't eat / drink through a gas mask.
+	if ( pPlayer->UH_IsGasMaskOn() )
+		return NULL;
 
 	return pPlayer;
 }

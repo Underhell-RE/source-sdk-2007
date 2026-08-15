@@ -55,6 +55,9 @@ IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropBool( RECVINFO( m_bLaserToggleState ) ),
 	// Underhell kick marker (kick window active).
 	RecvPropBool( RECVINFO( m_bKickMarker ) ),
+	// Underhell night vision / gas mask active state (client overlay).
+	RecvPropBool( RECVINFO( m_bNightVisionOn ) ),
+	RecvPropBool( RECVINFO( m_bGasMaskOn ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )

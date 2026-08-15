@@ -285,6 +285,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\uh_gear_overlay.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\hud_endurance.cpp"
 					>
 				</File>

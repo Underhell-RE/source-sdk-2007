@@ -677,8 +677,8 @@ sendtable `sub_101F2D30` / ClientCommand `sub_101F11D0`):
 
 | Feature | State | Command / input | Status |
 |---|---|---|---|
-| Night vision | `m_bHaveNightVision` @2138, `m_bNightVisionOn` @3369, `m_bNightVisionEnabled` @2140 | `NightVision_Toggle`, `SetNightVision` | TODO |
-| Gas mask | `m_bHaveGasMask` @2139, `m_bGasMaskOn` @3370, `m_bGasMaskEnabled` @2141 | `GasMask_Toggle`, `SetGasMask` | TODO |
+| Night vision | `m_bHaveNightVision` @2138, `m_bNightVisionOn` @3369, `m_bNightVisionEnabled` @2140 | `NightVision_Toggle`, `SetNightVision` | done (battery drain TODO) |
+| Gas mask | `m_bHaveGasMask` @2139, `m_bGasMaskOn` @3370, `m_bGasMaskEnabled` @2141 | `GasMask_Toggle`, `SetGasMask` | done |
 | Shoulder flashlight | `m_bShoulderFlashlight` @5040 | — | networked, viewmodel TODO |
 | Flashlight viewmodel | `m_bFlashlightHolstered` | `v_flashlight_pg.mdl` | TODO |
 | Fake flare | `m_bHoldingFlare` @2122, `m_bFlareHitting` @2124, `m_bFlareMarker` @2125 | `v_flare_pg.mdl` | TODO |
@@ -988,3 +988,29 @@ Decoded the remaining item MyTouch handlers and implemented them (server-side,
 
 Still TODO (unknown class names / no RTTI): item_bandagespack, item_syringepack,
 item_flags, item_health.
+
+## Night vision + gas mask — implemented
+
+Decoded the two gear toggles and ported them (server + client):
+
+- **NightVision_Toggle** (client command -> CHL2_Player vtable 404, sub_102E19B0):
+  mutual exclusion with the gas mask, ownership gate (`m_bHaveNightVision` &&
+  `m_bNightVisionEnabled`), battery gate (deny when `m_iUHBatteryCount <= 0` &&
+  `m_flUHBatteryCharge <= 10`), toggles the networked `m_bNightVisionOn`, flips
+  the "NightVision" playermodel bodygroup, plays `Player.nvon`/`Player.nvoff`.
+- **GasMask_Toggle** (client command -> sub_101ED380): mutual exclusion with
+  night vision, ownership gate (`m_bHaveGasMask` && `m_bGasMaskEnabled`),
+  toggles the networked `m_bGasMaskOn`, starts/stops the looping
+  `GasMask.Breath.Normal` (CSoundPatch), flips the "GasMask" bodygroup, plays
+  `Player.GasMaskOn`/`Player.GasMaskOff`.
+- **SetNightVision / SetGasMask** inputs (FIELD_BOOLEAN) grant/take the gear
+  (sub_101E36C0 / sub_101E3750); taking them while active forces the overlay off.
+- Gear resets on Spawn + Event_Killed (breath loop stopped, "on" flags cleared).
+- Client: `m_bNightVisionOn`/`m_bGasMaskOn` recv'd on C_BaseHLPlayer; a new
+  `IScreenSpaceEffect` (`uh_gear_overlay.cpp`) draws `shader/nightvision` and
+  `shader/gasmask` full-screen (the materials + shaders are in the game install).
+
+TODO (decode leftovers): the original also clears `r_flashlightscissor` on the
+night-vision toggle, sets a custom effects flag 0x400 (outside SDK EF_MAX_BITS),
+and drains the flashlight battery while night vision is on (auto-off in
+sub_102E3DE0) — the turn-on battery gate is ported, the continuous drain is not.

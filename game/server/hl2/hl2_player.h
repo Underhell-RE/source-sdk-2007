@@ -394,6 +394,8 @@ public:
 	void				UH_SetHaveNightVision( bool bHave ) { m_bHaveNightVision = bHave; }
 	bool				UH_HasGasMask( void ) const { return m_bHaveGasMask; }
 	void				UH_SetHaveGasMask( bool bHave ) { m_bHaveGasMask = bHave; }
+	bool				UH_IsGasMaskOn( void ) const { return m_bGasMaskOn; }
+	bool				UH_IsNightVisionOn( void ) const { return m_bNightVisionOn; }
 	void				UH_SetShoulderFlashlight( bool bHave ) { m_bShoulderFlashlight = bHave; }
 	void				UH_SetFlashlightOn( bool bOn ) { m_bFlashlightOn = bOn; }
 
@@ -414,9 +416,21 @@ public:
 	void				UH_DropWeapon( void );		// "DropWeapon" — throw the active weapon
 	void				UH_ThrowNade( void );		// "Throw_Nade" — grenade toss
 
-	// Underhell gear inputs (give the pistol / rifle silencer; disable drop).
+	// Underhell night vision + gas mask toggles (client commands
+	// "NightVision_Toggle" -> vtable 404 = sub_102E19B0, "GasMask_Toggle" ->
+	// sub_101ED380). Both are mutually exclusive and gated on ownership +
+	// an enabled flag; night vision additionally drains flashlight batteries.
+	void				UH_ToggleNightVision( void );
+	void				UH_ToggleGasMask( void );
+	void				UH_StopGasMaskBreath( void );	// kill the breath loop (death/reset)
+
+	// Underhell gear inputs (give the pistol / rifle silencer / night vision /
+	// gas mask; disable drop). SetNightVision / SetGasMask grant-take the gear
+	// (sub_101E36C0 / sub_101E3750 set m_bHaveNightVision / m_bHaveGasMask).
 	void				InputSetPistolSilencer( inputdata_t &inputdata );
 	void				InputSetRifleSilencer( inputdata_t &inputdata );
+	void				InputSetNightVision( inputdata_t &inputdata );
+	void				InputSetGasMask( inputdata_t &inputdata );
 	void				InputDisableDropWeapon( inputdata_t &inputdata );
 	void				InputEnableDropWeapon( inputdata_t &inputdata );
 
@@ -509,11 +523,17 @@ private:
 	CNetworkVar( bool, m_bLaserToggleState );
 
 	// Underhell gear ownership (original CBasePlayer members m_bHaveNightVision
-	// @2138 / m_bHaveGasMask @2139). Server-side only for now — the night-vision
-	// overlay / gas-mask usage system (m_bNightVisionOn @3369 / m_bGasMaskOn
-	// @3370) is still TODO, so nothing on the client reads these yet.
+	// @2138 / m_bHaveGasMask @2139). "On" state is networked (m_bNightVisionOn
+	// @3369 / m_bGasMaskOn @3370) so the client draws the overlay; the enabled
+	// flags (m_bNightVisionEnabled @2140 / m_bGasMaskEnabled @2141, default on)
+	// are the map-side gear gate.
 	bool				m_bHaveNightVision;
 	bool				m_bHaveGasMask;
+	CNetworkVar( bool, m_bNightVisionOn );	// night vision overlay active
+	CNetworkVar( bool, m_bGasMaskOn );		// gas mask overlay active
+	bool				m_bNightVisionEnabled;	// map allows night vision use
+	bool				m_bGasMaskEnabled;		// map allows gas mask use
+	CSoundPatch			*m_pGasMaskBreathLoop;	// looping breath sound while masked
 
 	// Server-only runtime accumulators (mirror the original binary's members;
 	// not networked, saved for parity).
