@@ -1166,6 +1166,30 @@ Decode: the whole left-arm flashlight hold is driven by the weapon-script
 `weapon_cleaver.txt` all ship `"OneHanded" "1"`). Deploy = `sub_101F0C60`
 (sets viewmodel 1 = `v_flashlight_pg.mdl`, skin 1, `m_bLeftArmDeployed=1`).
 
+### 2b. Flashlight with a two-handed weapon auto-switches to one-handed
+
+The original does **not** deny the flashlight when a two-handed weapon is
+active — it **switches to a one-handed weapon and raises the flashlight**.
+
+Decode: `sub_101F0C60` (flashlight deploy) calls `sub_101E60C0` before toggling
+the holster state. `sub_101E60C0` (with `sub_100CF460` = `this[525]` =
+`m_hActiveWeapon`, `sub_100D0CC0` = `GetWpnData`, `sub_100D0E00` =
+`GetWpnData()+1832` = `m_bMeleeWeapon`):
+
+- active weapon exists and is not melee and `GetWpnData()+80` (`OneHanded`) == 0
+  → scan all 48 weapon slots (`this+524` down to `this+477`, the `m_hMyWeapons`
+  array);
+- switch to the first OneHanded **non-melee** weapon (pistol) via
+  `Weapon_Switch(weapon, 0)` (vtable +964); if none, remember the OneHanded
+  **melee** weapon and switch to it as fallback;
+- if there is no one-handed weapon at all, drop the current weapon (vtable
+  +1236) and holster.
+
+Port (`FlashlightTurnOn` + `UH_FindOneHandedWeapon`): with a two-handed weapon
+active, switch to `UH_FindOneHandedWeapon()` (non-melee preferred, melee
+fallback); only deny when no one-handed weapon exists. The original's
+"drop the weapon" fallback is left out (deny instead) — documented divergence.
+
 ### 3. Grenades never threw (`weapon_frag` never owned)
 
 `UH_ThrowNade` / `UH_LeftArmContextThink` looked up

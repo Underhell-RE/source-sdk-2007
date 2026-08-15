@@ -104,6 +104,39 @@ void CHL2_Player::UH_HolsterLeftArm( void )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Find a weapon the left hand can hold the flashlight with — a
+// "OneHanded" weapon (pistol), preferring a non-melee one and falling back to
+// melee. Decoded from sub_101E60C0 (called by the flashlight deploy
+// sub_101F0C60): with a two-handed weapon active the original scans every
+// weapon slot and switches to a one-handed weapon so the left arm is free to
+// raise v_flashlight_pg.mdl. Returns NULL if the player has no one-handed
+// weapon at all.
+//-----------------------------------------------------------------------------
+CBaseCombatWeapon *CHL2_Player::UH_FindOneHandedWeapon( void )
+{
+	CBaseCombatWeapon *pMeleeFallback = NULL;
+
+	for ( int i = 0; i < MAX_WEAPONS; i++ )
+	{
+		CBaseCombatWeapon *pWeapon = GetWeapon( i );
+		if ( !pWeapon )
+			continue;
+
+		if ( !pWeapon->GetWpnData().m_bOneHanded )
+			continue;
+
+		// Prefer a non-melee one-handed weapon (pistol) like the original,
+		// which switches to the first non-melee OneHanded it finds.
+		if ( !pWeapon->GetWpnData().m_bMeleeWeapon )
+			return pWeapon;
+
+		pMeleeFallback = pWeapon;
+	}
+
+	return pMeleeFallback;
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Put a flare in the left hand (flare-pack "useitem").
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_EquipFlare( void )
