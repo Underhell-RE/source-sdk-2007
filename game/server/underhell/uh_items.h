@@ -305,6 +305,39 @@ UH_DECLARE_PICKUP_ITEM( CItemHeadsetPMC )
 // names unknown (no RTTI entries found for them).
 
 //-----------------------------------------------------------------------------
+// Active FM radio / radio cracker – world prop that plays Radio.Track.*
+// and attracts infected (CSoundEnt). Cracker explodes after time or when
+// destroyed by infected.
+// Reconstructed from sub_101736B0 (precache), sub_10173710/ sub_101737E0
+// (play + soundent 1024 radius), sub_10173790 (Use -> think+5s).
+//----------------------------------------------------------------------------
+class CUHRadio : public CBaseAnimating
+{
+public:
+	DECLARE_CLASS( CUHRadio, CBaseAnimating );
+	DECLARE_DATADESC();
+
+	CUHRadio();
+
+	virtual void Spawn( void );
+	virtual void Precache( void );
+	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+
+	void SetIsCracker( bool bCracker ) { m_bIsCracker = bCracker; }
+	bool IsCracker( void ) const { return m_bIsCracker; }
+	void RadioThink( void );
+	void ExplodeThink( void );
+	void Explode( void );
+
+private:
+	bool m_bIsCracker; // true = radiocracker, false = fmradio
+	bool m_bIsActive;
+	int  m_iTrack; // 1..7
+	int  m_iPlays;
+	float m_flExplodeTime;
+};
+
+//-----------------------------------------------------------------------------
 // item_random — spawns a random item from the fixed pool (original
 // CItemRandom::Spawn, sub_101757D0).
 //

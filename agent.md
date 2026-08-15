@@ -60,7 +60,8 @@
   свет от `v_flashlight_pg.mdl` вместо ванильного `EF_DIMLIGHT`).
 - **Щит** — настоящая механика блока (пока +10 брони заглушкой).
 - **Заражённые NPC** — карабканье, спринт, распространение заражения, гибы.
-- **Free-aim камера** (за плечо / third-person).
+- **Free-aim** (от первого лица: крестик отвязывается от взгляда, вьюмодель
+  кренится за мышью; НЕ путать с OTS — тот third-person).
 - **Hermit cards** — только чит `uh_give_hermit_card`.
 - **Транспорт** — вход NPC в транспорт, трассер AR2 на турели джипа; застревание BFG-джипа колёсами.
 - **Точные тайминги** — pump-задержка дробовика, чтение `sk_plr_num_shotgun_pellets` из конвара.
@@ -84,8 +85,70 @@
 3. **Выброс светящегося глоустика** — должен спавниться светящийся проп,
    а не исчезать.
 4. **Фальшфейер** — бросается и светит (`kRenderGlow` + `EF_BRIGHTLIGHT`).
-5. **Фонарик** — включается только со свободной левой рукой (одноручное/холодное);
-   с двухручным — отказ.
+5. **Фонарик** — с двухручным оружием (автомат/дробовик) НЕ отказ, а авто-переключение
+   на одноручное (пистолет в приоритете, melee fallback) и подъём фонарика в левой руке
+   (`sub_101F0C60` -> `sub_101E60C0`). Портировано в `FlashlightTurnOn` + `UH_FindOneHandedWeapon`.
+   `UH_UpdateLeftArm` использует тот же гейт `!pWeapon || OneHanded || MeleeWeapon`,
+   что и `FlashlightTurnOn` (раньше без оружия свет горел, а вьюмодель не поднималась).
+6. **Радио (useitem)** — починено: ветка FM-radio/radiocracker была мёртвым кодом
+   (вложена в блок фальшфейера после `return true`). Теперь `useitem` спавнит
+   `uh_radio` и активирует его.
+7. **Гранаты** — починено: бросок был завязан на `Weapon_OwnsThisType("weapon_frag")`,
+   которого у игрока никогда нет (граната = патроны). Теперь гейт по
+   `GetAmmoCount("grenade")` + прямой спавн `Fraggrenade_Create` + `RemoveAmmo`.
+
+### Аудит HUD (клиент) — найдено и починено
+
+Сверил 5 HUD-панелей с декомпилом (`sub_100BDF90`/`sub_100BDC80` батарея,
+`sub_100CAC10` стамина, `sub_100C8710` выносливость, `sub_100BE800` кровь,
+`sub_100BCFA0`/`sub_100BD080` карты) + recv-таблицей `sub_10043D70` +
+HudLayout.res/HudAnimations.txt/ClientScheme.res.
+
+- **Батарея: не хватало триггера ПНВ** (логический баг, починено). Оригинал
+  светит шкалу при `m_bFlashlightOn (5286) || m_bNightVisionOn (3449) || count
+  (5292) изменился`. У нас был только фонарик+счёт — ПНВ жрёт батареи, шкала
+  гасла. Добавлен `m_bNightVisionOn`.
+- **Батарея: бар был сплошной, в оригинале чанкованный** (починено). 7 чанков
+  2px/1px, bottom-up, `round(charge/100*7)`.
+- **Текст счёта** `"x%i"` → `"   x%i"` (починено).
+- Стамина/выносливость — проверено, совпадает (пороги 35 / 20/50, FgColor
+  анимации, направления заполнения).
+- Задокументировано (не менял): карты гермита — бинарный show/hide vs наш
+  плавный фейд; пропущен `CHudDotReticle`; позиция текста счёта батареи.
+Полная таблица оффсетов + разбор — в `docs/UNDERHELL.md` (§ «HUD audit»).
+
+### Точка-прицел (CHudDotReticle) + фейд батареи — реализовано
+
+- **Батарея**: фейд приведён к декомпилу — `GetAlpha() - 0.1` за тик (float),
+  а не 1 за тик (раньше шкала гасла за ~4с вместо медленного затухания
+  оригинала). `m_iAlpha` → `m_flAlpha`.
+- **CHudDotReticle** (новый: `hud_dotreticle.{h,cpp}`): точка по центру,
+  загорается при нажатии **+use** и линейно гаснет за **3.0 с**
+  (`alpha = (3.0 - elapsed) * 85`, декомпил `sub_100BC870`); скрыта при
+  прицеливании (ironsight). Триггер — фронт +use в OnThink (расхождение с
+  оригиналом задокументировано: оригинал штампует timestamp на игроке offset
+  3456 через free-aim-ввод; free-aim пока TODO).
+- `SetHiddenBits(4096)` = 1<<12 — кастомный бит Underhell (за пределами
+  ванильного HIDEHUD_BITCOUNT), управляется SetStatusVisibility/SetHudVisibility.
+Полный разбор — в `docs/UNDERHELL.md` (§ «Dot reticle»).
+
+### Аудит VMF (карты) — нереализованные инпуты игрока
+
+Карт в SDK-репо нет — они в декомпиле (`klaxons1/underhell-hexrays` →
+`Underhell/maps/`, 5 шт.). Все 160 classname в картах зарегистрированы в нашей
+DLL (нет «unknown entity» при загрузке). Но карты жмут на `!player` инпуты,
+которых у нас **нет** (подтверждены в `serveror.dll`):
+
+`SetStatusVisibility` (20), `EnableInventory`/`DisableInventory` (6/5),
+`EmptyInventory` (4), `BleedPlayer` (10), `RemoveLitGlowstick` (8),
+`removeheldflare` (3), `SetEndurance` (2), `AddEndurance` (1), `SetBatteries` (2),
+`GiveShoulderFlashlight`/`RemoveShoulderFlashLight` (2/1), `SetHudVisibility` (3),
+`DisplayHermitCards` (1), `DisableBt`/`EnableBt` (1/1 — bullet-time, отдельный TODO).
+
+Плюс: 5 мели-записей пула `item_random` (`weapon_wrench/pipe/axe/hammer/shiv`)
+спавнят NULL — не совпадают с `weapon_melee_*`. Это 1:1 с оригиналом
+(`sub_101757D0`; сам FGD предупреждает «Melee weapons may not work with
+item_randoms»). Полная таблица — в `docs/UNDERHELL.md` (§ «VMF entity audit»).
 
 ### Известные места, где возможны баги
 - **Гранаты не подбираются** — проверить `sk_max_grenade` в консоли (должно быть `4`

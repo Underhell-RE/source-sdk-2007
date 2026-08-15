@@ -57,7 +57,7 @@ private:
 
 	int		m_iBatteryCount;	// cached m_iUHBatteryCount
 	int		m_iContourTexture;
-	int		m_iAlpha;			// fade alpha (original fades the whole gauge)
+	float	m_flAlpha;			// fade alpha (original fades 0.1 per think, sub_100BDF90)
 };
 
 #endif // HUD_UHBATTERY_H

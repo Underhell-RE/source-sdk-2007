@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -43,7 +43,13 @@ enum
 	SOUND_PLAYER_VEHICLE	= 0x00002000,
 	SOUND_READINESS_LOW		= 0x00004000, // Changes listener's readiness (Player Companion only)
 	SOUND_READINESS_MEDIUM	= 0x00008000,
-	SOUND_READINESS_HIGH	= 0x00010000,
+	SOUND_READINESS_HIGH			= 0x00010000,
+
+	// Underhell FM radio / radiocracker attract sound. The original serveror.dll
+	// (sub_101737E0) inserts this exact sound type (0x20000) with volume 1024 /
+	// duration 1.0 so NPCs within ~1024 units hear it. Mapped to COND_HEAR_FMRADIO
+	// in CAI_BaseNPC::OnListened().
+	SOUND_FMRADIO				= 0x00020000,
 
 	// Contexts begin here.
 	SOUND_CONTEXT_FROM_SNIPER		= 0x00100000, // additional context for SOUND_DANGER

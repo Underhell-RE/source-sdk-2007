@@ -47,7 +47,15 @@ private:
 
 	CPanelAnimationVar( int, m_iBarDisabledAlpha, "BarDisabledAlpha", "20" );
 
+	// Icon sprite (scripts/HudLayout.res "HudStamina": iconx 1, icony -6,
+	// iconwide 24, icontall 24 — the gauge outline art drawn behind the bar).
+	CPanelAnimationVarAliasType( float, m_fIconX, "iconx", "1", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_fIconY, "icony", "-6", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_fIconWide, "iconwide", "24", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_fIconTall, "icontall", "24", "proportional_float" );
+
 	float	m_flStamina;
+	int		m_iIconTexture;
 };
 
 #endif // HUD_STAMINA_H

@@ -309,6 +309,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\hud_dotreticle.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\shared\underhell\uh_inventory.cpp"
 					>
 				</File>
@@ -334,6 +338,10 @@
 				</File>
 				<File
 					RelativePath=".\underhell\hud_hermitcards.h"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_dotreticle.h"
 					>
 				</File>
 				<File

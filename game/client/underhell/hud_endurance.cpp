@@ -42,6 +42,8 @@ CHudEndurance::CHudEndurance( const char *pElementName ) : CHudElement( pElement
 	// Hidden with the health cluster, when the player is dead, or when no suit
 	// is equipped (the original bars only exist once the suit is on).
 	SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
+
+	m_iIconTexture = -1;
 }
 
 //-----------------------------------------------------------------------------
@@ -50,6 +52,7 @@ CHudEndurance::CHudEndurance( const char *pElementName ) : CHudElement( pElement
 void CHudEndurance::Init( void )
 {
 	m_flEndurance = ENDURANCE_INIT;
+	m_iIconTexture = -1;
 }
 
 void CHudEndurance::Reset( void )
@@ -111,6 +114,20 @@ void CHudEndurance::OnThink( void )
 //-----------------------------------------------------------------------------
 void CHudEndurance::Paint()
 {
+	// Icon sprite (vertical gauge outline) behind the bar, matching the
+	// original which precaches "sprites/hud/hud_endurance" in its ctor.
+	if ( m_iIconTexture < 0 )
+	{
+		m_iIconTexture = vgui::surface()->CreateNewTextureID();
+		vgui::surface()->DrawSetTextureFile( m_iIconTexture, "sprites/hud/hud_endurance", 1, false );
+	}
+
+	vgui::surface()->DrawSetColor( 255, 255, 255, 255 );
+	vgui::surface()->DrawSetTexture( m_iIconTexture );
+	vgui::surface()->DrawTexturedRect(
+		(int)m_fIconX, (int)m_fIconY,
+		(int)( m_fIconX + m_fIconWide ), (int)( m_fIconY + m_fIconTall ) );
+
 	float flChunkStep = m_flBarChunkHeight + m_flBarChunkGap;
 	int chunkCount = ( flChunkStep > 0.0f ) ? (int)( m_flBarHeight / flChunkStep ) : 0;
 	int enabledChunks = (int)( (float)chunkCount * ( m_flEndurance / 100.0f ) + 0.5f );

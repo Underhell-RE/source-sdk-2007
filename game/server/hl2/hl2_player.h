@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		Player for HL2.
 //
@@ -426,6 +426,7 @@ public:
 	void				UH_EquipFlare( void );		// put a flare in the left hand (flare pack use)
 	void				UH_HolsterLeftArm( void );	// put the left arm away (weapon switch / drop)
 	void				UH_SetLeftArmModel( const char *pszModel, int nSkin, bool bDeployed );
+	CBaseCombatWeapon	*UH_FindOneHandedWeapon( void );	// left-arm-free weapon for the flashlight (sub_101E60C0)
 
 	// Underhell flashlight viewmodel in the left hand. Raised while the
 	// flashlight is on and a one-handed weapon is active.

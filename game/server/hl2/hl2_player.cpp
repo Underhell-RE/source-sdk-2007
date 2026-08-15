@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		Player for HL2.
 //
@@ -2210,14 +2210,23 @@ void CHL2_Player::FlashlightTurnOn( void )
 	// works when the left arm is free â€” no weapon, a one-handed weapon (pistol)
 	// or melee. A shoulder-mounted flashlight (item_shoulderflashlight) works
 	// with any weapon.
+	//
+	// With a two-handed weapon the original does NOT deny: it auto-switches to
+	// a one-handed weapon and raises the flashlight in the left hand
+	// (sub_101F0C60 -> sub_101E60C0). Only when the player has no one-handed
+	// weapon at all does the light refuse (use-deny).
 	if ( !m_bShoulderFlashlight )
 	{
 		CBaseCombatWeapon *pWeapon = GetActiveWeapon();
 		bool bLeftArmFree = !pWeapon || pWeapon->GetWpnData().m_bOneHanded || pWeapon->GetWpnData().m_bMeleeWeapon;
 		if ( !bLeftArmFree )
 		{
-			EmitSound( "HL2Player.UseDeny" );
-			return;
+			CBaseCombatWeapon *pOneHanded = UH_FindOneHandedWeapon();
+			if ( !pOneHanded || !Weapon_Switch( pOneHanded, 0 ) )
+			{
+				EmitSound( "HL2Player.UseDeny" );
+				return;
+			}
 		}
 	}
 

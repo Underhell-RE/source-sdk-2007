@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		The default shared conditions
 //
@@ -111,6 +111,8 @@ enum SCOND_t
 	COND_TALKER_RESPOND_TO_QUESTION,
 	
 	COND_NO_CUSTOM_INTERRUPTS,		// Don't call BuildScheduleTestBits for this schedule. Used for schedules that must strictly control their interruptibility.
+
+	COND_HEAR_FMRADIO,			// Underhell: heard the FM radio / radiocracker (SOUND_FMRADIO).
 
 	// ======================================
 	// IMPORTANT: This must be the last enum

@@ -482,10 +482,14 @@ The mod author (Mxthe) documented his sources in `notes/`:
   by `m_expFactor` over `gMoveTime`. The port parses these into
   `FileWeaponInfo_t::m_expOffset` / `m_expOriOffset` / `m_flAccuracy`.
 - **`Over the Shoulder View - Valve Developer Community.html`** — the VDC
-  **"Over the Shoulder View"** tutorial. Its "OPTIONAL: Adding free aim"
-  section is the "свободная камера" feature: the mouse moves the crosshair on
+  **"Over the Shoulder View"** tutorial. Its MAIN body is a THIRD-PERSON
+  over-the-shoulder camera (the `cam_ots_*` convars: offset, offset_lag,
+  origin_lag, shake_*, translucencyThreshold). Its "OPTIONAL: Adding free aim"
+  section is a SEPARATE FIRST-PERSON feature: the mouse moves the crosshair on
   screen (deadzone + auto-turn past the edge), decoupling the aim point from
-  the view — i.e. the viewmodel no longer tracks the crosshair 1:1.
+  the view, and the weapon VIEWMODEL tilts/rolls toward the crosshair — the
+  "weapon sways toward the mouse when not aiming" behaviour. Do NOT conflate
+  the two: OTS = third person; free-aim = first person.
 
 ### One-handed weapons & the flashlight (user-confirmed + decoded)
 
@@ -660,8 +664,9 @@ Decoded from `sub_101E2F50` (toggle) + `sub_101F11D0` (ClientCommand dispatch)
 
 ### TODO (ironsight / weapons)
 
-- Free-aim (over-the-shoulder) camera still TODO — first-person only, and the
-  original gates it behind the one third-person location.
+- Free-aim (first-person: crosshair decouples from the view, weapon viewmodel
+  tilts toward the mouse) still TODO — see the dedicated section below. It is
+  NOT the same as the third-person over-the-shoulder (OTS) camera.
 - Shotgun multi-pellet fire (skill.cfg `sk_plr_num_shotgun_pellets = 12`):
   the port fires a single shot per trigger pull; the original fires 12 pellets.
 - Exact fire rate for SMG / shotgun / sniper / BFG (recover from each weapon's
@@ -1110,3 +1115,550 @@ The client already draws `shader/nightvision` / `shader/gasmask` full-screen
 shader from the game-shader DLL isn't being applied — i.e. the DLL isn't
 loading in the install (check `Underhell/bin/game_shader_generic_eshader_2007.dll`
 exists and gameinfo.txt points at the mod), not a client.dll/server.dll bug.
+
+## Radio / flashlight / grenade throw fixes (second-hand system)
+
+Three bugs fixed in the second-hand (left arm, viewmodel index 1) + inventory
+paths, each cross-checked against the decompile (`klaxons1/underhell-hexrays`,
+`Underhell/bin/server/sub_*.cpp`).
+
+### 1. FM radio / radio cracker "useitem" never threw (dead code)
+
+`UH_ItemAction` (server `uh_player_inventory.cpp`) had the FM-radio / radio-
+cracker branch **nested inside** the flare-pack branch, after its `return true;`:
+
+```cpp
+if ( bUse && iItem == UH_ITEM_FLARE_PACK )
+{
+    ...
+    return true;
+
+    // unreachable: this `if` was inside the flare block, after `return true`
+    if ( bUse && ( iItem == UH_ITEM_FM_RADIO || ... ) )
+    {
+        ...
+    }
+}
+```
+
+The radio `if` was dead code — MSVC compiles it (C4702 unreachable-code
+warning) but it never runs, so "useitem" on a radio did nothing. "dropitem"
+worked because it goes through the separate `if (!bUse)` drop path (no radio
+attract logic — expected).
+
+Fix: close the flare-pack block after `return true;` so the radio branch is a
+sibling. The radio branch spawns `uh_radio` (class `CUHRadio`), sets
+`SetIsCracker()` per id, `Spawn()`, then `Use(USE_ON)` to activate (think +5 s,
+then `CSoundEnt::InsertSound( SOUND_FMRADIO, … 1024, 1.0 )` every second).
+
+Decode: `UH_ItemAction` = vtable [411] = `sub_102E05F0`; radio activation =
+`sub_10173790` (Use -> think +5 s) / `sub_101737E0` (SOUND_FMRADIO insert).
+
+### 2. Second hand didn't raise the flashlight (no-weapon case)
+
+`UH_UpdateLeftArm` gated the hand-held flashlight viewmodel on
+`bOneHanded = pWeapon && (OneHanded || MeleeWeapon)` — **false when the player
+has no active weapon**. `FlashlightTurnOn` already allows the light with
+`!pWeapon || OneHanded || MeleeWeapon`, so with no weapon the flashlight turned
+ON (EF_DIMLIGHT) but the left hand never showed `v_flashlight_pg.mdl`.
+
+Fix: `UH_UpdateLeftArm` now uses the same `bLeftArmFree = !pWeapon || OneHanded
+|| MeleeWeapon` gate, keeping the two functions in sync.
+
+Decode: the whole left-arm flashlight hold is driven by the weapon-script
+`OneHanded` flag at weapon-info offset 80 (pistols: `weapon_pistol_glock.txt` /
+`weapon_pistol_beretta.txt`; melee: `weapon_melee_axe/baton/pipe/wrench.txt` +
+`weapon_cleaver.txt` all ship `"OneHanded" "1"`). Deploy = `sub_101F0C60`
+(sets viewmodel 1 = `v_flashlight_pg.mdl`, skin 1, `m_bLeftArmDeployed=1`).
+
+### 2b. Flashlight with a two-handed weapon auto-switches to one-handed
+
+The original does **not** deny the flashlight when a two-handed weapon is
+active — it **switches to a one-handed weapon and raises the flashlight**.
+
+Decode: `sub_101F0C60` (flashlight deploy) calls `sub_101E60C0` before toggling
+the holster state. `sub_101E60C0` (with `sub_100CF460` = `this[525]` =
+`m_hActiveWeapon`, `sub_100D0CC0` = `GetWpnData`, `sub_100D0E00` =
+`GetWpnData()+1832` = `m_bMeleeWeapon`):
+
+- active weapon exists and is not melee and `GetWpnData()+80` (`OneHanded`) == 0
+  → scan all 48 weapon slots (`this+524` down to `this+477`, the `m_hMyWeapons`
+  array);
+- switch to the first OneHanded **non-melee** weapon (pistol) via
+  `Weapon_Switch(weapon, 0)` (vtable +964); if none, remember the OneHanded
+  **melee** weapon and switch to it as fallback;
+- if there is no one-handed weapon at all, drop the current weapon (vtable
+  +1236) and holster.
+
+Port (`FlashlightTurnOn` + `UH_FindOneHandedWeapon`): with a two-handed weapon
+active, switch to `UH_FindOneHandedWeapon()` (non-melee preferred, melee
+fallback); only deny when no one-handed weapon exists. The original's
+"drop the weapon" fallback is left out (deny instead) — documented divergence.
+
+### 3. Grenades never threw (`weapon_frag` never owned)
+
+`UH_ThrowNade` / `UH_LeftArmContextThink` looked up
+`Weapon_OwnsThisType("weapon_frag")` and called `WeaponFrag_ThrowNow()`. But in
+Underhell a grenade is **ammo, not a weapon**: `CHL2_Player::BumpWeapon`
+converts a picked-up `weapon_frag` into `"grenade"` ammo (max 4) and removes the
+entity. The player therefore never owns `weapon_frag`, the lookup returned
+NULL, and every `Throw_Nade` returned early.
+
+Fix (decode `sub_101ED130`): the original gates the throw on the grenade ammo
+count — `sub_100CF610(a1, "grenade") > 0`, where `sub_100CF610` is
+`GetAmmoCount(name)` (`this[v5 + 445]` = the player's ammo array). The port now:
+
+- `UH_ThrowNade`: `GetAmmoDef()->Index("grenade")` + `GetAmmoCount() <= 0` gate,
+  then stages the throw (grenade viewmodel in left hand, `m_bFlareMarker=1`,
+  `ACT_VM_THROW`, think +0.4 s — unchanged).
+- `UH_LeftArmContextThink`: spawns the frag directly via
+  `Fraggrenade_Create(… , vForward*1200, 3.0 s fuse, owner=player)` and
+  `RemoveAmmo(1, grenade)` — the vanilla `CWeaponFrag::ThrowGrenade` +
+  `DecrementAmmo` path, run against the player's grenade ammo instead of a
+  weapon_frag instance.
+
+`WeaponFrag_ThrowNow` / `CWeaponFrag::ThrowNow` are now unused (left in place,
+harmless) — the throw no longer needs a weapon_frag entity.
+
+## VMF entity audit (maps vs. SDK implementation)
+
+Audited the 5 compiled maps in `klaxons1/underhell-hexrays` → `Underhell/maps/`
+(`Uh_House_1_d.vmf`, `uh_prologue_1_d.vmf`, `uh_prologue_2_d.vmf`,
+`uh_chapter1_11_d.vmf`, `Uh_Chapter1_16_d.vmf`) — the SDK repo itself ships no
+`.vmf`. Cross-checked every `"classname"` against our server DLL registrations.
+
+### A. No missing entity classes
+
+160 unique classnames appear across the maps. All are registered (vanilla HL2
++ Underhell custom). No map would fail with "unknown entity" at load.
+
+Underhell-custom entities actually used by the maps, with status:
+
+| Entity | Count | Status |
+|---|---|---|
+| `item_random` | 175 | implemented (pool; see §C) |
+| `prop_dynamic_override` | 191 | implemented (+use / OnPlayerUse) |
+| `prop_physics_override` | 171 | vanilla (props.cpp) |
+| `env_message` | 17 | extended, implemented |
+| `env_hudhint` | 9 | implemented |
+| `env_global` | 6 | implemented |
+| `item_flashlight` / `item_battery_pack` / `item_uhsoda` | 4 | implemented |
+| `npc_infected` | 1 (point_template + npc_template_maker) | implemented — partial (climb/sprint/infection/gibs TODO) |
+| `weapon_pistol_python` / `weapon_rpg` | 2 | implemented |
+| `item_healthkit` / `item_healthvial` | 9 | vanilla modified (stash to inventory) |
+
+`npc_infected` spawns via `npc_template_maker` (`TemplateName
+Infected_Mainframe`), and the template sets body-variant keyvalues `Worker/
+Uniform/Rural/Inmate` (capitalised in the VMF vs. lowercase `worker/uniform/
+rural/inmate` in the FGD + our datamap — case-insensitive, so non-issue, but
+worth an in-game glance at the spawned variants).
+
+### B. `additionalequipment` on NPCs (Uh_Chapter1_16_d)
+
+`npc_combine_s` / `npc_citizen` carry `additionalequipment` lists
+(`weapon_smg_mp5, weapon_smg_mp5_eod, weapon_smg_mp7, weapon_rifle_g36k,
+weapon_shotgun_m3/m5/spas12/xm1014`) — all 8 classnames are registered in our
+SDK, so NPC weapon give works.
+
+### C. `item_random` melee pool — 5 entries spawn nothing (faithful to original)
+
+Our `s_ItemRandomPool` (and the original `sub_101757D0`) reference these
+classnames for pool entries 46–50, which do NOT match the registered melee
+classnames (`weapon_melee_wrench/pipe/axe`), or don't exist at all:
+
+| Pool id | Spawned classname | Reality |
+|---|---|---|
+| 46 | `weapon_wrench` | registered as `weapon_melee_wrench` → NULL |
+| 47 | `weapon_pipe` | registered as `weapon_melee_pipe` → NULL |
+| 48 | `weapon_axe` | registered as `weapon_melee_axe` → NULL |
+| 49 | `weapon_hammer` | not registered (no CWeaponHammer) |
+| 50 | `weapon_shiv` | not registered (no CWeaponShiv) |
+
+Confirmed in the decompile: `weapon_wrench`/`weapon_hammer`/`weapon_shiv`
+appear ONLY in `sub_101757D0` (item_random Spawn), while `weapon_melee_*`
+appear in the Precache registry `sub_101753E0` + the LINK_ENTITY_TO_CLASS
+functions. The FGD itself warns: "Melee weapons may not work with item_randoms".
+So these 5 entries silently spawn nothing in both the original and our port —
+a 1:1 reproduction of an original quirk, not a regression.
+
+### D. NOT-implemented player inputs fired by the maps (real gaps)
+
+The maps fire these inputs at `!player`; our `CHL2_Player` datamap does not
+register them. Every name below is confirmed present in the original
+`serveror.dll` (binary string table), so they are real Underhell inputs, not
+VMF typos. Usage counts across all 5 maps:
+
+| Input | Uses | What it does (string-level) |
+|---|---|---|
+| `SetStatusVisibility` | 20 | show/hide the HUD status panels |
+| `EnableInventory` / `DisableInventory` | 6 / 5 | toggle the inventory system |
+| `EmptyInventory` | 4 | clear all inventory slots |
+| `BleedPlayer` (fired `Bleedplayer`/`bleedplayer`) | 10 | force the bleed state |
+| `RemoveLitGlowstick` (also `Removelitglowstick`) | 8 | remove the lit glowstick strapped to the player |
+| `removeheldflare` | 3 | drop/remove the held flare (left hand) |
+| `SetEndurance` | 2 | set the hunger/endurance meter |
+| `AddEndurance` | 1 | add endurance |
+| `SetBatteries` | 2 | set the flashlight battery count |
+| `GiveShoulderFlashlight` / `RemoveShoulderFlashLight` | 2 / 1 | grant/remove the shoulder flashlight |
+| `SetHudVisibility` | 3 | HUD visibility (related to SetStatusVisibility) |
+| `DisplayHermitCards` | 1 | show the hermit-card deck HUD |
+| `DisableBt` / `EnableBt` | 1 / 1 | bullet-time off/on (bt_* TODO) |
+
+`SetStatusVisibility` / `SetHudVisibility` live in the CBasePlayer datamap
+builder `sub_101F2D30`. The rest are datamap inputs whose semantics need the
+same datamap + handler decode before porting (all still TODO).
+
+### Conclusion
+
+- **No missing entity classes** — nothing breaks at map load.
+- The only "not implemented" entity behaviour with visible in-game impact is
+  **§C** (5 `item_random` melee pool entries never roll a weapon) — which
+  matches the original exactly.
+- The substantive gaps are the **§D player inputs** — inventory/environment
+  control the maps rely on (`EmptyInventory`, `DisableInventory`,
+  `SetBatteries`, `BleedPlayer`, `SetStatusVisibility`, …), still TODO and the
+  next sensible porting target.
+
+## HUD audit (client panels vs. decompiled CHud* + HudLayout.res)
+
+Cross-checked our 5 Underhell HUD panels against the decompiled client
+(`Underhell/bin/client/sub_100BDF90` battery think / `sub_100BDC80` battery
+paint / `sub_100CAC10` stamina / `sub_100C8710` endurance / `sub_100BE800`
+bleeding / `sub_100BCFA0` + `sub_100BD080` hermit cards), the client recv table
+`sub_10043D70`, and `scripts/HudLayout.res` + `scripts/HudAnimations.txt` +
+`resource/ClientScheme.res`.
+
+### Client field offsets (recv table `sub_10043D70`, confirmed)
+
+| field | client offset |
+|---|---|
+| m_iEndurance | 3432 |
+| m_iBleedCounter | 3436 |
+| m_bNightVisionOn | **3449** |
+| m_bGasMaskOn | 3450 |
+| m_bLeftArmDeployed | 3451 |
+| m_bHoldingFlare | 3452 |
+| m_flSuitPower (in m_HL2Local) | 5168 |
+| m_bFlashlightOn | 5286 |
+| m_bDisplayHermitCard | 5287 |
+| m_iUHBatteryCount | 5292 |
+| m_iUHHermitCardsCount | 5296 |
+| m_iUHHermitCurrentQuestCount | 5300 |
+| m_iUHHermitTotalQuestCount | 5304 |
+| battery charge float (inside m_HL2Local @+48) | 5212 |
+
+### 1. Battery HUD — missing night-vision trigger (LOGIC BUG, fixed)
+
+`sub_100BDF90` lights the gauge when:
+`m_bFlashlightOn (5286) || m_bNightVisionOn (3449) || count changed (5292)`.
+
+The first port only checked `m_bFlashlightOn || count changed`. Night vision
+drains flashlight batteries (auto-off at empty, sub_102E3DE0), so the gauge
+must stay lit while NV is active — the original does this, ours didn't.
+
+Fixed: `CHudUHBattery::OnThink` now also checks `pPlayer->m_bNightVisionOn`.
+
+### 2. Battery bar was continuous, original is chunked (fixed)
+
+`sub_100BDC80` draws the charge bar as **discrete chunks**:
+`chunkCount = BarHeight / (BarChunkHeight + BarChunkGap)` (= 23 / 3 = 7),
+`enabledChunks = round(charge/100 * chunkCount)`, filled chunks at the bottom,
+exhausted above (bottom-up). The port drew one continuous filled rect.
+
+Fixed: `CHudUHBattery::Paint` now draws the chunked bar (7 × 2 px chunks,
+1 px gap, bottom-up), matching the decompile.
+
+### 3. Battery count text format (fixed)
+
+Original formats `"   x%i"` (3 leading spaces) with the HudNumbers font. The
+port printed `"x%i"`. Fixed to `"   x%i"`.
+
+Position: the original draws it at `DrawSetTextPos(0,0)` (panel-local top-left,
+overlapping the contour). The port draws at (BarInsetX+BarWidth+2, BarInsetY-8).
+Left as-is (the original's (0,0) placement looks like an oddity; the port's
+position is a sane interpretation). TODO if exact pixel parity is wanted.
+
+### 4. Hermit cards — fade model differs (documented, not changed)
+
+Original (`sub_100BCFA0` / `sub_100BD080`) is a **binary show/hide**: a show
+flag + `SetAlpha(255)` while "changed within the last 3 s", hidden (alpha 0)
+once stable 3 s. The port fades the panel gradually (`m_iAlpha -= 1` per think)
+after the 3 s window. Functionally equivalent (appears on change, gone after a
+few seconds); the port's crossfade is a minor visual divergence. Not a bug.
+
+### 5. Missing CHudDotReticle (TODO)
+
+The original client RTTI has `CHudDotReticle` (HudLayout.res `HudDotReticle`,
+dotx/doty 8, xpos `c-8` ypos `c-8` — a centered dot reticle). The port does not
+implement it. Out of scope for the inventory HUD work; note for later.
+
+### 6. Doc/code mismatch (stale docs)
+
+`docs/UNDERHELL.md` (battery stage 16) claims "our port fills one chunk per
+battery (count-capped)". The code actually fills from `m_flUHBatteryCharge`
+(the continuous 0..100 charge), which is what the original does too (offset
+5212). The docs were stale; the code was correct. (Now also chunked — see §2.)
+
+### Stamina / endurance — verified correct (no change)
+
+- `sub_100CAC10` (stamina): reads m_flSuitPower (5168); `>= 35` → "StaminaNormal",
+  `< 35 && > 0` → "StaminaLow", `<= 0` → no sequence. Port matches.
+- `sub_100C8710` (endurance): reads m_iEndurance (3432); `>= 50` → High,
+  `>= 20` → Medium, `> 0` → Low, `<= 0` → none. Port matches.
+- Both fire the animation sequence every think (no early-out), value cached at
+  `this[79]`. Port matches.
+- Colour: both bars draw with the panel `FgColor`, animated by
+  HudAnimations.txt (FgColor "0 128 255" blue ↔ "230 230 50" yellow ↔
+  "DamagedFg" "180 0 0" red). Port uses `GetFgColor()` — correct.
+- Fill direction: stamina horizontal left→right (BarChunkWidth 1, gap 0 → 210
+  chunks); endurance vertical bottom-up (BarChunkHeight 1, gap 0 → 84 chunks).
+  Port matches the vanilla CHudSuitPower chunk pattern.
+
+The only remaining stamina/endurance nit: the exhausted-portion alpha uses a
+`BarDisabledAlpha` default of 20 (the original modded panel used a
+"HullDisabledAlpha"; vanilla suit power uses 70). Cosmetic only.
+
+## Dot reticle (CHudDotReticle) + battery fade — implemented
+
+### Battery fade — matched to decompile
+
+`CHudUHBattery::OnThink` faded the gauge at 1 unit per think (int); the
+original `sub_100BDF90` fades `GetAlpha() - 0.1` per think (float). Changed
+`m_iAlpha` (int) → `m_flAlpha` (float) and the fade to `- 0.1f`, so the gauge
+lingers the same way as the original instead of snapping away in ~4 s.
+
+### CHudDotReticle — the "+use" dot
+
+New client element `game/client/underhell/hud_dotreticle.{h,cpp}`, panel
+"`HudDotReticle`". Decoded from the original:
+
+- **Constructor** `sub_100BCC90`: registers the panel, 4 animation vars
+  (`dotx`/`doty`/`dottall`/`dotwide`), `SetAlpha(128)`, `SetHiddenBits(4096)`.
+- **Paint** `sub_100BC870`: draws the dot with
+  `alpha = (3.0 - (curtime - flTriggerTime)) * 85` — full (255) at the trigger,
+  linear fade to 0 over **3.0 s**; skipped while iron-sighted
+  (`m_bIronSighted` @4140).
+- **Trigger timestamp** is a client-local float at player offset **3456**,
+  stamped by the free-aim input path (`update_freeaim %f %f %f` engine cmd in
+  the same paint). The free-aim camera is still TODO.
+
+HudLayout.res `HudDotReticle [$WIN32]`: `xpos c-8 ypos c-8 wide 16 tall 16`
+(centred 16x16), `dotx 8 doty 8`, `PaintBackgroundType 2`, visible/enabled.
+
+Port behaviour (self-contained, documented divergence): the +use press edge is
+detected in `OnThink` (`m_nButtons & IN_USE`, latched) and stamps a panel-local
+`m_flTriggerTime`; `Paint` draws a small centred dot (4x4 by default) fading
+over 3.0 s and hidden while iron-sighted. The original's free-aim dependency
+(`update_freeaim`, player-offset-3456 timestamp) is intentionally not ported —
+the free-aim camera is a separate tracked TODO.
+
+- `SetHiddenBits(1<<12)` = 4096: an Underhell custom hide bit beyond the
+  vanilla `HIDEHUD_BITCOUNT` (12). Toggled by the mod's `SetStatusVisibility` /
+  `SetHudVisibility` player inputs (also TODO — see VMF audit §D).
+- The `hud_reticle_scale/minalpha/maxalpha/alpha_speed` ConVars
+  (`sub_102B6B30/60/90/BC0`, defaults 1.0/125/255/700) belong to a *different*
+  reticle (the zoom/crossbow reticle, `ZoomReticleColor`); the dot reticle's
+  fade is hard-coded (85.0, 3.0 s) and does not use them.
+- `dotwide`/`dottall` default to "1" in the original (the `.res` only sets
+  `dotx`/`doty`; the paint's exact rect size is ambiguous in the decompile).
+  The port defaults them to 4 for a visible dot — tune via the `.res` if needed.
+
+## Reticle + battery/stamina/endurance fixes (decompile-verified, round 2)
+
+### Dot reticle — it is a caret, not a square
+
+The first reticle port drew a filled 4x4 square (the "semi-transparent square"
+seen in game). Decoding `sub_100BC870` carefully, the original draws **two
+filled rects**:
+
+- `DrawSetColor(255,255,255,alpha)` then a **2x8** rect, then
+  `DrawSetColor(0,0,0,alpha)` then a **3x8** rect at the same origin — i.e. a
+  small crosshair caret (white 2x8 with a black 1px outline), not a square.
+
+The fade is `alpha = (3.0 - (curtime - trigger)) * 85` (full at trigger, 0 at
+3.0 s). Fixed to match: black 3x8 tick + white 2x8 tick at dotx/doty (8,8).
+
+Reference cross-check: `eXeC64/NightmareHouse` (`src/game/client/hud_crosshair.cpp`)
+implements the same "+use reticle" family — alpha ramping with
+`hud_reticle_alpha_speed` (700/s), lit on `IN_USE` + a linger window. Underhell
+keeps the same ConVars (`sub_102B6B30/60/90/BC0`: scale/minalpha/maxalpha/
+alpha_speed) but its `CHudDotReticle` fade is the hard-coded 3.0 s / 85.0 ramp,
+not the convar-driven one — the convars belong to the zoom/crosshair reticle
+(`ZoomReticleColor`).
+
+### Battery — contour drawn ON TOP of the bar
+
+`sub_100BDC80` order: (1) chunked bar (filled HullColor + exhausted at
+HullDisabledAlpha, bottom-up), (2) `hud_battery_contour` textured rect ON TOP,
+(3) "   x<N>" count text. The first port drew the contour FIRST then the bar,
+so the bar could overdraw the frame. Reordered to bar → contour → text.
+
+### Stamina / endurance — missing icon sprites (added)
+
+The ctors precache icon textures the first port never drew:
+`sub_100CB4C0` (stamina) loads `sprites/hud/hud_stamina`; `sub_100C8F40`
+(endurance) loads `sprites/hud/hud_endurance`. Both are the gauge outline art
+drawn behind the chunked bar. Added:
+
+- `CHudStamina`: `hud_stamina` at iconx 1 / icony -6 / iconwide 24 / icontall 24.
+- `CHudEndurance`: `hud_endurance` at iconx 2 / icony 116 / iconwide 16 /
+  icontall 134 (per HudLayout.res — the endurance icon is a tall vertical
+  outline; exact placement needs an in-game glance since icontall 134 > panel
+  height, the mod ships it that way).
+
+### Sprite inventory (materials/Sprites/Hud/)
+
+`hud_battery_contour`, `hud_battery_meter`, `hud_blooddrop`, `hud_endurance`,
+`hud_flashlight`, `hud_hermitcards`, `hud_shoulderflashlight`, `hud_stamina`.
+Note `hud_battery_meter` + `hud_flashlight` + `hud_shoulderflashlight` are not
+referenced by the HUD ctors in the decompile (the battery bar is drawn as
+chunks, not the meter texture) — `hud_flashlight` / `hud_shoulderflashlight`
+belong to the (TODO) shoulder-flashlight viewmodel HUD.
+## Diaphora reference (new asset in the hexrays repo) — how to use it
+
+`klaxons1/underhell-hexrays` now ships a Diaphora export + a full re-decompile:
+`Underhell/bin/diaphora/cliento.diaphora` (SQLite) and
+`Cliento_diaphora.dll.c` (24 MB, Hex-Rays 9.1).
+
+### What it is
+
+- `cliento.diaphora`: Diaphora match of `Cliento.dll` (Underhell) vs
+  `original/Client.dll` (vanilla OB). **11405 matched / 12685 unmatched**.
+  Match types: best 10199 / multimatch 1199 / partial 7.
+- `Cliento_diaphora.dll.c`: the full Hex-Rays 9.1 decompile of Cliento.dll with
+  Diaphora names + RTTI class names applied (e.g. `CHudDotReticle::`vftable'`).
+
+### Value (real)
+
+1. **Better decompile reference** — Hex-Rays 9.1, single grep-able file,
+   struct-typed in places. Prefer it over the old per-function `sub_*.cpp`.
+2. **RTTI class attribution is correct** — the vtable owners
+   (`CHudDotReticle`, `CHudUHBattery`, `CHudEndurance`, `CHudStamina`,
+   `CHudBleeding`, `CHudUHHermitCards`) match the vtable analysis in § RTTI
+   validation. Confirms the class mapping.
+3. **`unmatched` = the Underhell delta** — a clean to-do map of the 12685
+   functions that are mod-specific (HUD, inventory, weapons, gear).
+
+### Caveat (critical): false positives in the modified regions
+
+Diaphora matches by AST/pseudocode similarity, and Underhell REPLACED vanilla
+code in the HUD/inventory/weapon regions. There, custom functions get spurious
+matches to nearby unrelated vanilla functions — with ratio 1.0. Concrete cases:
+
+| Underhell function | what it really is | Diaphora named it |
+|---|---|---|
+| `sub_100BDC80` | battery HUD paint (reads m_iUHBatteryCount@5292, draws chunked bar + "x<N>") | `CAsyncCaptionResourceManager::~CAsyncCaptionResourceManager` |
+| `sub_100BE800` | bleeding HUD paint (m_iBleedCounter@3436 * 2.55) | `CHudCloseCaption::CHudCloseCaption` |
+| `sub_100BCFA0` | hermit-cards think | `CUtlVector<CaptionLookup_t>::CopyArray` |
+| `sub_100BD080` | hermit-cards paint | `CUtlVector<AsyncCaption_t>::RemoveAll` |
+
+All "best"/"multimatch", ratio 1.0, all wrong. The tell: genuine matches carry
+the region's consistent address shift (~0x13xxx); these false matches have
+anomalous small deltas (-0x530 … -0x30).
+
+**Rule**: never trust a Diaphora name in the HUD/inventory/weapon regions
+without reading the code. Use it as a MAP (unmatched = delta, matched = vanilla
+framework), not ground truth.
+
+### Reticle re-confirmed (caret, not square)
+
+The 9.1 decompile of the dot-reticle paint (`sub_100BC870`) confirms the first
+fix: it draws `DrawSetColor(white, alpha)` + `DrawFilledRect(dotx, doty, 2, 8)`,
+then `DrawSetColor(black, alpha)` + `DrawFilledRect(dotx, doty, 3, 8)` — a tiny
+2-3 px × 8 px tick, NOT a filled square. `alpha = (3.0 - (curtime - trigger)) * 85`.
+The exact screen origin is ambiguous from the decompile (the rect coords read
+degenerate); verify pixel position in game.
+
+## Battery HUD — field map re-verified against Diaphora 9.1 decompile
+
+Used `Cliento_diaphora.dll.c` (Hex-Rays 9.1) to nail the CHudUHBattery member
+offsets via the paint (`sub_100BDC80`) + ctor anim-var registrations
+(`sub_100BE0A0..100BE520`). Confirms the port's bar logic is correct:
+
+| member | offset | value (HudLayout.res) | role |
+|---|---|---|---|
+| charge (float, cached) | +220 | player m_flUHBatteryCharge | 0..100 |
+| HullDisabledAlpha | +232 | "0" | exhausted-chunk alpha |
+| HullColor | +237..240 | "2 127 252 192" | filled-chunk color |
+| BarInsetX | +252 | 6 | chunk x0 |
+| BarInsetY | +260 | 31 | chunk y0 (bar bottom anchor) |
+| BarWidth | +268 | 14 | chunk x1 offset |
+| BarHeight | +276 | 23 | chunkCount = BarHeight/(ChunkHeight+Gap) = 7 |
+| BarChunkHeight | +284 | 2 | chunk y1 offset |
+| BarChunkGap | +292 | 1 | y step = 2+1 = 3 |
+| contourx/contoury | +300/+308 | 1/0 | contour rect x0/y0 |
+| contourtall/contourwide | +316/+324 | 42/24 | contour rect y1/x1 |
+
+Verified correct in the port:
+- fill is bottom-up: `y = BarInsetY` (31), `y -= step` (3) per chunk, 7 chunks.
+- filled color = HullColor (alpha 192); exhausted = HullColor.rgb +
+  HullDisabledAlpha (0 → exhausted invisible, bar shrinks).
+- draw order bar → contour (`hud_battery_contour`) → "   x%i" text.
+- think: `m_bFlashlightOn(5286) || m_bNightVisionOn(3449) || count(5292) changed`
+  → alpha 255; else `alpha -= 0.1`.
+
+Two quirks found and matched:
+- count text is drawn at `DrawSetTextPos(0,0)` (panel top-left), the 3 leading
+  spaces in "   x%i" push the digits right — port now matches (was a guessed
+  22,23).
+- the contour rect is drawn as `DrawTexturedRect(contourx, contoury,
+  contourwide, contourtall)` — contourwide/tall used as ABSOLUTE x1/y1, not
+  added to x0/y0. The port adds them (1 px difference, imperceptible); left
+  as-is.
+
+## Diaphora filter script (devtools/bin/diaphora_filter.py)
+
+Splits a `.diaphora` SQLite export into three tiers by address-delta:
+
+- `reliable` — "best" matches with delta >= 0x10000 (the image shift; same
+  function moved by the mod's inserted code). Trust these names.
+- `verify` — multimatch/partial, or best with small/zero/negative delta. These
+  are the false positives (e.g. battery paint -> caption dtor) + ambiguous.
+  Read the code.
+- `mod_delta` — the `unmatched` table: functions with no vanilla match (the
+  mod's additions + any vanilla functions Diaphora failed to match).
+
+Run: `python3 devtools/bin/diaphora_filter.py cliento.diaphora [--min-delta
+0x10000] [--out DIR]`. On the client export it produced 6482 reliable / 4923
+verify / 12685 mod_delta, and correctly routed all four known false positives
+(sub_100BDC80/100BE800/100BCFA0/100BD080) into `verify`.
+
+Note: the delta signal is not absolute — `best` + large positive delta is a
+STRONG trust signal, but `verify` still contains some genuine matches (and
+`unmatched` contains vanilla functions Diaphora simply couldn't match, e.g.
+CAchievementNotificationPanel). Use the tiers as a triage map, not ground truth.
+
+## Free-aim (weapon tilts toward the mouse) — NOT a standalone feature
+
+The "weapon sways/tilts toward the mouse when not aiming" is a SIDE EFFECT of
+the third-person OTS (over-the-shoulder) camera + aim-angle separation, NOT a
+standalone first-person feature. A first port attempt (based on the VDC
+"Over the Shoulder View" tutorial's OPTIONAL free-aim section, shipped in the
+mod's `notes/`) was reverted after it felt wrong in game. Decode corrections:
+
+### What the binary actually does (not the tutorial)
+
+- `cam_ots_freeaim_enable` is read in EXACTLY ONE place: `sub_10014D80`
+  (`CBaseViewModel::CalcViewModelView`), where it gates the viewmodel tilt.
+- The OTHER 6 `cam_ots_freeaim_*` ConVars (`interval_enable`, `move_threshold`,
+  `move_max`, `speed_turn`, `speed_evenYawSpeed`, `autoturn_speed`) are
+  **registered but never read** — the tutorial's deadzone/auto-turn cursor
+  logic does NOT exist in the binary.
+- `CInput` has no `TryCursorMove` / `CAM_IsFreeAiming` / `CAM_GetFreeAimCursor`
+  (confirmed from the decompile's named `CInput::*` methods).
+- The viewmodel tilt reads a Vector2D "cursor" via IInput vtable slot 12, which
+  is populated by the OTS angle-separation logic (`CalcPlayerAngle`-style
+  view-vs-aim split, `m_angViewAngle`) in `CInput::MouseMove` — entangled with
+  the third-person camera, not a first-person mouse-cursor.
+- `update_freeaim %f %f %f` is a server ConCommand; the client dot-reticle paint
+  `sub_100BC870` computes the free-aim world target via `ScreenToWorld`
+  (`sub_10070AD0`) and sends it each frame.
+
+### Conclusion / TODO
+
+The "weapon tilt" is entangled with the OTS third-person camera system
+(angle separation, `m_angViewAngle`, `AllowOvertheShoulderView`, server aim
+sync via `update_freeaim`). A faithful port requires the whole OTS system, not
+a small viewmodel offset. Treat as TODO alongside the OTS third-person camera;
+do not port the tutorial's first-person free-aim in isolation — the binary
+doesn't implement it that way.
