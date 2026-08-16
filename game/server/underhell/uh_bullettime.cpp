@@ -46,23 +46,31 @@ static const char *UH_BulletModel( int ammoType )
 void UH_BulletTimeSpawnTracer( CBaseCombatCharacter *pShooter, const Vector &start, const Vector &direction, int ammoType, bool bEnemyBullet )
 {
 	if ( !UH_BulletTimeActive() || !pShooter ) return;
-	CUHBullet *pBullet = static_cast< CUHBullet * >( CreateEntityByName( "uh_bullet" ) );
+	// Use prop_physics for the visible bullet: unlike the old custom
+	// CBaseAnimating entity it has a stock server/client network class and a
+	// replicated VPhysics object, matching the original CBullet's visible
+	// physics/entity behavior.
+	CBaseEntity *pBullet = CreateEntityByName( "prop_physics" );
 	if ( !pBullet ) return;
 	const char *pModel = UH_BulletModel( ammoType );
 	CBaseEntity::PrecacheModel( pModel );
+	Vector dir = direction;
+	VectorNormalize( dir );
+	QAngle bulletAngles;
+	VectorAngles( dir, bulletAngles );
 	pBullet->SetModel( pModel );
 	pBullet->SetAbsOrigin( start );
-	pBullet->m_vecDirection = direction; VectorNormalize( pBullet->m_vecDirection );
-	QAngle bulletAngles;
-	VectorAngles( pBullet->m_vecDirection, bulletAngles );
 	pBullet->SetAbsAngles( bulletAngles );
-	pBullet->m_flSpeed = bEnemyBullet ? bt_enemybulletspeed.GetFloat() : bt_playerbulletspeed.GetFloat();
-	// sub_101078D0 has no artificial four-second expiry. Keep the visual
-	// bullet alive for its full trace distance, recomputing travel speed every
-	// 0.05 s as the BT state changes.
-	pBullet->m_flRemainingDistance = MAX_TRACE_LENGTH;
 	pBullet->SetOwnerEntity( pShooter );
 	DispatchSpawn( pBullet );
+	IPhysicsObject *pPhysics = pBullet->VPhysicsGetObject();
+	if ( pPhysics )
+	{
+		float speed = ( bEnemyBullet ? bt_enemybulletspeed.GetFloat() : bt_playerbulletspeed.GetFloat() ) * bt_timescale.GetFloat();
+		Vector velocity = dir * speed;
+		pPhysics->SetVelocity( &velocity, NULL );
+	}
+	pBullet->SetContextThink( &CBaseEntity::SUB_Remove, gpGlobals->curtime + 120.0f, "BulletTimeLifetime" );
 }
 
 static void UH_BulletTimeChanged( IConVar *pVar, const char *pOldValue, float flOldValue )

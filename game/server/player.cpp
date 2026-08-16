@@ -1,4 +1,4 @@
-//===== Copyright © 1996-2005, Valve Corporation, All rights reserved. ======//
+//===== Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: Functions dealing with the player.
 //
@@ -5275,8 +5275,11 @@ void CBasePlayer::VelocityPunch( const Vector &vecForce )
 //-----------------------------------------------------------------------------
 bool CBasePlayer::CanEnterVehicle( IServerVehicle *pVehicle, int nRole )
 {
-	// Must not have a passenger there already
-	if ( pVehicle->GetPassenger( nRole ) )
+	// Underhell gunner seat: the NPC remains in the driver's seat while the
+	// player enters the same legacy role as a mounted-gun passenger. Vanilla
+	// rejects the occupied driver role before CPropVehicleDriveable sees it.
+	CPropVehicleDriveable *pDriveable = dynamic_cast< CPropVehicleDriveable * >( pVehicle->GetVehicleEnt() );
+	if ( pVehicle->GetPassenger( nRole ) && !( pDriveable && pDriveable->GetDriver() && pDriveable->GetDriver()->IsNPC() ) )
 		return false;
 
 	// Must be able to holster our current weapon (ie. grav gun!)
