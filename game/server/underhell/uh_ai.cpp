@@ -908,26 +908,6 @@ static int UH_RagdollBoneToHitgroup( CRagdollProp *pRagdoll, int iPhysicsBone )
 	return HITGROUP_GENERIC;
 }
 
-// A shot commonly lands on a child physics object (forearm/calf). Sever the
-// highest consecutive element which belongs to that same hitgroup, otherwise
-// only the child constraint breaks and the limb stretches against its parent.
-static int UH_RagdollLimbRoot( CRagdollProp *pRagdoll, int iPhysicsBone, int iHitgroup )
-{
-	ragdoll_t *pRagdollPhys = pRagdoll->GetRagdoll();
-	CStudioHdr *pHdr = pRagdoll->GetModelPtr();
-	if ( iPhysicsBone <= 0 || iPhysicsBone >= pRagdollPhys->listCount || !pHdr )
-		return iPhysicsBone;
-
-	int iRoot = iPhysicsBone;
-	for ( int iParent = pRagdollPhys->list[iRoot].parentIndex; iParent > 0; iParent = pRagdollPhys->list[iParent].parentIndex )
-	{
-		if ( UH_StudioBoneToHitgroup( pHdr, pRagdollPhys->boneIndex[iParent] ) != iHitgroup )
-			break;
-		iRoot = iParent;
-	}
-	return iRoot;
-}
-
 void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage, int iPhysicsBone, const Vector &pos, const Vector &dir )
 {
 	if ( !pRagdoll )
@@ -1026,13 +1006,11 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 	if ( !bRemoved )
 		return;
 
-	// Heads are a bodygroup/decal destruction in the original path, not a
-	// detached ragdoll constraint. Arms and legs sever at their limb root.
-	if ( iHitGroup != HITGROUP_HEAD )
-	{
-		int iLimbRoot = UH_RagdollLimbRoot( pRagdoll, iPhysicsBone, iHitGroup );
-		pRagdoll->UH_SeverLimb( iLimbRoot );
-	}
+	// sub_10031BF0 does *not* break a constraint in the source ragdoll.  It
+	// changes the source bodygroup and creates a separately simulated limb with
+	// sub_101CDCC0.  Breaking the original constraint as well made the hidden
+	// limb's physics pull the torso into a second, distorted pose.
+	// The generated sub-ragdoll below is the only detached physics object.
 
 	// Spawn a severed-limb gib at the hit position.
 	CBaseEntity *pGib = NULL;
