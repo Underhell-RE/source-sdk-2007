@@ -3,7 +3,7 @@
 // Purpose: Underhell dot reticle HUD element — implementation.
 //
 // Behavioural re-implementation of the original CHudDotReticle:
-//   * a small centered dot,
+//   * a small centered white ring with a black outer outline,
 //   * lights at full alpha when the player presses +use,
 //   * fades linearly to zero over 3.0 s (alpha = (3.0 - elapsed) * 85, from
 //     the original paint sub_100BC870),
@@ -140,16 +140,15 @@ void CHudDotReticle::Paint()
 	if ( iAlpha <= 0 )
 		return;
 
-	// The original (sub_100BC870) draws two small filled rects — a 3x8 black
-	// tick with a 2x8 white tick on top — a tiny crosshair caret, NOT a filled
-	// square. dotx/doty (8,8) mark the CENTER of the 16x16 panel; draw the
-	// caret centered on them. Black outline tick first, then white tick.
+	// vgui::ISurface vtable+384 is DrawOutlinedCircle (the IAppSystem base adds
+	// two slots). The original draws an 8-segment white radius-2 ring followed
+	// by a black radius-3 outline at dotx/doty.
 	int cx = (int)m_fdotx;
 	int cy = (int)m_fdoty;
 
-	vgui::surface()->DrawSetColor( 0, 0, 0, iAlpha );
-	vgui::surface()->DrawFilledRect( cx - 1, cy - 4, cx + 2, cy + 4 );
-
 	vgui::surface()->DrawSetColor( 255, 255, 255, iAlpha );
-	vgui::surface()->DrawFilledRect( cx - 1, cy - 4, cx + 1, cy + 4 );
+	vgui::surface()->DrawOutlinedCircle( cx, cy, 2, 8 );
+
+	vgui::surface()->DrawSetColor( 0, 0, 0, iAlpha );
+	vgui::surface()->DrawOutlinedCircle( cx, cy, 3, 8 );
 }

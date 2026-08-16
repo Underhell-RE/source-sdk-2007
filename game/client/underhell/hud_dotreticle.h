@@ -1,7 +1,7 @@
 //========= Copyright (c) 2008, Mxthe (Underhell). All rights reserved. ============//
 //
-// Purpose: Underhell dot reticle HUD element — a small centered aiming dot
-//          that lights up when the player presses +use and then fades out.
+// Purpose: Underhell dot reticle HUD element — a tiny centered two-ring marker
+//          that lights up while the player uses +use and then fades out.
 //
 // Original CHudDotReticle (panel "HudDotReticle" in scripts/HudLayout.res,
 // class "CHudDotReticle" in the client RTTI dump). Decoded:
