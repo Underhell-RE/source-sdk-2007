@@ -447,14 +447,20 @@ void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &ve
 	CBaseEntity *pHelmet = CreateEntityByName( pszItem );
 	if ( pHelmet )
 	{
-		pHelmet->SetAbsOrigin( vecPosition );
-		pHelmet->SetAbsAngles( vec3_angle );
+		// sub_10031BF0 drops head equipment from Eyes, rather than from the
+		// arbitrary bullet impact on the hitbox.
+		Vector vecDropOrigin = vecPosition;
+		QAngle angDrop = vec3_angle;
+		GetAttachment( "Eyes", vecDropOrigin, angDrop );
+		pHelmet->SetAbsOrigin( vecDropOrigin );
+		pHelmet->SetAbsAngles( angDrop );
 		DispatchSpawn( pHelmet );
 
 		IPhysicsObject *pPhys = pHelmet->VPhysicsGetObject();
 		if ( pPhys )
 		{
-			pPhys->SetVelocity( &vecDir, NULL );
+			Vector vecDropVelocity = vecDir * 0.25f;
+			pPhys->SetVelocity( &vecDropVelocity, NULL );
 		}
 	}
 
@@ -478,14 +484,18 @@ static void UH_DropGearItem( CBaseAnimating *pNPC, const char *pszBodygroup, con
 	if ( !pItem )
 		return;
 
-	pItem->SetAbsOrigin( vecPosition );
-	pItem->SetAbsAngles( vec3_angle );
+	Vector vecDropOrigin = vecPosition;
+	QAngle angDrop = vec3_angle;
+	pNPC->GetAttachment( "Eyes", vecDropOrigin, angDrop );
+	pItem->SetAbsOrigin( vecDropOrigin );
+	pItem->SetAbsAngles( angDrop );
 	DispatchSpawn( pItem );
 
 	IPhysicsObject *pPhys = pItem->VPhysicsGetObject();
 	if ( pPhys )
 	{
-		pPhys->SetVelocity( &vecDir, NULL );
+		Vector vecDropVelocity = vecDir * 0.25f;
+		pPhys->SetVelocity( &vecDropVelocity, NULL );
 	}
 }
 
