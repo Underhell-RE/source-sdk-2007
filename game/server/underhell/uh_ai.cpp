@@ -314,7 +314,7 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 // limb flops naturally; a plain prop_physics with these models renders as an
 // invisible/static body.
 //-----------------------------------------------------------------------------
-static CBaseEntity *UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, const Vector &vecDir, CBaseEntity *pOwner )
+static CBaseEntity *UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, const QAngle &angPosition, const Vector &vecDir, CBaseEntity *pOwner )
 {
 	// The gib models are spawned dynamically (after the map precache phase),
 	// so force-precache them here. Without this, SetModel() fires
@@ -327,7 +327,10 @@ static CBaseEntity *UH_SpawnGibProp( const char *pszModel, const Vector &vecPosi
 
 	pProp->SetModel( pszModel );
 	pProp->SetAbsOrigin( vecPosition );
-	pProp->SetAbsAngles( vec3_angle );
+	pProp->SetAbsAngles( angPosition );
+	// sub_10031BF0 places every detached sub-ragdoll in collision group 1
+	// (debris), so the limb does not block the remaining corpse or navigation.
+	pProp->SetCollisionGroup( COLLISION_GROUP_DEBRIS );
 	DispatchSpawn( pProp );
 
 	IPhysicsObject *pPhys = pProp->VPhysicsGetObject();
@@ -342,6 +345,25 @@ static CBaseEntity *UH_SpawnGibProp( const char *pszModel, const Vector &vecPosi
 
 	pProp->SetOwnerEntity( pOwner );
 	return pProp;
+}
+
+// The original creates a sub-ragdoll at the authored sever attachment, not
+// at the bullet impact point.  The impact may be anywhere along a forearm or
+// calf and produced visibly detached/floating gibs in the old port.
+static void UH_GetLimbSpawnTransform( CBaseAnimating *pBody, int iHitGroup, const Vector &vecFallback, Vector &vecOrigin, QAngle &angOrigin )
+{
+	const char *pszAttachment = NULL;
+	switch ( iHitGroup )
+	{
+	case HITGROUP_LEFTARM:  pszAttachment = "ForeArm_L"; break;
+	case HITGROUP_RIGHTARM: pszAttachment = "ForeArm_R"; break;
+	case HITGROUP_LEFTLEG:  pszAttachment = "Calf_L"; break;
+	case HITGROUP_RIGHTLEG: pszAttachment = "Calf_R"; break;
+	}
+	vecOrigin = vecFallback;
+	angOrigin = vec3_angle;
+	if ( pszAttachment )
+		pBody->GetAttachment( pszAttachment, vecOrigin, angOrigin );
 }
 
 //-----------------------------------------------------------------------------
@@ -525,7 +547,10 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 		const char *pszModel = UH_GibModelFor( STRING( GetModelName() ), pszLimb );
 		if ( pszModel )
 		{
-			pGib = UH_SpawnGibProp( pszModel, vecPosition, vecDir, this );
+			Vector vecGibOrigin;
+			QAngle angGibOrigin;
+			UH_GetLimbSpawnTransform( this, iHitGroup, vecPosition, vecGibOrigin, angGibOrigin );
+			pGib = UH_SpawnGibProp( pszModel, vecGibOrigin, angGibOrigin, vecDir, this );
 		}
 	}
 
@@ -1014,7 +1039,10 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 		const char *pszModel = UH_GibModelFor( STRING( pRagdoll->GetModelName() ), pszLimb );
 		if ( pszModel )
 		{
-			pGib = UH_SpawnGibProp( pszModel, pos, dir, pRagdoll );
+			Vector vecGibOrigin;
+			QAngle angGibOrigin;
+			UH_GetLimbSpawnTransform( pRagdoll, iHitGroup, pos, vecGibOrigin, angGibOrigin );
+			pGib = UH_SpawnGibProp( pszModel, vecGibOrigin, angGibOrigin, dir, pRagdoll );
 		}
 	}
 

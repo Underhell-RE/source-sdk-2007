@@ -1263,9 +1263,10 @@ int CNPC_UH_Infected::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		PainSound( info );
 	}
 
-	// If shot in head with helmet, knock off helmet (reuse uh_ai logic via UH_ConsiderGib)
-	// Handled by CAI_BaseNPC::UH_ConsiderGib in uh_ai.cpp – call it
-	UH_ConsiderGib( info.GetDamage() > 10 ? HITGROUP_HEAD : HITGROUP_GENERIC, info.GetDamage(), WorldSpaceCenter(), info.GetDamageForce() );
+	// TraceAttack in CAI_BaseNPC already sends the real hitgroup and impact
+	// position to UH_ConsiderGib.  Do not manufacture a head hit here: damage
+	// callbacks contain no hitgroup and the old code removed infected heads on
+	// any damage above 10.
 
 	return BaseClass::OnTakeDamage_Alive( info );
 }
