@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -905,12 +905,30 @@ void CPropJeep::FireCannon( void )
 	Vector aimDir;
 	GetCannonAim( &aimDir );
 
-	FireBulletsInfo_t info( 1, m_vecGunOrigin, aimDir, VECTOR_CONE_1DEGREES, MAX_TRACE_LENGTH, m_nAmmoType );
+	// Underhell mounted-gun mode is an AR2-style machine gun, not the jeep's
+	// tau/gauss cannon. The player is at the top gun while the NPC/script drives.
+	int iAmmoType = m_nAmmoType;
+	bool bMountedGun = m_bEnableMountedGun && m_bPlayerAtGun;
+	if ( bMountedGun )
+	{
+		int iAR2 = GetAmmoDef()->Index( "AR2" );
+		if ( iAR2 >= 0 )
+			iAmmoType = iAR2;
+	}
+	FireBulletsInfo_t info( 1, m_vecGunOrigin, aimDir, VECTOR_CONE_1DEGREES, MAX_TRACE_LENGTH, iAmmoType );
 
 	info.m_nFlags = FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS;
 	info.m_pAttacker = m_hPlayer;
 
 	FireBullets( info );
+
+	if ( bMountedGun )
+	{
+		// Original Underhell mounted-gun path uses the AR2 visual tracer instead
+		// of the tau cannon's GaussTracer/beam/explosion effect.
+		UTIL_Tracer( m_vecGunOrigin, m_vecGunOrigin + aimDir * MAX_TRACE_LENGTH,
+			entindex(), TRACER_DONT_USE_ATTACHMENT, 0, false, "AR2Tracer" );
+	}
 
 	// Register a muzzleflash for the AI
 	if ( m_hPlayer )
