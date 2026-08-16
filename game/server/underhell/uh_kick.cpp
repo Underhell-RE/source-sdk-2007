@@ -91,14 +91,33 @@ void CHL2_Player::UH_DoKickStrike( void )
 	trace_t tr;
 	UTIL_TraceLine( vecOrigin, vecOrigin + vecForward * UH_KICK_REACH, UH_KICK_MASK, this, COLLISION_GROUP_NONE, &tr );
 
+	// sub_101F0050 follows the 72-unit line with a short hull pass when the
+	// line misses. This makes close doors/props and broad NPC bodies register
+	// reliably without allowing a hit behind the player.
+	if ( tr.fraction == 1.0f )
+	{
+		trace_t hullTrace;
+		Vector vecHullEnd = vecOrigin + vecForward * ( UH_KICK_REACH - 55.424f );
+		UTIL_TraceHull( vecOrigin, vecHullEnd, Vector( -16, -16, -16 ), Vector( 16, 16, 16 ),
+			UH_KICK_MASK, this, COLLISION_GROUP_NONE, &hullTrace );
+		if ( hullTrace.fraction < 1.0f && hullTrace.m_pEnt )
+		{
+			Vector vecToTarget = hullTrace.m_pEnt->WorldSpaceCenter() - vecOrigin;
+			VectorNormalize( vecToTarget );
+			if ( DotProduct( vecToTarget, vecForward ) >= 0.70721f )
+				tr = hullTrace;
+		}
+	}
+
 	// Register the kick as combat noise so nearby NPCs react.
 	CSoundEnt::InsertSound( SOUND_COMBAT, tr.endpos, 400, 0.2f, this );
 
 	// Small forward view punch (decode sub_101F0050: (-2, 0, 0)).
 	ViewPunch( QAngle( -2.0f, 0.0f, 0.0f ) );
 
-	// Rumble (decode sub_101E3110: RumbleEffect(4, 0, 4)).
-	RumbleEffect( 4, 0, 4 );
+	// Contact rumble in sub_101F0050 is (9, 0, 4); a second lighter (4, 0, 4)
+	// pulse is emitted below only on an actual entity hit.
+	RumbleEffect( 9, 0, 4 );
 
 	if ( tr.fraction >= 1.0f || !tr.m_pEnt )
 	{
@@ -118,10 +137,13 @@ void CHL2_Player::UH_DoKickStrike( void )
 	CTakeDamageInfo info( this, this, uh_kick_damage.GetFloat(), DMG_CLUB );
 	info.SetDamagePosition( tr.endpos );
 
-	// Force: push the victim along the kick direction.
-	Vector vecForce = vecForward * ( uh_kick_forcemult.GetFloat() * 300.0f );
-	info.SetDamageForce( vecForce );
+	// Use the engine's melee-force curve then apply the original configurable
+	// multiplier. A constant 300-unit push made doors and heavy props react
+	// very differently from the binary.
+	CalculateMeleeDamageForce( &info, vecForward, tr.endpos, uh_kick_forcemult.GetFloat() );
 
+	// The impact path adds its own, lighter rumble pulse after a real hit.
+	RumbleEffect( 4, 0, 4 );
 	pHit->TakeDamage( info );
 
 	// Let the victim react (OnKicked output; the map uses e.g.
