@@ -433,10 +433,23 @@ static void UH_DispatchLimbBlood( CBaseAnimating *pBody, int iHitGroup, CBaseAni
 	}
 }
 
+// Select the exact item family used by the original CNPC_CombineS branches.
+// PMC is tested before generic combine because its model may use a soldier
+// skeleton/bodygroups but drops its own helmet item.
+static const char *UH_HelmetItemFor( CBaseAnimating *pBody )
+{
+	const char *pszModel = STRING( pBody->GetModelName() );
+	if ( V_stristr( pszModel, "pmc" ) )
+		return "item_helmet_pmc";
+	if ( V_stristr( pszModel, "prisonguard" ) )
+		return "item_helmet_prison";
+	if ( V_stristr( pszModel, "worker" ) )
+		return "item_helmet_worker";
+	return "item_helmet_guard";
+}
+
 //-----------------------------------------------------------------------------
-// Shoot the helmet off: HELMET bodygroup -> 0 and drop the helmet model. The
-// model depends on the NPC ("combine_soldier" drops helmet_visor, the prison
-// guard drops the plain helmet), per the tutorial.
+// Shoot the helmet off: HELMET bodygroup -> 0 and drop the helmet model.
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &vecDir )
 {
@@ -449,15 +462,7 @@ void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &ve
 	// The original spawns an item_helmet_* entity (pickable as armor), chosen
 	// by the NPC's body: prison guard -> plain helmet, soldier -> visored
 	// helmet, worker -> worker helmet, pmc -> pmc helmet.
-	const char *pszItem;
-	if ( V_stristr( STRING( GetModelName() ), "prisonguard" ) )
-		pszItem = "item_helmet_prison";
-	else if ( V_stristr( STRING( GetModelName() ), "worker" ) )
-		pszItem = "item_helmet_worker";
-	else if ( V_stristr( STRING( GetModelName() ), "pmc" ) )
-		pszItem = "item_helmet_pmc";
-	else
-		pszItem = "item_helmet_guard";
+	const char *pszItem = UH_HelmetItemFor( this );
 
 	CBaseEntity *pHelmet = CreateEntityByName( pszItem );
 	if ( pHelmet )
@@ -959,8 +964,7 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 				pRagdoll->m_flGibDamage[0] = 0.0f;
 				pRagdoll->SetBodygroup( iHelmet, 0 );
 
-				const char *pszItem = V_stristr( STRING( pRagdoll->GetModelName() ), "prisonguard" )
-					? "item_helmet_prison" : "item_helmet_guard";
+				const char *pszItem = UH_HelmetItemFor( pRagdoll );
 				CBaseEntity *pHelmet = CreateEntityByName( pszItem );
 				if ( pHelmet )
 				{
