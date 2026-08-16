@@ -319,6 +319,20 @@ void CUHGunWeapon::ItemPostFrame( void )
 	BaseClass::ItemPostFrame();
 }
 
+bool CUHGunWeapon::Holster( CBaseCombatWeapon *pSwitchingTo )
+{
+	if ( m_hLaserDot.Get() )
+	{
+		UTIL_Remove( m_hLaserDot.Get() );
+		m_hLaserDot = NULL;
+	}
+	m_bSocomLaserOn = false;
+	CHL2_Player *pPlayer = dynamic_cast< CHL2_Player * >( ToBasePlayer( GetOwner() ) );
+	if ( pPlayer )
+		pPlayer->UH_SetLaserOn( false );
+	return BaseClass::Holster( pSwitchingTo );
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: NPC fire. PrimaryAttack() is player-only (it pulls the eye origin /
 // view vectors off CBasePlayer). Uses the operator's shoot position + the AI's

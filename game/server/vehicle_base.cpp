@@ -833,7 +833,12 @@ bool CPropVehicleDriveable::CanEnterVehicle( CBaseEntity *pEntity )
 	if ( IsOverturned() )
 		return false;
 
-	// Prevent entering if the vehicle's locked, or if it's moving too fast.
+	// Mounted-gun passengers may enter the self-driving Underhell jeep while
+	// the NPC driver is already moving. Normal driver entry keeps vanilla speed
+	// and lock restrictions.
+	if ( GetDriver() && GetDriver()->IsNPC() )
+		return !m_bLocked;
+
 	return ( !m_bLocked && (m_nSpeed <= m_flMinimumSpeedToEnterExit) );
 }
 

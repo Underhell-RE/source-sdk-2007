@@ -103,6 +103,7 @@ public:
 	void			UH_ToggleFireMode( void );
 	virtual void	WeaponIdle( void );
 	virtual void	ItemPostFrame( void );
+	virtual bool	Holster( CBaseCombatWeapon *pSwitchingTo = NULL );
 
 	float			m_flFireRate;			// seconds between shots
 	ConVar			*m_pDamage;				// sk_plr_dmg_<weapon> (skill.cfg)

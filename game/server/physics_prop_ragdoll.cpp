@@ -224,7 +224,9 @@ void CRagdollProp::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 	pPlayer->PickupObject( this, false );
 
 	CHL2_Player *pHL2Player = dynamic_cast< CHL2_Player * >( pPlayer );
-	if ( pHL2Player && pHL2Player->IsHoldingEntity( this ) )
+	// PlayerPickupObject installs its controller during this call; latch the
+	// weight state immediately rather than relying on same-frame holder query.
+	if ( pHL2Player )
 		pHL2Player->UH_BeginCarryRagdoll( this );
 }
 
