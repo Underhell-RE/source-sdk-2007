@@ -35,12 +35,12 @@
 //-----------------------------------------------------------------------------
 // Dismemberment tuning convars (original names + defaults).
 //-----------------------------------------------------------------------------
-static ConVar uh_gibhealth( "uh_gibhealth", "80", FCVAR_ARCHIVE,
-	"Damage to gib a leg. Arms take 50% of this value." );
-static ConVar uh_headhealth( "uh_headhealth", "21", FCVAR_ARCHIVE,
-	"Damage to destroy the head." );
-static ConVar uh_helmethealth( "uh_helmethealth", "30", FCVAR_ARCHIVE,
-	"Damage a helmet takes before being shot off." );
+ConVar uh_gibhealth( "uh_gibhealth", "80", FCVAR_ARCHIVE,
+	"Bodypart health pool: legs get half this value, arms a quarter (original @463690)." );
+ConVar uh_headhealth( "uh_headhealth", "21", FCVAR_ARCHIVE,
+	"Head health pool: the head gets half this value (original @463689)." );
+ConVar uh_helmethealth( "uh_helmethealth", "30", FCVAR_ARCHIVE,
+	"Helmet health before it is shot off (original @463685, no divisor)." );
 static ConVar uh_maxsergibs( "uh_maxsergibs", "8", FCVAR_ARCHIVE,
 	"Max server-side gibs before the oldest becomes a client ragdoll." );
 static ConVar uh_maxseragdolls( "uh_maxseragdolls", "16", FCVAR_ARCHIVE,
@@ -622,8 +622,63 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 	UH_DispatchLimbBlood( this, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, vecPosition, vecDir );
 	if ( iHitGroup == HITGROUP_HEAD )
 	{
-		EmitSound( "Player.HeadShot" );
+		// Original string is "Player.Headshot" (lowercase 's').
+		EmitSound( "Player.Headshot" );
 		UTIL_BloodSpray( vecPosition, vecDir, BLOOD_COLOR_RED, 8, FX_BLOODSPRAY_ALL );
+	}
+
+	// Losing an arm takes the NPC's weapon out of play. The original
+	// (sub_10031BF0 @130952/@130990) clears byte 1712 once the arm bodygroup
+	// state passes the "both arms gone" mark, and either drops the held weapon
+	// or strips the shoot capability depending on the current activity.
+	// Without this an armless NPC keeps aiming and firing from thin air.
+	if ( iHitGroup == HITGROUP_LEFTARM || iHitGroup == HITGROUP_RIGHTARM )
+		UH_OnArmSevered();
+}
+
+//-----------------------------------------------------------------------------
+// Arm loss consequences (original @130952-130975 / @130990-131018).
+//-----------------------------------------------------------------------------
+void CAI_BaseNPC::UH_OnArmSevered( void )
+{
+	// Track both arms through the gib pools: a pool at/below zero means that
+	// arm has already been severed.
+	const bool bLeftGone  = ( m_iGibHealth[1] <= 0 );
+	const bool bRightGone = ( m_iGibHealth[2] <= 0 );
+
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	if ( pWeapon )
+	{
+		// The original checks the current activity (34/35/36 in its enum) and
+		// only physically drops the weapon in those states; otherwise it just
+		// removes the ability to shoot. Approximate that with "is the NPC
+		// mid-animation on something other than a normal stand/aim pose".
+		Activity eActivity = GetActivity();
+		const bool bDropIt = ( eActivity == ACT_RANGE_ATTACK1 ||
+							   eActivity == ACT_RANGE_ATTACK2 ||
+							   eActivity == ACT_RELOAD ||
+							   bLeftGone );
+
+		if ( bDropIt )
+		{
+			Weapon_Drop( pWeapon );
+		}
+		else
+		{
+			CapabilitiesRemove( bits_CAP_WEAPON_RANGE_ATTACK1 | bits_CAP_WEAPON_RANGE_ATTACK2 );
+		}
+	}
+
+	if ( bLeftGone && bRightGone )
+	{
+		// Both arms gone: no weapons at all from here on.
+		m_bUhCanUseWeapons = false;
+		CapabilitiesRemove( bits_CAP_WEAPON_RANGE_ATTACK1 | bits_CAP_WEAPON_RANGE_ATTACK2 |
+							bits_CAP_WEAPON_MELEE_ATTACK1 | bits_CAP_WEAPON_MELEE_ATTACK2 );
+
+		CBaseCombatWeapon *pHeld = GetActiveWeapon();
+		if ( pHeld )
+			Weapon_Drop( pHeld );
 	}
 }
 
@@ -632,8 +687,33 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 // A worn helmet absorbs head damage and is shot off (uh_helmethealth) before
 // the head itself can be destroyed (uh_headhealth).
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Seed the per-bodypart health pools. Original constructor @463685-463693:
+//     helmet = uh_helmethealth        (30)
+//     head   = uh_headhealth  / 2     (21/2 = 10)
+//     arms   = uh_gibhealth   / 4     (80/4 = 20 each)
+//     legs   = uh_gibhealth   / 2     (80/2 = 40 each)
+// Note the divisors: an earlier port used the raw convar values for the head
+// and legs and half of uh_gibhealth for the arms, i.e. exactly double the
+// original cost for every part.
+//-----------------------------------------------------------------------------
+void CAI_BaseNPC::UH_InitGibHealth( void )
+{
+	m_iHelmetHealth		= uh_helmethealth.GetInt();
+	m_iGibHealth[0]		= uh_headhealth.GetInt() / 2;		// head
+	m_iGibHealth[1]		= uh_gibhealth.GetInt() / 4;		// left arm
+	m_iGibHealth[2]		= uh_gibhealth.GetInt() / 4;		// right arm
+	m_iGibHealth[3]		= uh_gibhealth.GetInt() / 2;		// left leg
+	m_iGibHealth[4]		= uh_gibhealth.GetInt() / 2;		// right leg
+}
+
 bool CAI_BaseNPC::UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &vecPosition, const Vector &vecDir )
 {
+	// Original gate @130572: byte 1713 is "dismemberment enabled for this NPC",
+	// checked before anything else. It is NOT an IsAlive() test.
+	if ( !m_bUhGibEnabled )
+		return false;
+
 	int idx = -1;
 	switch ( iHitGroup )
 	{
@@ -652,32 +732,24 @@ bool CAI_BaseNPC::UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &v
 		int iHelmet = UH_FindBodygroup( this, "helmet" );
 		if ( iHelmet >= 0 && GetBodygroup( iHelmet ) >= 1 )
 		{
-			m_flHelmetDamage += flDamage;
-			if ( m_flHelmetDamage >= uh_helmethealth.GetFloat() )
+			m_iHelmetHealth -= (int)flDamage;
+			if ( m_iHelmetHealth <= 0 )
 			{
 				UH_ShootOffHelmet( vecPosition, vecDir );
-				m_flHelmetDamage = 0.0f;
+				m_iHelmetHealth = 0;
 			}
 			return true;	// helmet absorbed the hit
 		}
 	}
 
-	// Dead NPCs gib freely; the threshold only gates living NPCs.
-	if ( IsAlive() )
-	{
-		m_flGibDamage[idx] += flDamage;
-
-		float flThreshold = 0.0f;
-		if ( iHitGroup == HITGROUP_HEAD )
-			flThreshold = uh_headhealth.GetFloat();
-		else if ( iHitGroup == HITGROUP_LEFTARM || iHitGroup == HITGROUP_RIGHTARM )
-			flThreshold = uh_gibhealth.GetFloat() * 0.5f;	// arms = 50% of legs
-		else
-			flThreshold = uh_gibhealth.GetFloat();
-
-		if ( m_flGibDamage[idx] < flThreshold )
-			return false;
-	}
+	// Subtract from the remaining pool and sever once it is exhausted. The
+	// original applies this to living AND dead NPCs alike — there is no
+	// IsAlive() branch in sub_10031BF0, so shooting a corpse apart costs the
+	// same damage as dismembering a living one. The previous port severed a
+	// corpse limb on the very first bullet.
+	m_iGibHealth[idx] -= (int)flDamage;
+	if ( m_iGibHealth[idx] > 0 )
+		return false;
 
 	UH_GibBodyPart( iHitGroup, vecPosition, vecDir );
 	return true;
@@ -990,10 +1062,10 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 		int iHelmet = UH_FindBodygroup( pRagdoll, "helmet" );
 		if ( iHelmet >= 0 && pRagdoll->GetBodygroup( iHelmet ) >= 1 )
 		{
-			pRagdoll->m_flGibDamage[0] += flDamage;
-			if ( pRagdoll->m_flGibDamage[0] >= uh_helmethealth.GetFloat() )
+			pRagdoll->m_iHelmetHealth -= (int)flDamage;
+			if ( pRagdoll->m_iHelmetHealth <= 0 )
 			{
-				pRagdoll->m_flGibDamage[0] = 0.0f;
+				pRagdoll->m_iHelmetHealth = 0;
 				pRagdoll->SetBodygroup( iHelmet, 0 );
 
 				const char *pszItem = UH_HelmetItemFor( pRagdoll );
@@ -1023,20 +1095,12 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 	if ( idx < 0 )
 		return;
 
-	pRagdoll->m_flGibDamage[idx] += flDamage;
-
-	float flThreshold = 0.0f;
-	if ( iHitGroup == HITGROUP_HEAD )
-		flThreshold = uh_headhealth.GetFloat();
-	else if ( iHitGroup == HITGROUP_LEFTARM || iHitGroup == HITGROUP_RIGHTARM )
-		flThreshold = uh_gibhealth.GetFloat() * 0.5f;	// arms = 50% of legs
-	else
-		flThreshold = uh_gibhealth.GetFloat();
-
-	if ( pRagdoll->m_flGibDamage[idx] < flThreshold )
+	// Same subtractive pool as the living NPC path — the original has no
+	// separate corpse rule, a dead body costs exactly as much damage to take
+	// apart as a live one.
+	pRagdoll->m_iGibHealth[idx] -= (int)flDamage;
+	if ( pRagdoll->m_iGibHealth[idx] > 0 )
 		return;
-
-	pRagdoll->m_flGibDamage[idx] = 0.0f;	// reset so the limb can be re-hit
 
 	// Visually remove the limb before touching physics. A bodygroup transition
 	// is also the persistent one-shot state: once it has already been removed,

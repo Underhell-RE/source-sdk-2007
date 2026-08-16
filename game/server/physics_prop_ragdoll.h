@@ -88,7 +88,13 @@ public:
 	// Underhell dismemberment. Sever a limb (break its ragdoll constraint) so a
 	// dead body can be shot apart, and accumulate per-hitgroup gib damage.
 	void			UH_SeverLimb( int iPhysicsBone );
-	float			m_flGibDamage[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
+	// Remaining per-bodypart health, same subtractive model as the living NPC
+	// (see CAI_BaseNPC::UH_InitGibHealth). Seeded from the convars and, when a
+	// corpse comes from a wounded NPC, inherited from it so damage already
+	// dealt while alive is not forgotten.
+	int				m_iGibHealth[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
+	int				m_iHelmetHealth;			// remaining helmet health
+	void			UH_InitGibHealth( void );
 	Vector			m_vecUHDraggedLastPos;		// original DraggedThink trail anchor
 	bool			m_bUHDragged;
 

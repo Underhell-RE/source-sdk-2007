@@ -10698,8 +10698,10 @@ BEGIN_DATADESC( CAI_BaseNPC )
 	DEFINE_KEYFIELD( m_flUhViewDistance,		FIELD_FLOAT,  "uh_viewdistance" ),
 	DEFINE_KEYFIELD( m_bUhSquadTemp,			FIELD_BOOLEAN, "squadtemp" ),
 	DEFINE_KEYFIELD( m_bUhSpotBodies,			FIELD_BOOLEAN, "uh_spotbodies" ),
-	DEFINE_ARRAY( m_flGibDamage,				FIELD_FLOAT, 5 ),
-	DEFINE_FIELD( m_flHelmetDamage,				FIELD_FLOAT ),
+	DEFINE_ARRAY( m_iGibHealth,					FIELD_INTEGER, 5 ),
+	DEFINE_FIELD( m_iHelmetHealth,				FIELD_INTEGER ),
+	DEFINE_FIELD( m_bUhGibEnabled,				FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bUhCanUseWeapons,			FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flNextSpotBodiesTime,		FIELD_TIME ),
 	DEFINE_FIELD( m_flNextTempSquadTime,		FIELD_TIME ),
   	DEFINE_FIELD( m_hStoredPathTarget,			FIELD_EHANDLE ),
@@ -10903,6 +10905,9 @@ void CAI_BaseNPC::Activate( void )
 
 	// Underhell: apply "uh_bodygroup" + "uh_fos" + "uh_viewdistance".
 	UH_ApplySpawnSettings();
+
+	// Underhell: seed the per-bodypart health pools (original @463685-463693).
+	UH_InitGibHealth();
 
 	// Get a handle to my enemy filter entity if there is one.
 	if ( m_iszEnemyFilterName != NULL_STRING )
@@ -11420,9 +11425,13 @@ CAI_BaseNPC::CAI_BaseNPC(void)
 	m_flUhViewDistance			= -1.0f;
 	m_bUhSquadTemp				= true;		// temp squads on by default ("SquadTemp : 1")
 	m_bUhSpotBodies				= false;
+	// Seeded properly in Spawn via UH_InitGibHealth(); zero here so a part is
+	// never severed before the pools are filled in.
 	for ( int i = 0; i < 5; i++ )
-		m_flGibDamage[i]		= 0.0f;
-	m_flHelmetDamage			= 0.0f;
+		m_iGibHealth[i]			= 0;
+	m_iHelmetHealth				= 0;
+	m_bUhGibEnabled				= true;		// original byte @1713 is set to 1 on construction
+	m_bUhCanUseWeapons			= true;		// original byte @1712
 	m_flNextSpotBodiesTime		= 0.0f;
 	m_flNextTempSquadTime		= 0.0f;
 	m_flEyeIntegRate			= 0.95;

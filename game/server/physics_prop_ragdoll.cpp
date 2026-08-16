@@ -95,7 +95,8 @@ BEGIN_DATADESC(CRagdollProp)
 	DEFINE_FIELD( m_bFirstCollisionAfterLaunch, FIELD_BOOLEAN ),
 
 	// Underhell dismemberment damage accumulation / dragged-body trail state.
-	DEFINE_ARRAY( m_flGibDamage, FIELD_FLOAT, 5 ),
+	DEFINE_ARRAY( m_iGibHealth, FIELD_INTEGER, 5 ),
+	DEFINE_FIELD( m_iHelmetHealth, FIELD_INTEGER ),
 	DEFINE_FIELD( m_vecUHDraggedLastPos, FIELD_POSITION_VECTOR ),
 	DEFINE_FIELD( m_bUHDragged, FIELD_BOOLEAN ),
 
@@ -305,8 +306,7 @@ CRagdollProp::CRagdollProp( void )
 	m_flFadeScale = 1;
 	m_flDefaultFadeScale = 1;
 
-	for ( int i = 0; i < 5; i++ )
-		m_flGibDamage[i] = 0.0f;
+	UH_InitGibHealth();
 	m_vecUHDraggedLastPos.Init();
 	m_bUHDragged = false;
 }
@@ -860,6 +860,24 @@ void CRagdollProp::TraceAttack( const CTakeDamageInfo &info, const Vector &dir, 
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Seed the corpse's per-bodypart health pools, matching the living
+// NPC seeding in CAI_BaseNPC::UH_InitGibHealth (original @463685-463693).
+//-----------------------------------------------------------------------------
+void CRagdollProp::UH_InitGibHealth( void )
+{
+	extern ConVar uh_gibhealth;
+	extern ConVar uh_headhealth;
+	extern ConVar uh_helmethealth;
+
+	m_iHelmetHealth	= uh_helmethealth.GetInt();
+	m_iGibHealth[0]	= uh_headhealth.GetInt() / 2;	// head
+	m_iGibHealth[1]	= uh_gibhealth.GetInt() / 4;	// left arm
+	m_iGibHealth[2]	= uh_gibhealth.GetInt() / 4;	// right arm
+	m_iGibHealth[3]	= uh_gibhealth.GetInt() / 2;	// left leg
+	m_iGibHealth[4]	= uh_gibhealth.GetInt() / 2;	// right leg
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Sever a ragdoll limb by destroying its physics constraint, so the
 // bone falls free (Underhell dismemberment).
 //-----------------------------------------------------------------------------
@@ -1375,6 +1393,18 @@ CBaseEntity *CreateServerRagdoll( CBaseAnimating *pAnimating, int forceBone, con
 	// colliding with server ragdolls they kill
 	pRagdoll->SetKiller( info.GetInflictor() );
 	pRagdoll->SetSourceClassName( pAnimating->GetClassname() );
+
+	// Underhell: carry the remaining bodypart health over from the NPC that
+	// just died. The pools live on the entity in the original, so damage dealt
+	// to an arm while the NPC was alive still counts once it is a corpse —
+	// without this transfer a heavily wounded body would heal back to full
+	// limb health the moment it ragdolled.
+	if ( CAI_BaseNPC *pNPC = pAnimating->MyNPCPointer() )
+	{
+		for ( int i = 0; i < 5; i++ )
+			pRagdoll->m_iGibHealth[i] = pNPC->m_iGibHealth[i];
+		pRagdoll->m_iHelmetHealth = pNPC->m_iHelmetHealth;
+	}
 
 	// NPC_STATE_DEAD npc's will have their COND_IN_PVS cleared, so this needs to force SetupBones to happen
 	unsigned short fPrevFlags = pAnimating->GetBoneCacheFlags();

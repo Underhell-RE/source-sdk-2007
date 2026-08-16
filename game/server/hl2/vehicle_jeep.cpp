@@ -65,6 +65,11 @@ const char *g_pJeepThinkContext = "JeepSeagullThink";
 #define JEEP_SEAGULL_MAX_TIME			60.0		// Time at which a seagull will definately perch on the jeep
 
 ConVar	sk_jeep_gauss_damage( "sk_jeep_gauss_damage", "15" );
+// The mounted gun reads its own convar in the original: the symbol Hex-Rays
+// names "sk_jeep_gauss_damage" is actually registered as "sk_jeep_gun_damage"
+// with default 50 (@1056574). The charged gauss cannon keeps using
+// sk_jeep_gauss_damage.
+ConVar	sk_jeep_gun_damage( "sk_jeep_gun_damage", "50" );
 ConVar	hud_jeephint_numentries( "hud_jeephint_numentries", "10", FCVAR_NONE );
 ConVar	g_jeepexitspeed( "g_jeepexitspeed", "100", FCVAR_CHEAT );
 
@@ -900,17 +905,44 @@ void CPropJeep::FireCannon( void )
 	if ( m_bUnableToFire )
 		return;
 
+	// Original gate (sub_103EAB30 @950510):
+	//     if ( (!m_bEnableMountedGun || m_bPlayerAtGun)
+	//          && curtime >= m_flCannonTime
+	//          && !m_bUnableToFire )
+	// i.e. a jeep flagged "EnableMountedGun" only fires while the player is
+	// actually manning the gun. On Uh_Chapter1_16_d the jeep is authored with
+	// "EnableMountedGun" "1" and Bryan drives while the player gunners, so
+	// without this test the keyvalue was parsed and then ignored.
+	if ( m_bEnableMountedGun && !m_bPlayerAtGun )
+		return;
+
 	// Underhell's mounted-gun path keeps jeep ammo/damage handling. AR2 is
 	// selected by its tracer/impact branch, not by replacing the ammo type.
 	m_flCannonTime = gpGlobals->curtime + 0.1f;
 	m_bCannonCharging = false;
 	DispatchParticleEffect( "muzzle_star_uh", PATTACH_POINT_FOLLOW, this, "muzzle_uh" );
 
+	// The original traces from the "muzzle" attachment, not from "gun_ref"
+	// (@950518: GetAttachment( LookupAttachment("muzzle") ) then AngleVectors).
+	// gun_ref is the aiming pivot; firing from it put the bullet origin inside
+	// the vehicle body, so shots hit the jeep itself and the gun read as dead.
+	Vector vecMuzzleOrigin = m_vecGunOrigin;
+	QAngle angMuzzle;
+	int iMuzzle = LookupAttachment( "muzzle" );
 	Vector aimDir;
-	GetCannonAim( &aimDir );
-	FireBulletsInfo_t info( 1, m_vecGunOrigin, aimDir, Vector( 0.0087299999f, 0.0087299999f, 0.0087299999f ),
+	if ( iMuzzle > 0 )
+	{
+		GetAttachment( iMuzzle, vecMuzzleOrigin, angMuzzle );
+		AngleVectors( angMuzzle, &aimDir );
+	}
+	else
+	{
+		GetCannonAim( &aimDir );
+	}
+
+	FireBulletsInfo_t info( 1, vecMuzzleOrigin, aimDir, Vector( 0.0087299999f, 0.0087299999f, 0.0087299999f ),
 		MAX_TRACE_LENGTH, m_nAmmoType );
-	info.m_iDamage = sk_jeep_gauss_damage.GetInt();
+	info.m_iDamage = sk_jeep_gun_damage.GetInt();
 	info.m_nFlags = FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS;
 	info.m_pAttacker = m_hPlayer;
 	FireBullets( info );
@@ -1457,12 +1489,14 @@ void CPropJeep::EnterVehicle( CBaseCombatCharacter *pPassenger )
 	if ( !pPlayer )
 		return;
 
-	// Underhell Chapter1_16: Bryan's hidden vehicle driver remains the wheel
-	// controller while the entering player is the mounted gunner. Set this
-	// before BaseClass::EnterVehicle so entry/drive code never treats the
-	// player as a second competing driver.
-	if ( GetDriver() && GetDriver()->IsNPC() )
-		m_bPlayerAtGun = true;
+	// Underhell Chapter1_16: Bryan drives while the player mans the mounted
+	// gun. The gunner state is owned by the map, which fires
+	//     Vehicle_Jeep,ToggleGunMode
+	// from the same trigger_once that runs
+	//     Bryan,EnterVehicleImmediatelyAsDriver,Vehicle_Jeep
+	// (Uh_Chapter1_16_d @198318). Do NOT force it here: entering the vehicle
+	// after the map has already toggled gun mode on would flip the flag back
+	// and silently disable the gun.
 
 	CheckWater();
 	BaseClass::EnterVehicle( pPassenger );
@@ -1478,6 +1512,11 @@ void CPropJeep::EnterVehicle( CBaseCombatCharacter *pPassenger )
 void CPropJeep::ExitVehicle( int nRole )
 {
 	HeadlightTurnOff();
+
+	// Clear the gunner state on the way out. It was only ever set (on entry),
+	// never cleared, so once a player had manned the gun the flag stayed true
+	// on the entity for the rest of the map.
+	m_bPlayerAtGun = false;
 
 	BaseClass::ExitVehicle( nRole );
 

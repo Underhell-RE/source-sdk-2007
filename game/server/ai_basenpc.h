@@ -1880,9 +1880,22 @@ public:
 	COutputEvent			m_OnSpotInfectedBody;		// fired when an npc_infected body is spotted
 	COutputEvent			m_OnSpotDefaultBody;		// fired when any other NPC body is spotted
 
-	// Gib/dismemberment runtime state (per-hitgroup accumulated damage).
-	float					m_flGibDamage[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
-	float					m_flHelmetDamage;			// accumulated damage to the helmet (shot off at uh_helmethealth)
+	// Gib/dismemberment runtime state. The original stores a REMAINING health
+	// pool per body part and subtracts incoming damage from it (servero
+	// sub_10031BF0 @130928: part -= info.GetDamage(), sever once <= 0). The
+	// pools are seeded in Spawn from the convars (@463685-463693):
+	//     head  = uh_headhealth  / 2
+	//     arms  = uh_gibhealth   / 4   (each)
+	//     legs  = uh_gibhealth   / 2   (each)
+	//     helmet= uh_helmethealth
+	// An earlier port accumulated damage upwards towards uh_headhealth /
+	// uh_gibhealth*0.5 / uh_gibhealth, which made every limb exactly twice as
+	// expensive to sever as in the original.
+	int						m_iGibHealth[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
+	int						m_iHelmetHealth;			// remaining helmet health (shot off at <= 0)
+	bool					m_bUhGibEnabled;			// original byte @1713: dismemberment allowed for this NPC
+	bool					m_bUhCanUseWeapons;			// original byte @1712: cleared when both arms are gone
+	void					UH_InitGibHealth( void );	// seed the pools from the convars
 	float					m_flNextSpotBodiesTime;		// throttle the spot-bodies scan
 	float					m_flNextTempSquadTime;		// throttle the temp-squad scan
 
@@ -1892,6 +1905,7 @@ public:
 	void					UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, const Vector &vecDir );
 	bool					UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &vecPosition, const Vector &vecDir );
 	void					UH_ShootOffHelmet( const Vector &vecPosition, const Vector &vecDir );
+	void					UH_OnArmSevered( void );		// drop weapon / clear shoot capability
 	void					UH_SpotBodiesThink( void );
 	void					UH_TempSquadUpdate( void );
 
