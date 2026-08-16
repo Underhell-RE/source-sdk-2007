@@ -2594,7 +2594,9 @@ int CHL2_Player::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	}
 
 	// Underhell: taking damage can open a bleeding wound.
-	if ( info.GetDamage() > 0.0f )
+	// Internal bleed ticks use the player as attacker. They must take real
+	// damage for death handling, but may not recursively open a new wound.
+	if ( info.GetDamage() > 0.0f && info.GetAttacker() != this )
 	{
 		UH_StartBleeding( info.GetDamage() );
 	}
