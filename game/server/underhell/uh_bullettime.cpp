@@ -49,7 +49,7 @@ void UH_BulletTimeSpawnTracer( CBaseCombatCharacter *pShooter, const Vector &sta
 	CUHBullet *pBullet = static_cast< CUHBullet * >( CreateEntityByName( "uh_bullet" ) );
 	if ( !pBullet ) return;
 	const char *pModel = UH_BulletModel( ammoType );
-	PrecacheModel( pModel );
+	CBaseEntity::PrecacheModel( pModel );
 	pBullet->SetModel( pModel );
 	pBullet->SetAbsOrigin( start );
 	pBullet->m_vecDirection = direction; VectorNormalize( pBullet->m_vecDirection );
