@@ -31,9 +31,18 @@ void CUHMeleeWeapon::PrimaryAttack( void )
 	CHL2_Player *pPlayer = ToBasePlayer( GetOwner() ) ? dynamic_cast<CHL2_Player *>( GetOwner() ) : NULL;
 	if ( pPlayer )
 	{
-		// TODO: gate the swing on having enough stamina (original plays
-		// "HL2Player.SprintNoPower" / a deny sound when drained).
+		// serveror.dll sub_102B0B50: melee cannot start below 15 stamina.
+		// It is intentionally a fixed entry threshold, while the actual amount
+		// drained is weapon-script StaminaToDrain.
+		if ( pPlayer->SuitPower_GetCurrentPercentage() < 15.0f )
+		{
+			pPlayer->EmitSound( "Player.Voice.Melee.Exhausted" );
+			return;
+		}
+
 		pPlayer->SuitPower_Drain( GetWpnData().m_flStaminaToDrain );
+		pPlayer->EmitSound( pPlayer->SuitPower_GetCurrentPercentage() < 35.0f
+			? "Player.Voice.Melee.Exhausted" : "Player.Voice.Melee" );
 	}
 
 	BaseClass::PrimaryAttack();
