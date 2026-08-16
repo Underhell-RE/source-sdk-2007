@@ -204,6 +204,7 @@ Added `npc_ace` base implementation:
 
 Added `npc_butcher` base implementation:
 
+- derives from `CNPC_BaseZombie` and implements its required sound/model virtual contract (headcrab, torso/legs, pain, melee, footscuff); this fixes the abstract-class compile error reported during the first build;
 - default model `models/butcher.mdl`;
 - original public butcher ConVars;
 - butcher sound precache and sound methods;
