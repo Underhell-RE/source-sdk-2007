@@ -97,6 +97,11 @@ void CHudUHBattery::OnThink( void )
 //-----------------------------------------------------------------------------
 void CHudUHBattery::Paint()
 {
+	// The original drives panel alpha. Do not leave disabled chunks visible
+	// after the contour/text have faded away.
+	if ( m_flAlpha <= 0.0f )
+		return;
+
 	// Charge bar: discrete chunks filling bottom-up from m_flUHBatteryCharge
 	// (0..100), exactly like the original sub_100BDC80 — chunkCount =
 	// BarHeight / (BarChunkHeight + BarChunkGap), enabledChunks =
@@ -121,7 +126,8 @@ void CHudUHBattery::Paint()
 	}
 
 	// Exhausted chunks (drawn with the disabled alpha).
-	vgui::surface()->DrawSetColor( m_HullColor[0], m_HullColor[1], m_HullColor[2], m_iHullDisabledAlpha );
+	vgui::surface()->DrawSetColor( m_HullColor[0], m_HullColor[1], m_HullColor[2],
+		m_iHullDisabledAlpha * (int)m_flAlpha / 255 );
 	for ( int i = enabledChunks; i < chunkCount; i++ )
 	{
 		vgui::surface()->DrawFilledRect(
