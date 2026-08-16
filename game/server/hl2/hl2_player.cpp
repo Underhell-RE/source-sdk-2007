@@ -3610,6 +3610,11 @@ bool CHL2_Player::Weapon_Switch( CBaseCombatWeapon *pWeapon, int viewmodelindex 
 	// resets to hip anyway; keep the authoritative flag + FOV in sync).
 	UH_DisableIronsight();
 
+	// SOCOM is the only weapon with the player laser sight; switching away
+	// must clear the replicated beam state.
+	if ( pWeapon && !FClassnameIs( pWeapon, "weapon_pistol_socom" ) )
+		m_bLaserToggleState = false;
+
 	// Underhell: re-evaluate the left-arm flashlight (one-handed vs two-handed).
 	UH_UpdateLeftArm();
 
