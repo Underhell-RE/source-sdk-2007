@@ -577,6 +577,9 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "Player.Voice.Kick.Exhausted" );
 	PrecacheScriptSound( "Player.Voice.Melee" );
 	PrecacheScriptSound( "Player.Voice.Melee.Exhausted" );
+	PrecacheScriptSound( "Player.bullettimestart" );
+	PrecacheScriptSound( "Player.bullettimeloop" );
+	PrecacheScriptSound( "Player.bullettimeend" );
 
 	// Underhell night vision + gas mask.
 	PrecacheScriptSound( "Player.nvon" );
