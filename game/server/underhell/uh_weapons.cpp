@@ -214,6 +214,28 @@ void CUHGunWeapon::PrimaryAttack( void )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: SOCOM laser secondary attack. CWeaponPistolSocom::sub_1027B9E0
+// toggles its laser state and sends activity 12/13; the player-level network
+// bit carries that state to the compact client beam renderer.
+//-----------------------------------------------------------------------------
+void CUHGunWeapon::SecondaryAttack( void )
+{
+	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
+	if ( pOwner && FClassnameIs( this, "weapon_pistol_socom" ) )
+	{
+		CHL2_Player *pPlayer = dynamic_cast< CHL2_Player * >( pOwner );
+		if ( pPlayer )
+			pPlayer->m_bLaserToggleState = !pPlayer->m_bLaserToggleState;
+
+		SendWeaponAnim( pPlayer && pPlayer->m_bLaserToggleState ? (Activity)12 : (Activity)13 );
+		m_flNextSecondaryAttack = gpGlobals->curtime + 0.2f;
+		return;
+	}
+
+	BaseClass::SecondaryAttack();
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: firemode_toggle (decode sub_102B0D10, the weapon method the client
 // command dispatches to at vtable+840). Flips full-auto <-> semi and plays the
 // hard-coded pistol-empty click. The original is asymmetric: full->semi is

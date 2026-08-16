@@ -66,6 +66,7 @@ class CUHGunWeapon : public CBaseHLCombatWeapon
 
 public:
 	virtual void	PrimaryAttack( void );
+	virtual void	SecondaryAttack( void );
 	virtual float	GetDamage( void ) { return m_pDamage->GetFloat(); }
 	virtual float	GetFireRate( void ) { return m_flFireRate; }
 	virtual const Vector &GetBulletSpread( void );

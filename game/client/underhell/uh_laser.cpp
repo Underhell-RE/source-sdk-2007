@@ -45,7 +45,7 @@ public:
 			return;
 
 		C_BaseCombatWeapon *pWeapon = pPlayer->GetActiveWeapon();
-		if ( !pWeapon || !FClassnameIs( pWeapon, "weapon_pistol_socom" ) )
+		if ( !pWeapon || !FClassnameIs( pWeapon, "weapon_pistol_socom" ) || !pPlayer->m_bLaserToggleState )
 			return;
 
 		if ( !pPlayer->IsAlive() )
