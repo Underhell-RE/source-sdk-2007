@@ -910,7 +910,7 @@ void CPropJeep::FireCannon( void )
 	GetCannonAim( &aimDir );
 	FireBulletsInfo_t info( 1, m_vecGunOrigin, aimDir, Vector( 0.0087299999f, 0.0087299999f, 0.0087299999f ),
 		MAX_TRACE_LENGTH, m_nAmmoType );
-	info.m_flDamage = sk_jeep_gauss_damage.GetFloat();
+	info.m_iDamage = sk_jeep_gauss_damage.GetInt();
 	info.m_nFlags = FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS;
 	info.m_pAttacker = m_hPlayer;
 	FireBullets( info );
