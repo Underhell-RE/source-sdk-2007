@@ -18,14 +18,14 @@ class CUHBullet : public CBaseAnimating
 	DECLARE_DATADESC();
 public:
 	void Spawn() { SetSolid( SOLID_NONE ); SetMoveType( MOVETYPE_FLY ); AddEffects( EF_NOSHADOW ); SetThink( &CUHBullet::BulletThink ); SetNextThink( gpGlobals->curtime ); }
-	void BulletThink() { float speed = UH_BulletTimeActive() ? m_flSpeed * bt_timescale.GetFloat() : 2500.0f; SetAbsVelocity( m_vecDirection * speed ); SetNextThink( gpGlobals->curtime + 0.05f ); if ( gpGlobals->curtime >= m_flDieTime ) UTIL_Remove( this ); }
-	Vector m_vecDirection; float m_flSpeed; float m_flDieTime;
+	void BulletThink() { float speed = UH_BulletTimeActive() ? m_flSpeed * bt_timescale.GetFloat() : 2500.0f; SetAbsVelocity( m_vecDirection * speed ); m_flRemainingDistance -= speed * 0.05f; SetNextThink( gpGlobals->curtime + 0.05f ); if ( m_flRemainingDistance <= 0.0f ) UTIL_Remove( this ); }
+	Vector m_vecDirection; float m_flSpeed; float m_flRemainingDistance;
 };
 LINK_ENTITY_TO_CLASS( uh_bullet, CUHBullet );
 BEGIN_DATADESC( CUHBullet )
 	DEFINE_FIELD( m_vecDirection, FIELD_VECTOR ),
 	DEFINE_FIELD( m_flSpeed, FIELD_FLOAT ),
-	DEFINE_FIELD( m_flDieTime, FIELD_TIME ),
+	DEFINE_FIELD( m_flRemainingDistance, FIELD_FLOAT ),
 	DEFINE_THINKFUNC( BulletThink ),
 END_DATADESC()
 
@@ -53,8 +53,14 @@ void UH_BulletTimeSpawnTracer( CBaseCombatCharacter *pShooter, const Vector &sta
 	pBullet->SetModel( pModel );
 	pBullet->SetAbsOrigin( start );
 	pBullet->m_vecDirection = direction; VectorNormalize( pBullet->m_vecDirection );
+	QAngle bulletAngles;
+	VectorAngles( pBullet->m_vecDirection, bulletAngles );
+	pBullet->SetAbsAngles( bulletAngles );
 	pBullet->m_flSpeed = bEnemyBullet ? bt_enemybulletspeed.GetFloat() : bt_playerbulletspeed.GetFloat();
-	pBullet->m_flDieTime = gpGlobals->curtime + 4.0f;
+	// sub_101078D0 has no artificial four-second expiry. Keep the visual
+	// bullet alive for its full trace distance, recomputing travel speed every
+	// 0.05 s as the BT state changes.
+	pBullet->m_flRemainingDistance = MAX_TRACE_LENGTH;
 	pBullet->SetOwnerEntity( pShooter );
 	DispatchSpawn( pBullet );
 }
