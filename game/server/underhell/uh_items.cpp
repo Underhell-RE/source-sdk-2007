@@ -270,7 +270,10 @@ void CItemUHSoda::Spawn( void )
 {
 	Precache();
 	SetModel( "models/props_junk/popcan01a.mdl" );
-	m_nSkin = random->RandomInt( 0, 5 );
+	// sub_10177380 randomizes only the default skin. A map-assigned flavour
+	// must survive Spawn and map to the same inventory soda ID on pickup.
+	if ( m_nSkin == 0 )
+		m_nSkin = random->RandomInt( 0, 5 );
 	BaseClass::Spawn();
 }
 
