@@ -530,6 +530,21 @@ static void UH_CopyLimbBodygroups( CBaseAnimating *pSource, CBaseAnimating *pGib
 //   legs: "blood_advisor_puncture_withdraw" on the severed gib ("Calf_L/R")
 //   head: "Blood_Trace" decal (handled separately via the trace)
 //-----------------------------------------------------------------------------
+static void UH_DispatchAttachedBlood( const char *pszParticle, CBaseAnimating *pEntity, const char *pszAttachment, const Vector &vecFallback )
+{
+	if ( !pEntity || !pszAttachment ) return;
+	const int iAttachment = pEntity->LookupAttachment( pszAttachment );
+	if ( iAttachment > 0 )
+	{
+		DispatchParticleEffect( pszParticle, PATTACH_POINT_FOLLOW, pEntity, iAttachment );
+		return;
+	}
+
+	// Replacement models occasionally omit Underhell's authored attachments.
+	// Keep the effect visible at the sever point rather than silently dropping it.
+	DispatchParticleEffect( pszParticle, vecFallback, pEntity->GetAbsAngles(), pEntity );
+}
+
 static void UH_DispatchLimbBlood( CBaseAnimating *pBody, int iHitGroup, CBaseAnimating *pGib, const Vector &vecPosition, const Vector &vecDir )
 {
 	const char *pszParticle = NULL;
@@ -572,13 +587,11 @@ static void UH_DispatchLimbBlood( CBaseAnimating *pBody, int iHitGroup, CBaseAni
 		return;
 
 	if ( pBody && pszBodyAttach )
-	{
-		DispatchParticleEffect( pszParticle, PATTACH_POINT_FOLLOW, pBody, pszBodyAttach );
-	}
+		UH_DispatchAttachedBlood( pszParticle, pBody, pszBodyAttach, vecPosition );
 	if ( pGib && pszGibAttach )
-	{
-		DispatchParticleEffect( pszParticle, PATTACH_POINT_FOLLOW, pGib, pszGibAttach );
-	}
+		UH_DispatchAttachedBlood( pszParticle, pGib, pszGibAttach, vecPosition );
+	else if ( pszGibAttach )
+		DispatchParticleEffect( pszParticle, vecPosition, vec3_angle );
 }
 
 // Select the exact item family used by the original CNPC_CombineS branches.
@@ -594,6 +607,14 @@ static const char *UH_HelmetItemFor( CBaseAnimating *pBody )
 	if ( V_stristr( pszModel, "worker" ) )
 		return "item_helmet_worker";
 	return "item_helmet_guard";
+}
+
+static void UH_SetDroppedItemVariant( CBaseEntity *pItem, int iVariant )
+{
+	CBaseAnimating *pAnimating = pItem ? pItem->GetBaseAnimating() : NULL;
+	if ( !pAnimating ) return;
+	// sub_101CB6F0 ends in SetBodygroup( 1, variant ); this is not a skin.
+	pAnimating->SetBodygroup( 1, iVariant );
 }
 
 //-----------------------------------------------------------------------------
@@ -624,8 +645,7 @@ void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &ve
 		pHelmet->SetAbsOrigin( vecDropOrigin );
 		pHelmet->SetAbsAngles( angDrop );
 		DispatchSpawn( pHelmet );
-		if ( pHelmet->GetBaseAnimating() )
-			pHelmet->GetBaseAnimating()->m_nSkin = iHelmetVariant;
+		UH_SetDroppedItemVariant( pHelmet, iHelmetVariant );
 
 		IPhysicsObject *pPhys = pHelmet->VPhysicsGetObject();
 		if ( pPhys )
@@ -646,6 +666,7 @@ void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &ve
 			pCap->SetAbsOrigin( vecDropOrigin );
 			pCap->SetAbsAngles( angDrop );
 			DispatchSpawn( pCap );
+			UH_SetDroppedItemVariant( pCap, 5 );
 		}
 	}
 
@@ -1199,7 +1220,7 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 				Vector org = pos; QAngle ang = vec3_angle;
 				pRagdoll->GetAttachment( "Eyes", org, ang );
 				pItem->SetAbsOrigin( org ); pItem->SetAbsAngles( ang ); DispatchSpawn( pItem );
-				if ( pItem->GetBaseAnimating() ) pItem->GetBaseAnimating()->m_nSkin = iVariant;
+				UH_SetDroppedItemVariant( pItem, iVariant );
 			}
 			if ( pRagdoll->m_iUHGibType == UH_GIBTYPE_PMC && iVariant == 5 )
 			{
@@ -1209,6 +1230,7 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 					Vector org = pos; QAngle ang = vec3_angle;
 					pRagdoll->GetAttachment( "Eyes", org, ang );
 					pCap->SetAbsOrigin( org ); pCap->SetAbsAngles( ang ); DispatchSpawn( pCap );
+					UH_SetDroppedItemVariant( pCap, 5 );
 				}
 			}
 		}
@@ -1258,12 +1280,12 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 	if ( iHitGroup != HITGROUP_HEAD ) pRagdoll->EmitSound( "Player.Splat" );
 	UH_DispatchLimbBlood( pRagdoll, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, pos, dir );
 	if ( iHitGroup == HITGROUP_LEFTLEG )
-		DispatchParticleEffect( "blood_advisor_puncture_withdraw", PATTACH_POINT_FOLLOW, pRagdoll, "Thigh_L" );
+		UH_DispatchAttachedBlood( "blood_advisor_puncture_withdraw", pRagdoll, "Thigh_L", pos );
 	else if ( iHitGroup == HITGROUP_RIGHTLEG )
-		DispatchParticleEffect( "blood_advisor_puncture_withdraw", PATTACH_POINT_FOLLOW, pRagdoll, "Thigh_R" );
+		UH_DispatchAttachedBlood( "blood_advisor_puncture_withdraw", pRagdoll, "Thigh_R", pos );
 	else if ( iHitGroup == HITGROUP_HEAD )
 	{
 		pRagdoll->EmitSound( "Player.HeadShot" );
-		DispatchParticleEffect( "blood_zombie_split_spray", PATTACH_POINT_FOLLOW, pRagdoll, "Neck" );
+		UH_DispatchAttachedBlood( "blood_zombie_split_spray", pRagdoll, "Neck", pos );
 	}
 }
