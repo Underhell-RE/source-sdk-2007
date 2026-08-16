@@ -28,6 +28,7 @@
 #include "vehicle_jeep.h"
 #include "eventqueue.h"
 #include "rumble_shared.h"
+#include "particle_parse.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -198,6 +199,7 @@ void CPropJeep::Precache( void )
 	PrecacheScriptSound( "Jeep.GaussCharge" );
 
 	PrecacheModel( GAUSS_BEAM_SPRITE );
+	PrecacheParticleSystem( "muzzle_star_uh" );
 
 	BaseClass::Precache();
 }
@@ -898,144 +900,20 @@ void CPropJeep::FireCannon( void )
 	if ( m_bUnableToFire )
 		return;
 
-	m_flCannonTime = gpGlobals->curtime + 0.2f;
+	// The original mounted-gun path keeps jeep ammo/damage handling. AR2 is
+	// selected by its tracer/impact branch, not by replacing the ammo type.
+	m_flCannonTime = gpGlobals->curtime + 0.1f;
 	m_bCannonCharging = false;
+	DispatchParticleEffect( "muzzle_star_uh", PATTACH_POINT_FOLLOW, this, "muzzle_uh" );
 
-	//Find the direction the gun is pointing in
 	Vector aimDir;
 	GetCannonAim( &aimDir );
-
-	// Underhell mounted-gun mode is an AR2-style machine gun, not the jeep's
-	// tau/gauss cannon. The player is at the top gun while the NPC/script drives.
-	int iAmmoType = m_nAmmoType;
-	bool bMountedGun = m_bEnableMountedGun && m_bPlayerAtGun;
-	if ( bMountedGun )
-	{
-		int iAR2 = GetAmmoDef()->Index( "AR2" );
-		if ( iAR2 >= 0 )
-			iAmmoType = iAR2;
-	}
-	FireBulletsInfo_t info( 1, m_vecGunOrigin, aimDir, VECTOR_CONE_1DEGREES, MAX_TRACE_LENGTH, iAmmoType );
-
+	FireBulletsInfo_t info( 1, m_vecGunOrigin, aimDir, Vector( 0.0087299999f, 0.0087299999f, 0.0087299999f ),
+		MAX_TRACE_LENGTH, m_nAmmoType );
+	info.m_flDamage = sk_jeep_gauss_damage.GetFloat();
 	info.m_nFlags = FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS;
 	info.m_pAttacker = m_hPlayer;
-
 	FireBullets( info );
-
-	if ( bMountedGun )
-	{
-		// Original Underhell mounted-gun path uses the AR2 visual tracer instead
-		// of the tau cannon's GaussTracer/beam/explosion effect.
-		UTIL_Tracer( m_vecGunOrigin, m_vecGunOrigin + aimDir * MAX_TRACE_LENGTH,
-			entindex(), TRACER_DONT_USE_ATTACHMENT, 0, false, "AR2Tracer" );
-	}
-
-	// Register a muzzleflash for the AI
-	if ( m_hPlayer )
-	{
-		m_hPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
-		m_hPlayer->RumbleEffect( RUMBLE_PISTOL, 0, RUMBLE_FLAG_RESTART	);
-	}
-
-	CPASAttenuationFilter sndFilter( this, "PropJeep.FireCannon" );
-	EmitSound( sndFilter, entindex(), "PropJeep.FireCannon" );
-	
-	// make cylinders of gun spin a bit
-	m_nSpinPos += JEEP_GUN_SPIN_RATE;
-	//SetPoseParameter( JEEP_GUN_SPIN, m_nSpinPos );	//FIXME: Don't bother with this for E3, won't look right
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CPropJeep::FireChargedCannon( void )
-{
-	bool penetrated = false;
-
-	m_bCannonCharging	= false;
-	m_flCannonTime		= gpGlobals->curtime + 0.5f;
-
-	StopChargeSound();
-
-	CPASAttenuationFilter sndFilter( this, "PropJeep.FireChargedCannon" );
-	EmitSound( sndFilter, entindex(), "PropJeep.FireChargedCannon" );
-
-	if( m_hPlayer )
-	{
-		m_hPlayer->RumbleEffect( RUMBLE_357, 0, RUMBLE_FLAG_RESTART );
-	}
-
-	//Find the direction the gun is pointing in
-	Vector aimDir;
-	GetCannonAim( &aimDir );
-
-	Vector endPos = m_vecGunOrigin + ( aimDir * MAX_TRACE_LENGTH );
-	
-	//Shoot a shot straight out
-	trace_t	tr;
-	UTIL_TraceLine( m_vecGunOrigin, endPos, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr );
-	
-	ClearMultiDamage();
-
-	//Find how much damage to do
-	float flChargeAmount = ( gpGlobals->curtime - m_flCannonChargeStartTime ) / MAX_GAUSS_CHARGE_TIME;
-
-	//Clamp this
-	if ( flChargeAmount > 1.0f )
-	{
-		flChargeAmount = 1.0f;
-	}
-
-	//Determine the damage amount
-	//FIXME: Use ConVars!
-	float flDamage = 15 + ( ( 250 - 15 ) * flChargeAmount );
-
-	CBaseEntity *pHit = tr.m_pEnt;
-	
-	//Look for wall penetration
-	if ( tr.DidHitWorld() && !(tr.surface.flags & SURF_SKY) )
-	{
-		//Try wall penetration
-		UTIL_ImpactTrace( &tr, m_nBulletType, "ImpactJeep" );
-		UTIL_DecalTrace( &tr, "RedGlowFade" );
-
-		CPVSFilter filter( tr.endpos );
-		te->GaussExplosion( filter, 0.0f, tr.endpos, tr.plane.normal, 0 );
-		
-		Vector	testPos = tr.endpos + ( aimDir * 48.0f );
-
-		UTIL_TraceLine( testPos, tr.endpos, MASK_SHOT, GetDriver(), COLLISION_GROUP_NONE, &tr );
-			
-		if ( tr.allsolid == false )
-		{
-			UTIL_DecalTrace( &tr, "RedGlowFade" );
-
-			penetrated = true;
-		}
-	}
-	else if ( pHit != NULL )
-	{
-		CTakeDamageInfo dmgInfo( this, GetDriver(), flDamage, DMG_SHOCK );
-		CalculateBulletDamageForce( &dmgInfo, GetAmmoDef()->Index("GaussEnergy"), aimDir, tr.endpos, 1.0f + flChargeAmount * 4.0f );
-
-		//Do direct damage to anything in our path
-		pHit->DispatchTraceAttack( dmgInfo, aimDir, &tr );
-	}
-
-	ApplyMultiDamage();
-
-	//Kick up an effect
-	if ( !(tr.surface.flags & SURF_SKY) )
-	{
-  		UTIL_ImpactTrace( &tr, m_nBulletType, "ImpactJeep" );
-
-		//Do a gauss explosion
-		CPVSFilter filter( tr.endpos );
-		te->GaussExplosion( filter, 0.0f, tr.endpos, tr.plane.normal, 0 );
-	}
-
-	//Show the effect
-	DrawBeam( m_vecGunOrigin, tr.endpos, 9.6 );
 
 	// Register a muzzleflash for the AI
 	if ( m_hPlayer )
