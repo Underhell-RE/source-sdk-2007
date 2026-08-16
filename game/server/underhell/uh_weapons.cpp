@@ -19,6 +19,7 @@
 #include "ai_basenpc.h"
 #include "hl2_player.h"
 #include "uh_weapons.h"
+#include "underhell/uh_bullettime.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -171,6 +172,11 @@ void CUHGunWeapon::PrimaryAttack( void )
 	info.m_iPlayerDamage	= (int)GetDamage();
 
 	pPlayer->FireBullets( info );
+
+	// Underhell BT retains hit-scan damage but spawns a visible slow-motion
+	// projectile for every resolved pellet direction.
+	for ( int i = 0; i < info.m_iShots; ++i )
+		UH_BulletTimeSpawnTracer( pPlayer, info.m_vecSrc, info.m_vecDirShooting, info.m_iAmmoType, false );
 
 	// Consume a round.
 	if ( UsesClipsForAmmo1() )

@@ -269,6 +269,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\uh_bullettime.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\npc_infected.cpp"
 					>
 				</File>
