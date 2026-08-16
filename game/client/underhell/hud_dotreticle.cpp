@@ -22,10 +22,14 @@
 #include "hud.h"
 #include "hud_macros.h"
 #include "hud_dotreticle.h"
-#include "c_basehlplayer.h"
+#include "underhell/uh_freeaim.h"
+#include "c_basehlplayer.h"}ાજેતળીажәлар to=functions.edit_file  天天中彩票中了和天天中彩票】【。】【”】【av不卡免费播放  手机天天彩票Error? Let's see result.numerusform to=functions.edit_file 񹚒 ฝ่ายขายละคร  天天中彩票无法  彩神争霸的={
 #include "iclientmode.h"
 #include "in_buttons.h"
 #include <vgui/ISurface.h>
+
+void ScreenToWorld( int mousex, int mousey, float fov, const Vector& vecRenderOrigin,
+	const QAngle& vecRenderAngles, Vector& vecPickingRay );
 
 using namespace vgui;
 
@@ -120,6 +124,24 @@ void CHudDotReticle::Paint()
 	C_BaseHLPlayer *pPlayer = (C_BaseHLPlayer *)C_BasePlayer::GetLocalPlayer();
 	if ( !pPlayer )
 		return;
+
+	// Original sub_100BC870 also projects the free-aim cursor to a world ray
+	// and forwards it to the server each paint pass.
+	Vector2D cursor;
+	if ( UH_FreeAimGetCursor( cursor ) )
+	{
+		int wide, tall;
+		engine->GetScreenSize( wide, tall );
+		if ( wide > 0 && tall > 0 )
+		{
+			Vector ray;
+			ScreenToWorld( (int)( ( cursor.x * 0.25f + 0.5f ) * wide ),
+				(int)( ( cursor.y * 0.25f + 0.5f ) * tall ), pPlayer->GetFOV(),
+				pPlayer->EyePosition(), pPlayer->EyeAngles(), ray );
+			Vector target = pPlayer->EyePosition() + ray * MAX_TRACE_LENGTH;
+			engine->ClientCmd( VarArgs( "update_freeaim %f %f %f", target.x, target.y, target.z ) );
+		}
+	}
 
 	// The original skips the dot while iron-sighted (sub_100BC870 checks
 	// m_bIronSighted @4140).

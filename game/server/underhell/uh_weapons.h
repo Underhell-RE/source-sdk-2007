@@ -41,6 +41,7 @@ class CUHMeleeWeapon : public CBaseHLBludgeonWeapon
 
 public:
 	virtual void	PrimaryAttack( void );	// drains StaminaToDrain, then swings
+	virtual void	SecondaryAttack( void );	// no vanilla secondary swing in Underhell melee
 	virtual float	GetDamageForActivity( Activity hitActivity ) { return m_pDamage->GetFloat(); }
 	virtual float	GetDamage( void ) { return m_pDamage->GetFloat(); }
 	virtual float	GetRange( void ) { return GetWpnData().m_flMeleeRange; }
@@ -66,6 +67,7 @@ class CUHGunWeapon : public CBaseHLCombatWeapon
 
 public:
 	virtual void	PrimaryAttack( void );
+	virtual void	SecondaryAttack( void );
 	virtual float	GetDamage( void ) { return m_pDamage->GetFloat(); }
 	virtual float	GetFireRate( void ) { return m_flFireRate; }
 	virtual const Vector &GetBulletSpread( void );
@@ -100,6 +102,8 @@ public:
 	// so a held trigger only fires one shot in semi mode.
 	void			UH_ToggleFireMode( void );
 	virtual void	WeaponIdle( void );
+	virtual void	ItemPostFrame( void );
+	virtual bool	Holster( CBaseCombatWeapon *pSwitchingTo = NULL );
 
 	float			m_flFireRate;			// seconds between shots
 	ConVar			*m_pDamage;				// sk_plr_dmg_<weapon> (skill.cfg)
@@ -108,6 +112,11 @@ public:
 	float			m_flAccuracyPenalty;	// grows per shot, decays over time
 	int				m_iFireMode;			// 1 = full auto, 2 = semi (FIREMODE_*)
 	bool			m_bFireOnEdge;			// semi-auto trigger latch
+	bool			m_bFireModeInitialized;	// weapon-script FireMode applied once
+	bool			m_bNeedPump;				// pending shotgun pump animation
+	float			m_flPumpTime;				// time to play the pump after firing
+	CHandle< CBaseEntity > m_hLaserDot;		// SOCOM env_laserdot
+	bool			m_bSocomLaserOn;
 };
 
 //-----------------------------------------------------------------------------

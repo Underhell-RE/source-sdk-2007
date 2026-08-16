@@ -299,17 +299,20 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 		Vector vecOrigin = EyePosition() + vecForward * 56.0f + Vector( 0, 0, 64.0f );
 		QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
 		CBaseEntity *pRadio = CreateEntityByName( "uh_radio" );
-		if ( pRadio )
+		if ( !pRadio )
 		{
-			pRadio->SetAbsOrigin( vecOrigin );
-			pRadio->SetAbsAngles( angItem );
-			CUHRadio *pUHRadio = dynamic_cast<CUHRadio *>( pRadio );
-			if ( pUHRadio )
-				pUHRadio->SetIsCracker( iItem == UH_ITEM_RADIO_CRACKER );
-			pRadio->Spawn();
-			// Activate – sets think +5 sec, then every 1 sec emits SOUND_COMBAT 1024 radius
-			pRadio->Use( this, this, USE_ON, 0 );
+			EmitSound( "HL2Player.UseDeny" );
+			engine->ClientCommand( edict(), "UpdateInventory" );
+			return false;
 		}
+
+		pRadio->SetAbsOrigin( vecOrigin );
+		pRadio->SetAbsAngles( angItem );
+		CUHRadio *pUHRadio = dynamic_cast<CUHRadio *>( pRadio );
+		if ( pUHRadio )
+			pUHRadio->SetIsCracker( iItem == UH_ITEM_RADIO_CRACKER );
+		pRadio->Spawn();
+		pRadio->Use( this, this, USE_ON, 0 );
 		UH_RemoveInventoryItem( iSlot );
 		engine->ClientCommand( edict(), "UpdateInventory" );
 		return true;
@@ -324,6 +327,16 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 		UH_RemoveInventoryItem( iSlot );
 		engine->ClientCommand( edict(), "UpdateInventory" );
 		return true;
+	}
+
+	// The original item virtual returns success before the slot is cleared. The
+	// SDK CItem::Use signature is void, so preserve the known deny gates here.
+	// In particular, a full-health/non-bleeding bandage must remain in inventory.
+	if ( iItem == UH_ITEM_BANDAGES && GetHealth() >= 100 && UH_GetBleedCounter() <= 0 )
+	{
+		EmitSound( "HL2Player.UseDeny" );
+		engine->ClientCommand( edict(), "UpdateInventory" );
+		return false;
 	}
 
 	// Use path (original sub_102E05F0): create the item entity, place it at

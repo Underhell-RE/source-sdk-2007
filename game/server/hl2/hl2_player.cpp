@@ -49,6 +49,7 @@
 #include "tier0/icommandline.h"
 
 #include "underhell/uh_weapons.h"
+#include "underhell/uh_bullettime.h"
 
 #ifdef HL2_EPISODIC
 #include "npc_alyx_episodic.h"
@@ -327,6 +328,9 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flLastBleedTickBase, FIELD_TIME ),
 	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_hCarryingRagdoll, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_flCarryingRagdollSavedSpeed, FIELD_FLOAT ),
+	DEFINE_FIELD( m_vecUHFreeAimTarget, FIELD_VECTOR ),
 	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
@@ -422,6 +426,8 @@ BEGIN_DATADESC( CHL2_Player )
 	// Underhell kick (uh_jake_kick).
 	DEFINE_INPUTFUNC( FIELD_VOID, "DisableKick", InputDisableKick ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "EnableKick", InputEnableKick ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "EnableBt", InputEnableBt ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "DisableBt", InputDisableBt ),
 	DEFINE_FIELD( m_bKickMarker, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bKickActive, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bKickDisabled, FIELD_BOOLEAN ),
@@ -471,6 +477,9 @@ CHL2_Player::CHL2_Player()
 	m_bHoldingFlare = false;
 	m_bFlareMarker = false;
 	m_bFlashlightHolstered = false;
+	m_hCarryingRagdoll = NULL;
+	m_flCarryingRagdollSavedSpeed = 0.0f;
+	m_vecUHFreeAimTarget = vec3_origin;
 
 	UH_InitializeInventory();
 	UH_InitializeEndurance();
@@ -566,6 +575,11 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.kick_fire_fly" );
 	PrecacheScriptSound( "Player.Voice.Kick" );
 	PrecacheScriptSound( "Player.Voice.Kick.Exhausted" );
+	PrecacheScriptSound( "Player.Voice.Melee" );
+	PrecacheScriptSound( "Player.Voice.Melee.Exhausted" );
+	PrecacheScriptSound( "Player.bullettimestart" );
+	PrecacheScriptSound( "Player.bullettimeloop" );
+	PrecacheScriptSound( "Player.bullettimeend" );
 
 	// Underhell night vision + gas mask.
 	PrecacheScriptSound( "Player.nvon" );
@@ -1909,6 +1923,12 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 		break;
 	}
 
+	case 110:
+	{
+		UH_SetBulletTime( !UH_BulletTimeActive() );
+		break;
+	}
+
 	case 101:
 	{
 		// Underhell impulse 101: the full Underhell weapon set + ammo. This
@@ -2585,7 +2605,9 @@ int CHL2_Player::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	}
 
 	// Underhell: taking damage can open a bleeding wound.
-	if ( info.GetDamage() > 0.0f )
+	// Internal bleed ticks use the player as attacker. They must take real
+	// damage for death handling, but may not recursively open a new wound.
+	if ( info.GetDamage() > 0.0f && info.GetAttacker() != this )
 	{
 		UH_StartBleeding( info.GetDamage() );
 	}
@@ -2960,6 +2982,20 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 		else
 		{
 			EmitSound( filter, entindex(), "Test.Sound" );
+		}
+		return true;
+	}
+
+	// Underhell free-aim target update. The original client sends this every
+	// free-aim paint/update pass; weapons read the stored world vector when
+	// cam_ots_freeaim_enable is active.
+	if ( !Q_stricmp( args[0], "update_freeaim" ) )
+	{
+		if ( args.ArgC() >= 4 )
+		{
+			m_vecUHFreeAimTarget.x = atof( args[1] );
+			m_vecUHFreeAimTarget.y = atof( args[2] );
+			m_vecUHFreeAimTarget.z = atof( args[3] );
 		}
 		return true;
 	}
@@ -3600,6 +3636,11 @@ bool CHL2_Player::Weapon_Switch( CBaseCombatWeapon *pWeapon, int viewmodelindex 
 	// Underhell: leaving ironsight when switching weapons (the viewmodel
 	// resets to hip anyway; keep the authoritative flag + FOV in sync).
 	UH_DisableIronsight();
+
+	// SOCOM is the only weapon with the player laser sight; switching away
+	// must clear the replicated beam state.
+	if ( pWeapon && !FClassnameIs( pWeapon, "weapon_pistol_socom" ) )
+		m_bLaserToggleState = false;
 
 	// Underhell: re-evaluate the left-arm flashlight (one-handed vs two-handed).
 	UH_UpdateLeftArm();

@@ -214,6 +214,16 @@ void CHL2_Player::UH_ToggleSilencer( void )
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_ToggleLaser( void )
 {
+	// The laser sight belongs to the SOCOM path; keeping a global player flag
+	// but allowing every weapon to toggle it made the beam appear on unrelated
+	// pistols, SMGs and rifles.
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	if ( !pWeapon || !FClassnameIs( pWeapon, "weapon_pistol_socom" ) )
+	{
+		m_bLaserToggleState = false;
+		return;
+	}
+
 	m_bLaserToggleState = !m_bLaserToggleState;
 }
 

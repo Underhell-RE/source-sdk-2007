@@ -24,6 +24,7 @@
 #include "cdll_client_int.h"
 #include "cdll_util.h"
 #include "tier1/convar_serverbounded.h"
+#include "underhell/uh_freeaim.h"
 
 #if defined( _X360 )
 #include "xbox/xbox_win32stubs.h"
@@ -83,6 +84,56 @@ ConVar sensitivity( "sensitivity","3", FCVAR_ARCHIVE, "Mouse sensitivity.", true
 static ConVar m_side( "m_side","0.8", FCVAR_ARCHIVE, "Mouse side factor." );
 static ConVar m_yaw( "m_yaw","0.022", FCVAR_ARCHIVE, "Mouse yaw factor." );
 static ConVar m_forward( "m_forward","1", FCVAR_ARCHIVE, "Mouse forward factor." );
+
+// Underhell OTS/free-aim cursor. These names, defaults and the cursor math
+// below are recovered from Cliento.dll (sub_100D7980). Only move_max is read
+// by that routine; the remaining tutorial-era knobs are registered by the
+// original client for config compatibility.
+static ConVar cam_ots_freeaim_enable( "cam_ots_freeaim_enable", "1", FCVAR_ARCHIVE, "Enable Underhell viewmodel free aim." );
+static ConVar cam_ots_freeaim_interval_enable( "cam_ots_freeaim_interval_enable", "0", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_move_threshold( "cam_ots_freeaim_move_threshold", "0.05", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_move_max( "cam_ots_freeaim_move_max", "0.1", FCVAR_ARCHIVE );
+static ConVar cam_underhell_turning( "cam_underhell_turning", "1", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_speed_turn( "cam_ots_freeaim_speed_turn", "1", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_speed_evenYawSpeed( "cam_ots_freeaim_speed_evenYawSpeed", "0", FCVAR_ARCHIVE );
+static ConVar cam_ots_freeaim_autoturn_speed( "cam_ots_freeaim_autoturn_speed", "250", FCVAR_ARCHIVE );
+
+static Vector2D g_vecUHFreeAimCursor;
+
+void UH_FreeAimUpdateCursor( float mouseX, float mouseY, CUserCmd *pCmd )
+{
+	if ( !cam_ots_freeaim_enable.GetBool() )
+	{
+		g_vecUHFreeAimCursor.Init();
+		return;
+	}
+
+	// sub_100D7980. ApplyMouse still receives the complete delta afterwards.
+	g_vecUHFreeAimCursor.x += m_yaw.GetFloat() * ( 1.0f / 90.0f ) * mouseX;
+	g_vecUHFreeAimCursor.y += m_pitch->GetFloat() * ( 1.0f / 90.0f ) * mouseY;
+
+	float flLength = g_vecUHFreeAimCursor.Length();
+	if ( flLength > 0.0f )
+	{
+		g_vecUHFreeAimCursor /= flLength;
+		g_vecUHFreeAimCursor *= min( flLength, cam_ots_freeaim_move_max.GetFloat() );
+	}
+
+	if ( pCmd )
+	{
+		pCmd->mousedx = (short)mouseX;
+		pCmd->mousedy = (short)mouseY;
+	}
+}
+
+bool UH_FreeAimGetCursor( Vector2D &cursor )
+{
+	if ( !cam_ots_freeaim_enable.GetBool() )
+		return false;
+
+	cursor = g_vecUHFreeAimCursor;
+	return true;
+}
 
 static ConVar m_customaccel( "m_customaccel", "0", FCVAR_ARCHIVE, "Custom mouse acceleration (0 disable, 1 to enable, 2 enable with separate yaw/pitch rescale)."\
 	"\nFormula: mousesensitivity = ( rawmousedelta^m_customaccel_exponent ) * m_customaccel_scale + sensitivity"\
@@ -589,6 +640,9 @@ void CInput::MouseMove( CUserCmd *cmd )
 
 		// Let the client mode at the mouse input before it's used
 		g_pClientMode->OverrideMouseInput( &mouse_x, &mouse_y );
+
+		// The original accumulates free aim before applying normal camera input.
+		UH_FreeAimUpdateCursor( mouse_x, mouse_y, cmd );
 
 		// Add mouse X/Y movement to cmd
 		ApplyMouse( viewangles, cmd, mouse_x, mouse_y );

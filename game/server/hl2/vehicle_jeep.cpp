@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -28,6 +28,7 @@
 #include "vehicle_jeep.h"
 #include "eventqueue.h"
 #include "rumble_shared.h"
+#include "particle_parse.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -198,6 +199,7 @@ void CPropJeep::Precache( void )
 	PrecacheScriptSound( "Jeep.GaussCharge" );
 
 	PrecacheModel( GAUSS_BEAM_SPRITE );
+	PrecacheParticleSystem( "muzzle_star_uh" );
 
 	BaseClass::Precache();
 }
@@ -898,18 +900,19 @@ void CPropJeep::FireCannon( void )
 	if ( m_bUnableToFire )
 		return;
 
-	m_flCannonTime = gpGlobals->curtime + 0.2f;
+	// Underhell's mounted-gun path keeps jeep ammo/damage handling. AR2 is
+	// selected by its tracer/impact branch, not by replacing the ammo type.
+	m_flCannonTime = gpGlobals->curtime + 0.1f;
 	m_bCannonCharging = false;
+	DispatchParticleEffect( "muzzle_star_uh", PATTACH_POINT_FOLLOW, this, "muzzle_uh" );
 
-	//Find the direction the gun is pointing in
 	Vector aimDir;
 	GetCannonAim( &aimDir );
-
-	FireBulletsInfo_t info( 1, m_vecGunOrigin, aimDir, VECTOR_CONE_1DEGREES, MAX_TRACE_LENGTH, m_nAmmoType );
-
+	FireBulletsInfo_t info( 1, m_vecGunOrigin, aimDir, Vector( 0.0087299999f, 0.0087299999f, 0.0087299999f ),
+		MAX_TRACE_LENGTH, m_nAmmoType );
+	info.m_iDamage = sk_jeep_gauss_damage.GetInt();
 	info.m_nFlags = FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS;
 	info.m_pAttacker = m_hPlayer;
-
 	FireBullets( info );
 
 	// Register a muzzleflash for the AI
@@ -1453,6 +1456,13 @@ void CPropJeep::EnterVehicle( CBaseCombatCharacter *pPassenger )
 	CBasePlayer *pPlayer = ToBasePlayer( pPassenger );
 	if ( !pPlayer )
 		return;
+
+	// Underhell Chapter1_16: Bryan's hidden vehicle driver remains the wheel
+	// controller while the entering player is the mounted gunner. Set this
+	// before BaseClass::EnterVehicle so entry/drive code never treats the
+	// player as a second competing driver.
+	if ( GetDriver() && GetDriver()->IsNPC() )
+		m_bPlayerAtGun = true;
 
 	CheckWater();
 	BaseClass::EnterVehicle( pPassenger );

@@ -1638,27 +1638,33 @@ mod's `notes/`) was reverted after it felt wrong in game. Decode corrections:
 
 ### What the binary actually does (not the tutorial)
 
-- `cam_ots_freeaim_enable` is read in EXACTLY ONE place: `sub_10014D80`
-  (`CBaseViewModel::CalcViewModelView`), where it gates the viewmodel tilt.
-- The OTHER 6 `cam_ots_freeaim_*` ConVars (`interval_enable`, `move_threshold`,
-  `move_max`, `speed_turn`, `speed_evenYawSpeed`, `autoturn_speed`) are
-  **registered but never read** — the tutorial's deadzone/auto-turn cursor
-  logic does NOT exist in the binary.
-- `CInput` has no `TryCursorMove` / `CAM_IsFreeAiming` / `CAM_GetFreeAimCursor`
-  (confirmed from the decompile's named `CInput::*` methods).
-- The viewmodel tilt reads a Vector2D "cursor" via IInput vtable slot 12, which
-  is populated by the OTS angle-separation logic (`CalcPlayerAngle`-style
-  view-vs-aim split, `m_angViewAngle`) in `CInput::MouseMove` — entangled with
-  the third-person camera, not a first-person mouse-cursor.
+- `cam_ots_freeaim_enable` is read in `sub_10014D80`
+  (`CBaseViewModel::CalcViewModelView`), where it gates the unsighted
+  viewmodel tilt.
+- `sub_100D7980`, reached from `CInput::MouseMove`, is the actual cursor
+  update routine. It accumulates `m_yaw * mouse_x / 90` and
+  `m_pitch * mouse_y / 90`, normalizes the resulting `Vector2D`, then caps its
+  length at `cam_ots_freeaim_move_max` (**0.1** by default). Normal camera
+  `ApplyMouse` still receives the full delta immediately afterwards: this is
+  not the VDC tutorial's deadzone/overflow turn implementation.
+- The other tutorial-era ConVars are registered with the original defaults
+  (`interval_enable=0`, `move_threshold=0.05`, `speed_turn=1`,
+  `speed_evenYawSpeed=0`, `autoturn_speed=250`); no additional read was found
+  in the recovered free-aim path.
+- `sub_10014D80` maps that cursor to pixel coordinates as
+  `(cursor * 0.25 + 0.5) * screen_size`, calls `ScreenToWorld`, converts the
+  ray using `VectorAngles`, and applies the result to the viewmodel only. It
+  retains the viewmodel origin and skips the effect while iron-sighted.
 - `update_freeaim %f %f %f` is a server ConCommand; the client dot-reticle paint
-  `sub_100BC870` computes the free-aim world target via `ScreenToWorld`
-  (`sub_10070AD0`) and sends it each frame.
+  `sub_100BC870` computes the same screen ray and sends the world target each
+  frame.
 
-### Conclusion / TODO
+### Port status
 
-The "weapon tilt" is entangled with the OTS third-person camera system
-(angle separation, `m_angViewAngle`, `AllowOvertheShoulderView`, server aim
-sync via `update_freeaim`). A faithful port requires the whole OTS system, not
-a small viewmodel offset. Treat as TODO alongside the OTS third-person camera;
-do not port the tutorial's first-person free-aim in isolation — the binary
-doesn't implement it that way.
+The client implementation now mirrors the confirmed visual path:
+`CInput::MouseMove` retains the bounded cursor, while
+`CBaseViewModel::CalcViewModelView` points an unsighted first-person model
+through the corresponding `ScreenToWorld` ray. It intentionally does **not**
+introduce unverified tutorial auto-turn/deadzone behaviour. Full OTS camera
+angle separation and server-side `update_freeaim` target syncing remain
+separate work; they are not necessary for the first-person weapon tilt.

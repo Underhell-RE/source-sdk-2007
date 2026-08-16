@@ -197,6 +197,7 @@ public:
 	//---------------------------------
 	void			InputEnterVehicle( inputdata_t &inputdata );
 	void			InputEnterVehicleImmediately( inputdata_t &inputdata );
+	void			InputEnterVehicleImmediatelyAsDriver( inputdata_t &inputdata );
 	void			InputCancelEnterVehicle( inputdata_t &inputdata );
 	void			InputExitVehicle( inputdata_t &inputdata );
 	bool			CanEnterVehicle( void );

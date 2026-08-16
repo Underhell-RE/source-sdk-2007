@@ -33,6 +33,19 @@ void CHL2_Player::InputSetPlayerModel( inputdata_t &inputdata )
 	PrecacheModel( pszModel );
 	SetModel( pszModel );
 
+	// SetModel alone preserves the previous model's sequence index. Player
+	// models commonly map that index to no sequence, which leaves the local
+	// mirror body in its bind pose. Rebind to a valid idle sequence before the
+	// normal PLAYER_IDLE/WALK/ATTACK animation state takes over.
+	int iIdle = SelectWeightedSequence( ACT_IDLE );
+	if ( iIdle >= 0 )
+	{
+		ResetSequence( iIdle );
+		SetCycle( 0.0f );
+		ResetSequenceInfo();
+	}
+	SetAnimation( PLAYER_IDLE );
+
 	// Only render this body in mirrors/monitors.
 	SetMirrorOnly( true );
 }

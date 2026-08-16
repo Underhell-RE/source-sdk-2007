@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: UNDONE: Rename this to prop_vehicle.cpp !!!
 //
@@ -822,15 +822,23 @@ bool CPropVehicleDriveable::CanEnterVehicle( CBaseEntity *pEntity )
 	// Only drivers are supported
 	Assert( pEntity && pEntity->IsPlayer() );
 
-	// Prevent entering if the vehicle's being driven by an NPC
-	if ( GetDriver() && GetDriver() != pEntity )
+	// A normal vehicle rejects a second driver. Underhell gunner mode is the
+	// exception: the NPC remains the physics driver while the player enters the
+	// mounted-gun position, so do not reject the player merely because Bryan's
+	// hidden vehicle-driver controller is assigned.
+	if ( GetDriver() && GetDriver() != pEntity && !GetDriver()->IsNPC() && !m_bPlayerAtGun )
 		return false;
 
 	// Can't enter if we're upside-down
 	if ( IsOverturned() )
 		return false;
 
-	// Prevent entering if the vehicle's locked, or if it's moving too fast.
+	// Mounted-gun passengers may enter the self-driving Underhell jeep while
+	// the NPC driver is already moving. Normal driver entry keeps vanilla speed
+	// and lock restrictions.
+	if ( GetDriver() && GetDriver()->IsNPC() )
+		return !m_bLocked;
+
 	return ( !m_bLocked && (m_nSpeed <= m_flMinimumSpeedToEnterExit) );
 }
 

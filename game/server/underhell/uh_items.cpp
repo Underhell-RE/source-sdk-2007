@@ -270,7 +270,10 @@ void CItemUHSoda::Spawn( void )
 {
 	Precache();
 	SetModel( "models/props_junk/popcan01a.mdl" );
-	m_nSkin = random->RandomInt( 0, 5 );
+	// sub_10177380 randomizes only the default skin. A map-assigned flavour
+	// must survive Spawn and map to the same inventory soda ID on pickup.
+	if ( m_nSkin == 0 )
+		m_nSkin = random->RandomInt( 0, 5 );
 	BaseClass::Spawn();
 }
 
@@ -313,6 +316,9 @@ void CItemGlowStick::Spawn( void )
 {
 	Precache();
 	SetModel( "models/pg_props/pg_obj/pg_glow_stick_pack.mdl" );
+	// sub_101741C0: half the packs stay skin 0; the rest select one of the
+	// five authored colour skins. The inventory id must retain this value.
+	m_nSkin = random->RandomInt( 0, 1 ) ? random->RandomInt( 0, 4 ) : 0;
 	BaseClass::Spawn();
 }
 
@@ -328,7 +334,9 @@ bool CItemGlowStick::MyTouch( CBasePlayer *pPlayer )
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
 
-	pHL2Player->UH_GiveItem( UH_ITEM_GLOWSTICK_FIRST + random->RandomInt( 0, 4 ) );
+	// sub_101741C0 stores the random colour in m_nSkin (0..4); preserve that
+	// exact world-model skin when converting the pickup into an inventory id.
+	pHL2Player->UH_GiveItem( UH_ITEM_GLOWSTICK_FIRST + clamp( m_nSkin, 0, 4 ) );
 	UTIL_Remove( this );
 
 	return true;
@@ -390,9 +398,12 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	pGlow->SetRenderMode( kRenderGlow );
 	pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
 
-	// Follow the player (strapped to the waist).
-	pGlow->SetParent( pPlayer );
-	pGlow->SetLocalOrigin( Vector( 0, 0, 36 ) );
+	// The original creates the lit prop at player origin + 36 and records it
+	// as the active glowstick; it does not parent a visible model to the waist.
+	// Parenting was our reconstruction and is the reason a glowstick rendered
+	// permanently on the belt.
+	pGlow->SetOwnerEntity( pPlayer );
+	pGlow->SetContextThink( &CBaseEntity::SUB_Remove, gpGlobals->curtime + 360.0f, "GlowStickLifetime" );
 
 	pPlayer->UH_SetActiveGlowStick( pGlow );
 	pPlayer->EmitSound( "glowstick.crack" );
@@ -758,13 +769,13 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
-	// Original gate: only while hurt or bleeding.
-	if ( pHL2Player->GetHealth() >= 100 && pHL2Player->UH_GetBleedCounter() <= 0 )
-		return false;
+	// A bandage is always collectable. Its health/bleeding condition belongs to
+	// the consumption path below, not to the inventory pickup path.
 
-	if ( pHL2Player->UH_FindFreeSlot() < 0 )
-		return false;
-
+	// Unlike the generic inventory pickups, bandages do not reject the touch
+	// merely because every slot is occupied. UH_GiveItem owns the full-inventory
+	// fallback and recreates the world item when required, matching the original
+	// item's pickup route.
 	pHL2Player->EmitSound( "HL2Player.PickupBandages" );
 	SetOwnerEntity( pHL2Player );
 	pHL2Player->UH_GiveItem( UH_ITEM_BANDAGES );
@@ -822,6 +833,7 @@ UH_DEFINE_ITEM( CItemCapPMC,			item_cap_pmc,			"models/items/pmc_cap.mdl" )
 UH_DEFINE_ITEM( CItemHeadsetPMC,		item_headset_pmc,		"models/items/pmc_headset.mdl" )
 UH_DEFINE_ARMOR_ITEM( CItemRespiratorGuard,	item_respirator_guard,	"models/items/respirator.mdl" )
 UH_DEFINE_ARMOR_ITEM( CItemGasmaskGuard,		item_gasmask_guard,		"models/items/gasmask.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemGasmaskPrison,	item_gasmask_prison,	"models/items/gasmask.mdl" )
 
 //-----------------------------------------------------------------------------
 // item_random
@@ -1199,29 +1211,17 @@ void CUHRadio::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useT
 	if ( !pPlayer )
 		return;
 
-	// If already active, +use picks it back into inventory
+	// An activated radio/cracker remains in the world. The original Use path
+	// arms its delayed radio think; a second +use does not put it back into
+	// inventory.
 	if ( m_bIsActive )
-	{
-		CHL2_Player *pHL2 = dynamic_cast<CHL2_Player *>( pPlayer );
-		if ( pHL2 && pHL2->UH_FindFreeSlot() >= 0 )
-		{
-			if ( m_bIsCracker )
-				pHL2->UH_GiveItem( UH_ITEM_RADIO_CRACKER );
-			else
-				pHL2->UH_GiveItem( UH_ITEM_FM_RADIO );
-
-			EmitSound( "HL2Player.PickupItems" );
-			UTIL_Remove( this );
-		}
 		return;
-	}
 
-	// Activate: start playing after 5 sec (original sets think +5)
+	// First attract sound after five seconds (sub_10173790).
 	m_bIsActive = true;
+	m_iTrack = random->RandomInt( 1, 7 );
 	SetThink( &CUHRadio::RadioThink );
 	SetNextThink( gpGlobals->curtime + 5.0f );
-
-	// Prevent immediate pickup
 	SetTouch( NULL );
 }
 
@@ -1230,29 +1230,20 @@ void CUHRadio::RadioThink( void )
 	if ( !m_bIsActive )
 		return;
 
-	// Play random track
-	m_iTrack = random->RandomInt( 1, 7 );
-	char szSound[32];
-	Q_snprintf( szSound, sizeof(szSound), "Radio.Track.%d", m_iTrack );
-	EmitSound( szSound );
-
-	// Attract NPCs – insert the Underhell radio attract sound (SOUND_FMRADIO = 0x20000),
-	// volume 1024 / duration 1.0, matching serveror.dll sub_101737E0 exactly.
-	CSoundEnt::InsertSound( SOUND_FMRADIO, GetAbsOrigin(), 1024, 1.0f, this );
-
-	// For cracker, count plays and explode after ~5 plays (~5 sec after start)
-	m_iPlays++;
-	if ( m_bIsCracker )
+	// sub_101737E0 starts one selected radio track, then keeps emitting the
+	// FMRADIO AI sound once per second. It does not pick a new track every tick.
+	if ( m_iPlays == 0 && !m_bIsCracker )
 	{
-		if ( m_iPlays >= 5 )
-		{
-			// Schedule explosion think shortly
-			SetThink( &CUHRadio::ExplodeThink );
-			SetNextThink( gpGlobals->curtime + 0.5f );
-			return;
-		}
+		char szSound[32];
+		Q_snprintf( szSound, sizeof(szSound), "Radio.Track.%d", m_iTrack );
+		EmitSound( szSound );
 	}
 
+	CSoundEnt::InsertSound( SOUND_FMRADIO, GetAbsOrigin(), 1024, 1.0f, this );
+	++m_iPlays;
+
+	// Radio cracker detonation is caused by the infected destroy-radio path
+	// (sub_10173A20), not an arbitrary five-play timer.
 	SetNextThink( gpGlobals->curtime + 1.0f );
 }
 

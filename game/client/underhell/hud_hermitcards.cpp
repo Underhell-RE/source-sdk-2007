@@ -98,24 +98,14 @@ void CHudUHHermitCards::OnThink( void )
 		return;
 	}
 
-	if ( gpGlobals->curtime - m_flLastChangeTime >= UH_HERMIT_FADE_TIME )
+	if ( iCards != m_iCardsCount || bDisplay != m_bDisplayCard )
 	{
-		if ( iCards == m_iCardsCount && bDisplay == m_bDisplayCard )
-		{
-			// Stable for long enough: fade out slowly.
-			m_iAlpha = max( 0, m_iAlpha - 1 );
-		}
-		else
-		{
-			// Count or display flag changed: light up.
-			m_flLastChangeTime = gpGlobals->curtime;
-			m_iAlpha = 255;
-		}
+		m_flLastChangeTime = gpGlobals->curtime;
 	}
-	else
-	{
-		m_iAlpha = 255;
-	}
+
+	// sub_100BCFA0 is binary, not a gradual VGUI fade: the panel remains fully
+	// opaque for three seconds after a change, then switches straight to alpha 0.
+	m_iAlpha = ( gpGlobals->curtime - m_flLastChangeTime < UH_HERMIT_FADE_TIME ) ? 255 : 0;
 
 	m_iCardsCount = iCards;
 	m_iQuestCurrent = pPlayer->m_iUHHermitCurrentQuestCount;

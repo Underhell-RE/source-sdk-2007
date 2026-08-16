@@ -74,16 +74,17 @@ struct UHInfectedVariant_t
 	const char *pszHelmet; // optional helmet model that can drop
 };
 
+// IDs are serveror.dll IDs, not FGD display order (sub_101A6620).
 static const UHInfectedVariant_t s_InfectedVariants[] =
 {
 	{ "inmate",  "models/infected/infected_inmate.mdl",  "models/gibs/bodyparts/infected/inmate_leftarm.mdl",  "models/gibs/bodyparts/infected/inmate_rightarm.mdl",  "models/gibs/bodyparts/infected/inmate_leftleg.mdl",  "models/gibs/bodyparts/infected/inmate_rightleg.mdl",  NULL },
-	{ "guard",   "models/infected/infected_guard.mdl",   "models/gibs/bodyparts/infected/guard_leftarm.mdl",   "models/gibs/bodyparts/infected/guard_rightarm.mdl",   "models/gibs/bodyparts/infected/guard_leftleg.mdl",   "models/gibs/bodyparts/infected/guard_rightleg.mdl",   "models/items/guard_helmet.mdl" },
 	{ "worker",  "models/infected/infected_worker.mdl",  "models/gibs/bodyparts/infected/worker_leftarm.mdl",  "models/gibs/bodyparts/infected/worker_rightarm.mdl",  "models/gibs/bodyparts/infected/worker_leftleg.mdl",  "models/gibs/bodyparts/infected/worker_rightleg.mdl",  "models/items/worker_helmet.mdl" },
-	{ "rural",   "models/infected/infected_rural.mdl",   "models/gibs/bodyparts/infected/rural_leftarm.mdl",   "models/gibs/bodyparts/infected/rural_rightarm.mdl",   "models/gibs/bodyparts/infected/rural_leftleg.mdl",   "models/gibs/bodyparts/infected/rural_rightleg.mdl",   NULL },
 	{ "doctor",  "models/infected/infected_doctor.mdl",  "models/gibs/bodyparts/infected/doctor_leftarm.mdl",  "models/gibs/bodyparts/infected/doctor_rightarm.mdl",  "models/gibs/bodyparts/infected/doctor_leftleg.mdl",  "models/gibs/bodyparts/infected/doctor_rightleg.mdl",  NULL },
 	{ "uniform", "models/infected/infected_uniform.mdl", "models/gibs/bodyparts/infected/uniform_leftarm.mdl", "models/gibs/bodyparts/infected/uniform_rightarm.mdl", "models/gibs/bodyparts/infected/uniform_leftleg.mdl", "models/gibs/bodyparts/infected/uniform_rightleg.mdl", NULL },
-	{ "office",  "models/infected/infected_office.mdl",  "models/gibs/bodyparts/infected/office_leftarm.mdl",  "models/gibs/bodyparts/infected/office_rightarm.mdl",  "models/gibs/bodyparts/infected/office_leftleg.mdl",  "models/gibs/bodyparts/infected/office_rightleg.mdl",  NULL },
 	{ "urban",   "models/infected/infected_urban.mdl",   "models/gibs/bodyparts/infected/urban_leftarm.mdl",   "models/gibs/bodyparts/infected/urban_rightarm.mdl",   "models/gibs/bodyparts/infected/urban_leftleg.mdl",   "models/gibs/bodyparts/infected/urban_rightleg.mdl",   NULL },
+	{ "rural",   "models/infected/infected_rural.mdl",   "models/gibs/bodyparts/infected/rural_leftarm.mdl",   "models/gibs/bodyparts/infected/rural_rightarm.mdl",   "models/gibs/bodyparts/infected/rural_leftleg.mdl",   "models/gibs/bodyparts/infected/rural_rightleg.mdl",   NULL },
+	{ "guard",   "models/infected/infected_guard.mdl",   "models/gibs/bodyparts/infected/guard_leftarm.mdl",   "models/gibs/bodyparts/infected/guard_rightarm.mdl",   "models/gibs/bodyparts/infected/guard_leftleg.mdl",   "models/gibs/bodyparts/infected/guard_rightleg.mdl",   "models/items/guard_helmet.mdl" },
+	{ "office",  "models/infected/infected_office.mdl",  "models/gibs/bodyparts/infected/office_leftarm.mdl",  "models/gibs/bodyparts/infected/office_rightarm.mdl",  "models/gibs/bodyparts/infected/office_leftleg.mdl",  "models/gibs/bodyparts/infected/office_rightleg.mdl",  NULL },
 };
 
 #define UH_INFECTED_VARIANT_COUNT ARRAYSIZE(s_InfectedVariants)
@@ -456,13 +457,13 @@ void CNPC_UH_Infected::PickBodyVariant( void )
 
 	// FGD: 1 = enabled (No disable), 0 = disabled (Yes)
 	if ( m_bDisableInmate )  enabled.AddToTail( 0 );
-	if ( m_bDisableGuard )   enabled.AddToTail( 1 );
-	if ( m_bDisableWorker )  enabled.AddToTail( 2 );
-	if ( m_bDisableRural )   enabled.AddToTail( 3 );
-	if ( m_bDisableDoctor )  enabled.AddToTail( 4 );
-	if ( m_bDisableUniform ) enabled.AddToTail( 5 );
-	if ( m_bDisableOffice )  enabled.AddToTail( 6 );
-	if ( m_bDisableUrban )   enabled.AddToTail( 7 );
+	if ( m_bDisableGuard )   enabled.AddToTail( 6 );
+	if ( m_bDisableWorker )  enabled.AddToTail( 1 );
+	if ( m_bDisableRural )   enabled.AddToTail( 5 );
+	if ( m_bDisableDoctor )  enabled.AddToTail( 2 );
+	if ( m_bDisableUniform ) enabled.AddToTail( 3 );
+	if ( m_bDisableOffice )  enabled.AddToTail( 7 );
+	if ( m_bDisableUrban )   enabled.AddToTail( 4 );
 
 	if ( enabled.Count() == 0 )
 	{
@@ -508,7 +509,7 @@ void CNPC_UH_Infected::ApplyBodygroups( void )
 	// Per-variant randomization (helmets, respirator, gloves, arms)
 	int iVariant = m_iInfectedVariant;
 
-	if ( iVariant == 2 ) // worker
+	if ( iVariant == 1 ) // worker
 	{
 		// worker: 0..5 skin already, plus head 0..8 random
 		int iHead = random->RandomInt( 0, 8 );
@@ -522,13 +523,13 @@ void CNPC_UH_Infected::ApplyBodygroups( void )
 
 		// Arms – will be overridden if limp
 	}
-	else if ( iVariant == 4 ) // doctor
+	else if ( iVariant == 2 ) // doctor
 	{
 		int iHead = random->RandomInt( 0, 8 );
 		if ( FindBodygroupByName( "head" ) >= 0 )
 			SetBodygroup( FindBodygroupByName( "head" ), iHead );
 	}
-	else if ( iVariant == 1 ) // guard
+	else if ( iVariant == 6 ) // guard
 	{
 		int iHelmet = random->RandomInt( 0, 3 );
 		int iHead = random->RandomInt( 0, 9 );
@@ -1262,9 +1263,10 @@ int CNPC_UH_Infected::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		PainSound( info );
 	}
 
-	// If shot in head with helmet, knock off helmet (reuse uh_ai logic via UH_ConsiderGib)
-	// Handled by CAI_BaseNPC::UH_ConsiderGib in uh_ai.cpp – call it
-	UH_ConsiderGib( info.GetDamage() > 10 ? HITGROUP_HEAD : HITGROUP_GENERIC, info.GetDamage(), WorldSpaceCenter(), info.GetDamageForce() );
+	// TraceAttack in CAI_BaseNPC already sends the real hitgroup and impact
+	// position to UH_ConsiderGib.  Do not manufacture a head hit here: damage
+	// callbacks contain no hitgroup and the old code removed infected heads on
+	// any damage above 10.
 
 	return BaseClass::OnTakeDamage_Alive( info );
 }

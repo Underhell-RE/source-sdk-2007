@@ -244,6 +244,8 @@ void CHL2_Player::UH_StartBleeding( float flDamage )
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_UpdateBleeding( void )
 {
+	UH_UpdateCarryRagdollWeight();
+
 	// First think has no previous timestamp; skip so dt is not huge.
 	if ( m_flLastBleedTickBase == 0.0f )
 	{
@@ -286,33 +288,28 @@ void CHL2_Player::UH_UpdateBleeding( void )
 		{
 			m_flPseudoHealth -= (float)iWhole;
 
-			// Bleeding can only bring the player down to 1 HP; the final
-			// point is finished by a "kill" client command (original does
-			// engine->ClientCommand( "kill" ) at health 0).
-			if ( GetHealth() <= 1 )
-			{
-				// At death's door, the wound stops draining health.
-			}
-			else
-			{
-				TakeHealth( (float)-iWhole, DMG_GENERIC );
-
-				// Blood drip at the player's feet (original spawns a
-				// "blood_drop" effect, sub_1002A5F0).
-				UTIL_BloodDrips( GetAbsOrigin() - Vector( 0, 0, 32 ), Vector( 0, 0, -1 ), BLOOD_COLOR_RED, 2 );
-
-				int iBleed = m_iBleedCounter - iWhole;
-				m_iBleedCounter = ( iBleed <= 10 ) ? 0 : iBleed;
-			}
+			// sub_101EF960 applies actual health loss, not a negative health
+			// pickup. Using TakeHealth(-N) bypassed normal player damage/death
+			// processing in this SDK and could leave a bleeding player stuck alive.
+			CTakeDamageInfo bleedInfo( this, this, (float)iWhole, DMG_GENERIC );
+			bleedInfo.SetDamagePosition( GetAbsOrigin() - Vector( 0, 0, 32 ) );
+			TakeDamage( bleedInfo );
 
 			if ( GetHealth() <= 0 )
 			{
-				m_iEHealthCount += 1;
-				if ( m_iEHealthCount >= 10 )
+				if ( ++m_iEHealthCount >= 10 )
 				{
 					m_iEHealthCount = 0;
 					m_iEndurance = 0;
 				}
+			}
+			else
+			{
+				// The original only emits the blood-drop and reduces wound severity
+				// after the player survived this whole-health point.
+				UTIL_BloodDrips( GetAbsOrigin() - Vector( 0, 0, 32 ), Vector( 0, 0, -1 ), BLOOD_COLOR_RED, 2 );
+				int iBleed = m_iBleedCounter - iWhole;
+				m_iBleedCounter = ( iBleed <= 10 ) ? 0 : iBleed;
 			}
 		}
 

@@ -19,6 +19,8 @@
 #include "ai_basenpc.h"
 #include "hl2_player.h"
 #include "uh_weapons.h"
+#include "underhell/uh_bullettime.h"
+#include "hl2/weapon_rpg.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -31,12 +33,28 @@ void CUHMeleeWeapon::PrimaryAttack( void )
 	CHL2_Player *pPlayer = ToBasePlayer( GetOwner() ) ? dynamic_cast<CHL2_Player *>( GetOwner() ) : NULL;
 	if ( pPlayer )
 	{
-		// TODO: gate the swing on having enough stamina (original plays
-		// "HL2Player.SprintNoPower" / a deny sound when drained).
+		// serveror.dll sub_102B0B50: melee cannot start below 15 stamina.
+		// It is intentionally a fixed entry threshold, while the actual amount
+		// drained is weapon-script StaminaToDrain.
+		if ( pPlayer->SuitPower_GetCurrentPercentage() < 15.0f )
+		{
+			pPlayer->EmitSound( "Player.Voice.Melee.Exhausted" );
+			return;
+		}
+
 		pPlayer->SuitPower_Drain( GetWpnData().m_flStaminaToDrain );
+		pPlayer->EmitSound( pPlayer->SuitPower_GetCurrentPercentage() < 35.0f
+			? "Player.Voice.Melee.Exhausted" : "Player.Voice.Melee" );
 	}
 
 	BaseClass::PrimaryAttack();
+}
+
+void CUHMeleeWeapon::SecondaryAttack( void )
+{
+	// CBaseHLBludgeonWeapon exposes a vanilla IN_ATTACK2 swing, but the
+	// Underhell melee vtable has only the primary sub_102B0B50 path.
+	m_flNextSecondaryAttack = gpGlobals->curtime + GetFireRate();
 }
 
 //-----------------------------------------------------------------------------
@@ -105,6 +123,18 @@ void CUHMeleeWeapon::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatC
 //-----------------------------------------------------------------------------
 void CUHGunWeapon::PrimaryAttack( void )
 {
+	// Constructors run before weapon-script data is available. Apply the
+	// original UH_Weapon_Special FireMode on the first real attack instead of
+	// leaving every thin weapon class in full-auto (the cause of automatic
+	// Beretta/Glock/SOCOM fire while the trigger is held).
+	if ( !m_bFireModeInitialized )
+	{
+		int iScriptFireMode = GetWpnData().m_iFireMode;
+		if ( iScriptFireMode == FIREMODE_FULLAUTO || iScriptFireMode == FIREMODE_SEMI || iScriptFireMode == FIREMODE_3RNDBURST )
+			m_iFireMode = iScriptFireMode;
+		m_bFireModeInitialized = true;
+	}
+
 	// If the clip is empty (and we use clips), start a reload.
 	if ( UsesClipsForAmmo1() && !m_iClip1 )
 	{
@@ -151,6 +181,11 @@ void CUHGunWeapon::PrimaryAttack( void )
 
 	pPlayer->FireBullets( info );
 
+	// Underhell BT retains hit-scan damage but spawns a visible slow-motion
+	// projectile for every resolved pellet direction.
+	for ( int i = 0; i < info.m_iShots; ++i )
+		UH_BulletTimeSpawnTracer( pPlayer, info.m_vecSrc, info.m_vecDirShooting, info.m_iAmmoType, false );
+
 	// Consume a round.
 	if ( UsesClipsForAmmo1() )
 	{
@@ -162,6 +197,14 @@ void CUHGunWeapon::PrimaryAttack( void )
 	}
 
 	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
+
+	// Underhell shotguns are pump-action. The old thin gun base used their
+	// 0.8 s refire time but never sent the intervening pump sequence.
+	if ( m_iShotsPerFire > 1 )
+	{
+		m_bNeedPump = true;
+		m_flPumpTime = gpGlobals->curtime + 0.4f;
+	}
 
 	// Out of ammo indicator.
 	if ( !m_iClip1 && pPlayer->GetAmmoCount( m_iPrimaryAmmoType ) <= 0 )
@@ -176,6 +219,39 @@ void CUHGunWeapon::PrimaryAttack( void )
 	// multipliers, not the penalty curve).
 	m_flAccuracyPenalty += 0.1f;
 	m_flAccuracyPenalty = clamp( m_flAccuracyPenalty, 0.0f, 1.0f );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: SOCOM laser secondary attack. CWeaponPistolSocom::sub_1027B9E0
+// toggles its laser state and sends activity 12/13; the player-level network
+// bit carries that state to the compact client beam renderer.
+//-----------------------------------------------------------------------------
+void CUHGunWeapon::SecondaryAttack( void )
+{
+	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
+	if ( pOwner && FClassnameIs( this, "weapon_pistol_socom" ) )
+	{
+		CHL2_Player *pPlayer = dynamic_cast< CHL2_Player * >( pOwner );
+		m_bSocomLaserOn = !m_bSocomLaserOn;
+		if ( pPlayer )
+			pPlayer->UH_SetLaserOn( m_bSocomLaserOn );
+
+		if ( !m_bSocomLaserOn )
+		{
+			UTIL_Remove( m_hLaserDot.Get() );
+			m_hLaserDot = NULL;
+		}
+		else if ( !m_hLaserDot.Get() )
+		{
+			m_hLaserDot = CreateLaserDot( pOwner->Weapon_ShootPosition(), this, true );
+		}
+
+		SendWeaponAnim( m_bSocomLaserOn ? (Activity)12 : (Activity)13 );
+		m_flNextSecondaryAttack = gpGlobals->curtime + 0.2f;
+		return;
+	}
+
+	BaseClass::SecondaryAttack();
 }
 
 //-----------------------------------------------------------------------------
@@ -213,6 +289,48 @@ void CUHGunWeapon::WeaponIdle( void )
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 	if ( pPlayer && !( pPlayer->m_nButtons & IN_ATTACK ) )
 		m_bFireOnEdge = true;
+}
+
+void CUHGunWeapon::ItemPostFrame( void )
+{
+	// sub_1027F4E0's pump sits between the fire event and the 0.8 s refire
+	// window. Run it from ItemPostFrame so it also happens while IN_ATTACK is
+	// held; WeaponIdle alone is skipped during sustained fire.
+	if ( m_bNeedPump && gpGlobals->curtime >= m_flPumpTime )
+	{
+		m_bNeedPump = false;
+		WeaponSound( SPECIAL1 );
+		SendWeaponAnim( ACT_SHOTGUN_PUMP );
+	}
+
+	if ( m_bSocomLaserOn && m_hLaserDot.Get() )
+	{
+		CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
+		if ( pOwner )
+		{
+			Vector start = pOwner->Weapon_ShootPosition();
+			Vector dir = pOwner->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );
+			trace_t tr;
+			UTIL_TraceLine( start, start + dir * MAX_TRACE_LENGTH, MASK_SHOT, pOwner, COLLISION_GROUP_NONE, &tr );
+			SetLaserDotPosition( m_hLaserDot.Get(), tr.endpos, tr.plane.normal );
+		}
+	}
+
+	BaseClass::ItemPostFrame();
+}
+
+bool CUHGunWeapon::Holster( CBaseCombatWeapon *pSwitchingTo )
+{
+	if ( m_hLaserDot.Get() )
+	{
+		UTIL_Remove( m_hLaserDot.Get() );
+		m_hLaserDot = NULL;
+	}
+	m_bSocomLaserOn = false;
+	CHL2_Player *pPlayer = dynamic_cast< CHL2_Player * >( ToBasePlayer( GetOwner() ) );
+	if ( pPlayer )
+		pPlayer->UH_SetLaserOn( false );
+	return BaseClass::Holster( pSwitchingTo );
 }
 
 //-----------------------------------------------------------------------------
@@ -502,7 +620,7 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; }
+	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bFireModeInitialized = false; m_bNeedPump = false; m_flPumpTime = 0.0f; m_hLaserDot = NULL; m_bSocomLaserOn = false; }
 
 #define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
 	acttable_t _className::m_acttable[] = \

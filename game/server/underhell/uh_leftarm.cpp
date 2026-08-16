@@ -85,13 +85,62 @@ void CHL2_Player::UH_UpdateLeftArm( void )
 	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
 	bool bLeftArmFree = !pWeapon || pWeapon->GetWpnData().m_bOneHanded || pWeapon->GetWpnData().m_bMeleeWeapon;
 
-	if ( FlashlightIsOn() && UH_IsFlashlightInLeftArm() && bLeftArmFree )
+	bool bWantFlashlight = FlashlightIsOn() && UH_IsFlashlightInLeftArm() && bLeftArmFree;
+	CBaseViewModel *pViewModel = GetViewModel( 1 );
+	bool bFlashlightModel = pViewModel &&
+		!Q_stricmp( STRING( pViewModel->GetModelName() ), UH_LEFTARM_FLASHLIGHT );
+
+	if ( bWantFlashlight )
 	{
-		UH_SetLeftArmModel( UH_LEFTARM_FLASHLIGHT, 1, true );
+		// sub_101F0C60: model is installed, then sequence 1 plays the raise
+		// animation. Keeping the model alive is what makes the transition
+		// visible instead of snapping the left hand into its idle pose.
+		if ( !bFlashlightModel )
+		{
+			pViewModel->SetWeaponModel( UH_LEFTARM_FLASHLIGHT, NULL );
+			pViewModel->m_nSkin = 1;
+			pViewModel->RemoveEffects( EF_NODRAW );
+			pViewModel->SendViewModelMatchingSequence( 1 );
+		}
+		m_bFlashlightHolstered = false;
+		m_bLeftArmDeployed = true;
+		return;
+	}
+
+	if ( bFlashlightModel && !m_bFlashlightHolstered )
+	{
+		// Original sequence 2 is the lower/holster animation. Defer hiding the
+		// viewmodel until it has had time to play.
+		pViewModel->SendViewModelMatchingSequence( 2 );
+		m_bFlashlightHolstered = true;
+		m_bLeftArmDeployed = false;
+		SetContextThink( &CHL2_Player::UH_FlashlightViewModelThink,
+			gpGlobals->curtime + 0.25f, "FlashlightViewModelThink" );
 		return;
 	}
 
 	UH_SetLeftArmModel( NULL, 0, false );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Complete sequence 2 after its lower/holster window. This is kept
+// separate from FlashLightContext, which the original uses for grenade throws.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_FlashlightViewModelThink( void )
+{
+	if ( FlashlightIsOn() && UH_IsFlashlightInLeftArm() )
+	{
+		UH_UpdateLeftArm();
+		return;
+	}
+
+	CBaseViewModel *pViewModel = GetViewModel( 1 );
+	if ( pViewModel && !Q_stricmp( STRING( pViewModel->GetModelName() ), UH_LEFTARM_FLASHLIGHT ) )
+	{
+		pViewModel->SetWeaponModel( NULL, NULL );
+		pViewModel->AddEffects( EF_NODRAW );
+	}
+	m_bLeftArmDeployed = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -100,6 +149,7 @@ void CHL2_Player::UH_UpdateLeftArm( void )
 void CHL2_Player::UH_HolsterLeftArm( void )
 {
 	m_bLeftArmDeployed = false;
+	m_bFlashlightHolstered = true;
 	UH_SetLeftArmModel( NULL, 0, false );
 }
 

@@ -64,6 +64,8 @@ struct UHGibFolder_t
 	const char *pszLimbPrefix;		// "" or a prefix like "pmc_" / "inmate_"
 };
 
+static int UH_FindBodygroup( CBaseAnimating *pBody, const char *pszName );
+
 static const UHGibFolder_t s_GibFolders[] =
 {
 	{ "combine_soldier_prisonguard",	"models/gibs/bodyparts/soldier_prisonguard",	"" },
@@ -79,12 +81,25 @@ static const UHGibFolder_t s_GibFolders[] =
 	{ "pmc",							"models/gibs/bodyparts/pmc",					"pmc_" },
 };
 
-static const char *UH_GibModelFor( const char *pszNPC, const char *pszLimb )
+static const char *UH_GibModelFor( CBaseAnimating *pBody, const char *pszLimb )
 {
+	const char *pszNPC = STRING( pBody->GetModelName() );
 	for ( int i = 0; i < ARRAYSIZE( s_GibFolders ); i++ )
 	{
 		if ( V_stristr( pszNPC, s_GibFolders[i].pszModelSubstring ) )
 		{
+			// CNPC_CombineS selects the second leg meshes whenever its authored
+			// Legs bodygroup is the heavy variant (value 4).  They are soldier
+			// meshes even for the heavy prison model.
+			if ( !V_stricmp( pszLimb, "leftleg" ) || !V_stricmp( pszLimb, "rightleg" ) )
+			{
+				int iLegs = UH_FindBodygroup( pBody, "legs" );
+				if ( iLegs >= 0 && pBody->GetBodygroup( iLegs ) >= 4 &&
+					( V_stristr( pszNPC, "combine_soldier" ) || V_stristr( pszNPC, "prisonguard" ) ) )
+				{
+					return UTIL_VarArgs( "models/gibs/bodyparts/soldier/%s2.mdl", pszLimb );
+				}
+			}
 			return UTIL_VarArgs( "%s/%s%s.mdl", s_GibFolders[i].pszFolder, s_GibFolders[i].pszLimbPrefix, pszLimb );
 		}
 	}
@@ -96,31 +111,89 @@ static const char *UH_GibModelFor( const char *pszNPC, const char *pszLimb )
 // combine_soldier table; the transition removes the named side. If the model
 // lacks the bodygroup, fail soft (the original would crash here).
 //-----------------------------------------------------------------------------
-static bool UH_RemoveBodygroupSide( CBaseAnimating *pNPC, const char *pszGroup, int iSide )
+// sub_10031BF0 does not use a generic left/right bitfield.  The authored
+// combine models encode arm-loss states differently: regular soldiers use
+// 0/2/4/6 while prison/worker/PMC variants use 0/1/2/3.  Treating them as
+// bits 1/2 (the old implementation) selected intact or wrong geometry.
+static int UH_FindBodygroup( CBaseAnimating *pBody, const char *pszName )
 {
-	int iGroup = pNPC->FindBodygroupByName( pszGroup );
+	int i = pBody->FindBodygroupByName( pszName );
+	if ( i >= 0 )
+		return i;
+
+	char alternate[64];
+	V_strncpy( alternate, pszName, sizeof( alternate ) );
+	if ( alternate[0] >= 'a' && alternate[0] <= 'z' )
+		alternate[0] -= 'a' - 'A';
+	else if ( alternate[0] >= 'A' && alternate[0] <= 'Z' )
+		alternate[0] += 'a' - 'A';
+	return pBody->FindBodygroupByName( alternate );
+}
+
+static bool UH_RemoveBodygroupSide( CBaseAnimating *pBody, const char *pszGroup, int iSide )
+{
+	int iGroup = UH_FindBodygroup( pBody, pszGroup );
 	if ( iGroup < 0 )
 		return false;
 
-	int iCur = pNPC->GetBodygroup( iGroup );
+	const int iCurrent = pBody->GetBodygroup( iGroup );
+	const int iCount = pBody->GetBodygroupCount( iGroup );
+	const char *pszModel = STRING( pBody->GetModelName() );
+	int iNew = iCurrent;
 
-	// Left = bit 1, right = bit 2 (of the low two "regular" bits). Heavy legs
-	// repeat the pattern in bits 3-4 (values 4-7), so mask off that bit too.
-	int iNew = iCur;
-	if ( iSide == 0 )		// left
+	if ( !V_stricmp( pszGroup, "arms" ) )
 	{
-		iNew |= 1;
+		// From sub_10031BF0 cases 4/5.  Soldier arm bodygroups reserve bit 0
+		// for the intact variant, therefore left/right loss is +2/+4.  The
+		// 4-state families use +1/+2.
+		const bool bSixStateSoldier =
+			V_stristr( pszModel, "combine_soldier" ) &&
+			!V_stristr( pszModel, "prisonguard" ) && iCount > 4;
+		const int iMask = bSixStateSoldier ? ( iSide == 0 ? 2 : 4 ) : ( iSide == 0 ? 1 : 2 );
+		iNew = iCurrent | iMask;
 	}
-	else					// right
+	else if ( !V_stricmp( pszGroup, "legs" ) )
 	{
-		iNew |= 2;
+		// The leg bodygroup has ordinary and heavy sets.  Preserve the heavy
+		// base (bit 2) and mark the severed side in its low bits.
+		const int iMask = iSide == 0 ? 1 : 2;
+		iNew = iCurrent | iMask;
+	}
+	else
+	{
+		iNew = iCurrent | ( iSide == 0 ? 1 : 2 );
 	}
 
-	if ( iNew == iCur )
+	if ( iNew == iCurrent || iNew >= iCount )
 		return false;
-
-	pNPC->SetBodygroup( iGroup, iNew );
+	pBody->SetBodygroup( iGroup, iNew );
+	pBody->ResetSequenceInfo();
 	return true;
+}
+
+// sub_10031BF0 uses model-family-specific destroyed-head variants. In
+// particular, value 1 is valid for the prison guard but leaves a normal
+// combine soldier with an intact/incorrect head; soldiers use the high
+// destroyed-head variants instead.
+static int UH_DestroyedHeadBodygroup( CBaseAnimating *pBody )
+{
+	const char *pszModel = STRING( pBody->GetModelName() );
+	if ( V_stristr( pszModel, "combine_soldier_prisonguard" ) )
+		return 1;
+	if ( V_stristr( pszModel, "combine_soldier" ) )
+	{
+		// CNPC_CombineS path in sub_10031BF0: normal combine variants use
+		// destroyed head 10, or 11 when their current head is already one of
+		// the high (helmet/gear) variants. Value 9 belongs to other NPC types.
+		int iHead = UH_FindBodygroup( pBody, "head" );
+		const int iDestroyed = ( iHead >= 0 && pBody->GetBodygroup( iHead ) >= 9 ) ? 11 : 10;
+		// Some map replacements use a reduced combine model.  Never assign an
+		// out-of-range studio body value: that leaves the networked ragdoll in
+		// an invalid state rather than producing the destroyed head.
+		if ( iHead >= 0 && iDestroyed < pBody->GetBodygroupCount( iHead ) )
+			return iDestroyed;
+	}
+	return 1;
 }
 
 //-----------------------------------------------------------------------------
@@ -241,13 +314,15 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 		PrecacheModel( "models/items/helmet_visor.mdl" );
 		PrecacheModel( "models/items/respirator.mdl" );
 	}
+	if ( V_stristr( pszModel, "pmc" ) )
+		PrecacheModel( "models/items/pmc_helmet.mdl" );
 
 	// Dismemberment blood sprays + sounds (1:1 with sub_10021D80 precache).
 	PrecacheParticleSystem( "blood_zombie_split_spray" );
 	PrecacheParticleSystem( "blood_advisor_puncture_withdraw" );
 	PrecacheScriptSound( "Player.Helmet" );
 	PrecacheScriptSound( "Player.Splat" );
-	PrecacheScriptSound( "Player.Headshot" );
+	PrecacheScriptSound( "Player.HeadShot" );
 }
 
 //-----------------------------------------------------------------------------
@@ -256,34 +331,78 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 // limb flops naturally; a plain prop_physics with these models renders as an
 // invisible/static body.
 //-----------------------------------------------------------------------------
-static CBaseEntity *UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, const Vector &vecDir, CBaseEntity *pOwner )
+static CBaseEntity *UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, const QAngle &angPosition, const Vector &vecDir, CBaseEntity *pOwner )
 {
-	// The gib models are spawned dynamically (after the map precache phase),
-	// so force-precache them here. Without this, SetModel() fires
-	// "UTIL_SetModel: not precached" and the game crashes.
-	CBaseEntity::PrecacheModel( pszModel );
-
-	CBaseEntity *pProp = CreateEntityByName( "prop_ragdoll" );
-	if ( !pProp )
+	CBaseAnimating *pAnimatingOwner = pOwner ? pOwner->GetBaseAnimating() : NULL;
+	if ( !pAnimatingOwner )
 		return NULL;
 
-	pProp->SetModel( pszModel );
-	pProp->SetAbsOrigin( vecPosition );
-	pProp->SetAbsAngles( vec3_angle );
-	DispatchSpawn( pProp );
+	// This is the SDK equivalent of serveror's sub_101CDCC0.  It copies the
+	// source skeleton through a temporary bone merge before initializing VPhysics;
+	// spawning an independent prop_ragdoll lost that pose and made detached limbs
+	// start in their reference/T pose.
+	CBaseAnimating *pGib = CreateServerRagdollSubmodel(
+		pAnimatingOwner, pszModel, vecPosition, angPosition, COLLISION_GROUP_DEBRIS );
+	if ( !pGib )
+		return NULL;
 
-	IPhysicsObject *pPhys = pProp->VPhysicsGetObject();
-	if ( pPhys )
+	// sub_10031BF0 explicitly copies the source skin to its sub-ragdoll.
+	pGib->m_nSkin = pAnimatingOwner->m_nSkin;
+
+	// Inherit the current corpse motion.  InitRagdoll receives a pose, not the
+	// parent physics object's linear/angular velocity; leaving it at zero made
+	// detached legs solve their first frame as a violent, comic launch.
+	IPhysicsObject *pSourcePhysics = pAnimatingOwner->VPhysicsGetObject();
+	IPhysicsObject *pGibPhysics = pGib->VPhysicsGetObject();
+	if ( pSourcePhysics && pGibPhysics )
 	{
-		// vecDir is the (unit) shot direction; scale it so the severed limb
-		// visibly flies off instead of just dropping in place.
-		Vector vecVelocity = vecDir * 150.0f;
-		AngularImpulse angImpulse( random->RandomFloat(-200,200), random->RandomFloat(-200,200), random->RandomFloat(-200,200) );
-		pPhys->SetVelocity( &vecVelocity, &angImpulse );
+		Vector vecVelocity;
+		AngularImpulse angVelocity;
+		pSourcePhysics->GetVelocity( &vecVelocity, &angVelocity );
+		pGibPhysics->SetVelocity( &vecVelocity, &angVelocity );
 	}
+	(void)vecDir;
 
-	pProp->SetOwnerEntity( pOwner );
-	return pProp;
+	pGib->SetOwnerEntity( pOwner );
+	return pGib;
+}
+
+// The original creates a sub-ragdoll at the authored sever attachment, not
+// at the bullet impact point.  The impact may be anywhere along a forearm or
+// calf and produced visibly detached/floating gibs in the old port.
+static void UH_GetLimbSpawnTransform( CBaseAnimating *pBody, int iHitGroup, const Vector &vecFallback, Vector &vecOrigin, QAngle &angOrigin )
+{
+	const char *pszAttachment = NULL;
+	switch ( iHitGroup )
+	{
+	case HITGROUP_LEFTARM:  pszAttachment = "ForeArm_L"; break;
+	case HITGROUP_RIGHTARM: pszAttachment = "ForeArm_R"; break;
+	case HITGROUP_LEFTLEG:  pszAttachment = "Calf_L"; break;
+	case HITGROUP_RIGHTLEG: pszAttachment = "Calf_R"; break;
+	}
+	vecOrigin = vecFallback;
+	angOrigin = vec3_angle;
+	if ( pszAttachment )
+		pBody->GetAttachment( pszAttachment, vecOrigin, angOrigin );
+}
+
+// sub_10031BF0 copies the relevant glove variant to an arm sub-ragdoll.
+// Without this, a gloved soldier leaves behind a bare detached hand because a
+// new prop starts with model bodygroups at zero.
+static void UH_CopyLimbBodygroups( CBaseAnimating *pSource, CBaseAnimating *pGib, int iHitGroup )
+{
+	const char *pszGlove = NULL;
+	if ( iHitGroup == HITGROUP_LEFTARM )
+		pszGlove = "Glove_L";
+	else if ( iHitGroup == HITGROUP_RIGHTARM )
+		pszGlove = "Glove_R";
+	if ( !pszGlove )
+		return;
+
+	int iSource = UH_FindBodygroup( pSource, pszGlove );
+	int iGib = UH_FindBodygroup( pGib, pszGlove );
+	if ( iSource >= 0 && iGib >= 0 )
+		pGib->SetBodygroup( iGib, min( pSource->GetBodygroup( iSource ), pGib->GetBodygroupCount( iGib ) - 1 ) );
 }
 
 //-----------------------------------------------------------------------------
@@ -344,14 +463,27 @@ static void UH_DispatchLimbBlood( CBaseAnimating *pBody, int iHitGroup, CBaseAni
 	}
 }
 
+// Select the exact item family used by the original CNPC_CombineS branches.
+// PMC is tested before generic combine because its model may use a soldier
+// skeleton/bodygroups but drops its own helmet item.
+static const char *UH_HelmetItemFor( CBaseAnimating *pBody )
+{
+	const char *pszModel = STRING( pBody->GetModelName() );
+	if ( V_stristr( pszModel, "pmc" ) )
+		return "item_helmet_pmc";
+	if ( V_stristr( pszModel, "prisonguard" ) )
+		return "item_helmet_prison";
+	if ( V_stristr( pszModel, "worker" ) )
+		return "item_helmet_worker";
+	return "item_helmet_guard";
+}
+
 //-----------------------------------------------------------------------------
-// Shoot the helmet off: HELMET bodygroup -> 0 and drop the helmet model. The
-// model depends on the NPC ("combine_soldier" drops helmet_visor, the prison
-// guard drops the plain helmet), per the tutorial.
+// Shoot the helmet off: HELMET bodygroup -> 0 and drop the helmet model.
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &vecDir )
 {
-	int iGroup = FindBodygroupByName( "helmet" );
+	int iGroup = UH_FindBodygroup( this, "helmet" );
 	if ( iGroup < 0 || GetBodygroup( iGroup ) < 1 )
 		return;	// no helmet worn
 
@@ -360,27 +492,25 @@ void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &ve
 	// The original spawns an item_helmet_* entity (pickable as armor), chosen
 	// by the NPC's body: prison guard -> plain helmet, soldier -> visored
 	// helmet, worker -> worker helmet, pmc -> pmc helmet.
-	const char *pszItem;
-	if ( V_stristr( STRING( GetModelName() ), "prisonguard" ) )
-		pszItem = "item_helmet_prison";
-	else if ( V_stristr( STRING( GetModelName() ), "worker" ) )
-		pszItem = "item_helmet_worker";
-	else if ( V_stristr( STRING( GetModelName() ), "pmc" ) )
-		pszItem = "item_helmet_pmc";
-	else
-		pszItem = "item_helmet_guard";
+	const char *pszItem = UH_HelmetItemFor( this );
 
 	CBaseEntity *pHelmet = CreateEntityByName( pszItem );
 	if ( pHelmet )
 	{
-		pHelmet->SetAbsOrigin( vecPosition );
-		pHelmet->SetAbsAngles( vec3_angle );
+		// sub_10031BF0 drops head equipment from Eyes, rather than from the
+		// arbitrary bullet impact on the hitbox.
+		Vector vecDropOrigin = vecPosition;
+		QAngle angDrop = vec3_angle;
+		GetAttachment( "Eyes", vecDropOrigin, angDrop );
+		pHelmet->SetAbsOrigin( vecDropOrigin );
+		pHelmet->SetAbsAngles( angDrop );
 		DispatchSpawn( pHelmet );
 
 		IPhysicsObject *pPhys = pHelmet->VPhysicsGetObject();
 		if ( pPhys )
 		{
-			pPhys->SetVelocity( &vecDir, NULL );
+			Vector vecDropVelocity = vecDir * 0.25f;
+			pPhys->SetVelocity( &vecDropVelocity, NULL );
 		}
 	}
 
@@ -394,7 +524,7 @@ void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &ve
 //-----------------------------------------------------------------------------
 static void UH_DropGearItem( CBaseAnimating *pNPC, const char *pszBodygroup, const char *pszItem, const Vector &vecPosition, const Vector &vecDir )
 {
-	int iGroup = pNPC->FindBodygroupByName( pszBodygroup );
+	int iGroup = UH_FindBodygroup( pNPC, pszBodygroup );
 	if ( iGroup < 0 || pNPC->GetBodygroup( iGroup ) < 1 )
 		return;	// not worn
 
@@ -404,14 +534,18 @@ static void UH_DropGearItem( CBaseAnimating *pNPC, const char *pszBodygroup, con
 	if ( !pItem )
 		return;
 
-	pItem->SetAbsOrigin( vecPosition );
-	pItem->SetAbsAngles( vec3_angle );
+	Vector vecDropOrigin = vecPosition;
+	QAngle angDrop = vec3_angle;
+	pNPC->GetAttachment( "Eyes", vecDropOrigin, angDrop );
+	pItem->SetAbsOrigin( vecDropOrigin );
+	pItem->SetAbsAngles( angDrop );
 	DispatchSpawn( pItem );
 
 	IPhysicsObject *pPhys = pItem->VPhysicsGetObject();
 	if ( pPhys )
 	{
-		pPhys->SetVelocity( &vecDir, NULL );
+		Vector vecDropVelocity = vecDir * 0.25f;
+		pPhys->SetVelocity( &vecDropVelocity, NULL );
 	}
 }
 
@@ -421,26 +555,35 @@ static void UH_DropGearItem( CBaseAnimating *pNPC, const char *pszBodygroup, con
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, const Vector &vecDir )
 {
-	// Update the model's bodygroup so the limb is visually removed.
+	// Bodygroups are the authoritative state shared by the living NPC and the
+	// server ragdoll created on death. Do not spawn duplicate gibs once a part
+	// is already absent.
+	bool bRemoved = false;
 	switch ( iHitGroup )
 	{
-	case HITGROUP_LEFTARM:	UH_RemoveBodygroupSide( this, "arms", 0 ); break;
-	case HITGROUP_RIGHTARM:	UH_RemoveBodygroupSide( this, "arms", 1 ); break;
-	case HITGROUP_LEFTLEG:	UH_RemoveBodygroupSide( this, "Legs", 0 ); break;
-	case HITGROUP_RIGHTLEG:	UH_RemoveBodygroupSide( this, "Legs", 1 ); break;
+	case HITGROUP_LEFTARM:	bRemoved = UH_RemoveBodygroupSide( this, "arms", 0 ); break;
+	case HITGROUP_RIGHTARM:	bRemoved = UH_RemoveBodygroupSide( this, "arms", 1 ); break;
+	case HITGROUP_LEFTLEG:	bRemoved = UH_RemoveBodygroupSide( this, "legs", 0 ); break;
+	case HITGROUP_RIGHTLEG:	bRemoved = UH_RemoveBodygroupSide( this, "legs", 1 ); break;
 	case HITGROUP_HEAD:
 		{
-			int iGroup = FindBodygroupByName( "head" );
-			if ( iGroup >= 0 )
-				SetBodygroup( iGroup, 1 );	// "Destroyed Head"
+			int iGroup = UH_FindBodygroup( this, "head" );
+			int iDestroyed = UH_DestroyedHeadBodygroup( this );
+			if ( iGroup >= 0 && GetBodygroup( iGroup ) != iDestroyed )
+			{
+				SetBodygroup( iGroup, iDestroyed );
+				bRemoved = true;
+			}
 
-			// Destroying the head also knocks off the respirator (combine_s)
-			// or gasmask (prison guard) if worn (sub_10031BF0).
 			UH_DropGearItem( this, "respirator", "item_respirator_guard", vecPosition, vecDir );
-			UH_DropGearItem( this, "gasmask", "item_gasmask_guard", vecPosition, vecDir );
+			UH_DropGearItem( this, "gasmask",
+				V_stristr( STRING( GetModelName() ), "prisonguard" ) ? "item_gasmask_prison" : "item_gasmask_guard",
+				vecPosition, vecDir );
 		}
 		break;
 	}
+	if ( !bRemoved )
+		return;
 
 	// Spawn the severed gib (a pickable physics prop) at the hit position. The
 	// head is "destroyed" via bodygroup only (no severed-head gib), matching
@@ -457,19 +600,30 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 	CBaseEntity *pGib = NULL;
 	if ( pszLimb )
 	{
-		const char *pszModel = UH_GibModelFor( STRING( GetModelName() ), pszLimb );
+		const char *pszModel = UH_GibModelFor( this, pszLimb );
 		if ( pszModel )
 		{
-			pGib = UH_SpawnGibProp( pszModel, vecPosition, vecDir, this );
+			Vector vecGibOrigin;
+			QAngle angGibOrigin;
+			UH_GetLimbSpawnTransform( this, iHitGroup, vecPosition, vecGibOrigin, angGibOrigin );
+			pGib = UH_SpawnGibProp( pszModel, vecGibOrigin, angGibOrigin, vecDir, this );
+			if ( pGib )
+				UH_CopyLimbBodygroups( this, pGib->GetBaseAnimating(), iHitGroup );
 		}
 	}
 
-	// Blood spray (1:1 with sub_10031BF0) + a blood decal at the wound.
-	UH_DispatchLimbBlood( this, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, vecPosition, vecDir );
+	// The original clears old decals and emits the splat once a limb is actually
+	// severed (not while merely accumulating damage).
+	RemoveAllDecals();
+	EmitSound( "Player.Splat" );
 
-	if ( BloodColor() != DONT_BLEED )
+	// Arms/legs use their authored particles. The original uses the separate
+	// headshot spray and sentence only when the head transition succeeds.
+	UH_DispatchLimbBlood( this, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, vecPosition, vecDir );
+	if ( iHitGroup == HITGROUP_HEAD )
 	{
-		SpawnBlood( vecPosition, vecDir, BloodColor(), 24.0f );
+		EmitSound( "Player.HeadShot" );
+		UTIL_BloodSpray( vecPosition, vecDir, BLOOD_COLOR_RED, 8, FX_BLOODSPRAY_ALL );
 	}
 }
 
@@ -495,7 +649,7 @@ bool CAI_BaseNPC::UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &v
 	// Head: a worn helmet absorbs the damage until it is shot off.
 	if ( iHitGroup == HITGROUP_HEAD )
 	{
-		int iHelmet = FindBodygroupByName( "helmet" );
+		int iHelmet = UH_FindBodygroup( this, "helmet" );
 		if ( iHelmet >= 0 && GetBodygroup( iHelmet ) >= 1 )
 		{
 			m_flHelmetDamage += flDamage;
@@ -710,7 +864,7 @@ public:
 	{
 		if ( gpGlobals->curtime < m_flNextScan )
 			return;
-		m_flNextScan = gpGlobals->curtime + 0.5f;
+		m_flNextScan = gpGlobals->curtime + 0.25f;
 
 		// Keep the LRU cap in sync (convar may change at runtime).
 		s_RagdollLRU.SetMaxRagdollCount( uh_maxseragdolls.GetInt() );
@@ -726,22 +880,31 @@ public:
 				// prop_ragdolls have no owner and are excluded, per the tutorial.
 				if ( pRagdoll->GetOwnerEntity() )
 				{
-					// Blood trail while dragged. (The ragdoll itself stays
-					// COLLISION_GROUP_INTERACTIVE_DEBRIS so it is pickable by the
-					// physcannon; uh_ragdollcollisiontype is registered but not
-					// force-applied, since overriding it to a debris group made
-					// bodies un-pickable.)
+					// sub_101CCD80 (DraggedThink): a held corpse leaves a blood
+					// decal only after it has moved more than four units in XY, then
+					// updates its anchor every 0.25 s. The former implementation
+					// sprayed a decal continuously even while the body was stationary.
 					IPhysicsObject *pPhys = pRagdoll->VPhysicsGetObject();
-					if ( pPhys && ( pPhys->GetGameFlags() & FVPHYSICS_PLAYER_HELD ) )
+					bool bHeld = pPhys && ( pPhys->GetGameFlags() & FVPHYSICS_PLAYER_HELD );
+					Vector vecPos = pRagdoll->GetAbsOrigin();
+					if ( bHeld )
 					{
-						Vector vecPos = pRagdoll->GetAbsOrigin();
-						Vector vecDown = vecPos - Vector( 0, 0, 32.0f );
-						trace_t tr;
-						UTIL_TraceLine( vecPos, vecDown, MASK_SOLID_BRUSHONLY, pRagdoll, COLLISION_GROUP_NONE, &tr );
-						if ( tr.fraction < 1.0f )
+						if ( pRagdoll->m_bUHDragged &&
+							( fabs( vecPos.x - pRagdoll->m_vecUHDraggedLastPos.x ) > 4.0f ||
+							  fabs( vecPos.y - pRagdoll->m_vecUHDraggedLastPos.y ) > 4.0f ) )
 						{
-							UTIL_DecalTrace( &tr, "blood_drop" );
+							Vector vecDown = vecPos - Vector( 0, 0, 32.0f );
+							trace_t tr;
+							UTIL_TraceLine( vecPos, vecDown, MASK_SOLID_BRUSHONLY, pRagdoll, COLLISION_GROUP_NONE, &tr );
+							if ( tr.fraction < 1.0f )
+								UTIL_DecalTrace( &tr, "blood_drop" );
 						}
+						pRagdoll->m_bUHDragged = true;
+						pRagdoll->m_vecUHDraggedLastPos = vecPos;
+					}
+					else
+					{
+						pRagdoll->m_bUHDragged = false;
 					}
 				}
 			}
@@ -769,18 +932,11 @@ static CUHRagdollManager g_UHRagdollManager;
 // (CRagdollProp::TestCollision only sets tr.physicsbone). Recover the hitgroup
 // from the physics bone's studio bone via the model's hitbox set.
 //-----------------------------------------------------------------------------
-static int UH_RagdollBoneToHitgroup( CRagdollProp *pRagdoll, int iPhysicsBone )
+// Resolve a studio bone to its hitgroup. A ragdoll physics element often uses
+// a parent of the hitbox bone, so callers also walk its physics parents.
+static int UH_StudioBoneToHitgroup( CStudioHdr *pHdr, int iStudioBone )
 {
-	ragdoll_t *pRagdollPhys = pRagdoll->GetRagdoll();
-	if ( iPhysicsBone < 0 || iPhysicsBone >= pRagdollPhys->listCount )
-		return HITGROUP_GENERIC;
-
-	int iStudioBone = pRagdollPhys->boneIndex[iPhysicsBone];
-	if ( iStudioBone < 0 )
-		return HITGROUP_GENERIC;
-
-	CStudioHdr *pHdr = pRagdoll->GetModelPtr();
-	if ( !pHdr )
+	if ( !pHdr || iStudioBone < 0 )
 		return HITGROUP_GENERIC;
 
 	for ( int iSet = 0; iSet < pHdr->numhitboxsets(); iSet++ )
@@ -790,12 +946,27 @@ static int UH_RagdollBoneToHitgroup( CRagdollProp *pRagdoll, int iPhysicsBone )
 		{
 			mstudiobbox_t *pBox = pSet->pHitbox( i );
 			if ( pBox->bone == iStudioBone )
-			{
 				return pBox->group;
-			}
 		}
 	}
+	return HITGROUP_GENERIC;
+}
 
+static int UH_RagdollBoneToHitgroup( CRagdollProp *pRagdoll, int iPhysicsBone )
+{
+	ragdoll_t *pRagdollPhys = pRagdoll->GetRagdoll();
+	CStudioHdr *pHdr = pRagdoll->GetModelPtr();
+	if ( iPhysicsBone < 0 || iPhysicsBone >= pRagdollPhys->listCount || !pHdr )
+		return HITGROUP_GENERIC;
+
+	// Check the struck element then its parents. This covers a physics bone
+	// such as a forearm whose hitbox is authored on the upper-arm bone.
+	for ( int iElement = iPhysicsBone; iElement >= 0; iElement = pRagdollPhys->list[iElement].parentIndex )
+	{
+		int iHitgroup = UH_StudioBoneToHitgroup( pHdr, pRagdollPhys->boneIndex[iElement] );
+		if ( iHitgroup != HITGROUP_GENERIC )
+			return iHitgroup;
+	}
 	return HITGROUP_GENERIC;
 }
 
@@ -816,7 +987,7 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 	// living-NPC path in sub_10031BF0.
 	if ( iHitGroup == HITGROUP_HEAD )
 	{
-		int iHelmet = pRagdoll->FindBodygroupByName( "helmet" );
+		int iHelmet = UH_FindBodygroup( pRagdoll, "helmet" );
 		if ( iHelmet >= 0 && pRagdoll->GetBodygroup( iHelmet ) >= 1 )
 		{
 			pRagdoll->m_flGibDamage[0] += flDamage;
@@ -825,8 +996,7 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 				pRagdoll->m_flGibDamage[0] = 0.0f;
 				pRagdoll->SetBodygroup( iHelmet, 0 );
 
-				const char *pszItem = V_stristr( STRING( pRagdoll->GetModelName() ), "prisonguard" )
-					? "item_helmet_prison" : "item_helmet_guard";
+				const char *pszItem = UH_HelmetItemFor( pRagdoll );
 				CBaseEntity *pHelmet = CreateEntityByName( pszItem );
 				if ( pHelmet )
 				{
@@ -868,43 +1038,66 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 
 	pRagdoll->m_flGibDamage[idx] = 0.0f;	// reset so the limb can be re-hit
 
-	// Visually remove the limb (bodygroup) so the severed bone doesn't leave a
-	// "ghost" limb on the corpse model.
+	// Visually remove the limb before touching physics. A bodygroup transition
+	// is also the persistent one-shot state: once it has already been removed,
+	// do not emit another gib/blood burst on every later bullet.
+	bool bRemoved = false;
 	switch ( iHitGroup )
 	{
-	case HITGROUP_LEFTARM:	UH_RemoveBodygroupSide( pRagdoll, "arms", 0 ); break;
-	case HITGROUP_RIGHTARM:	UH_RemoveBodygroupSide( pRagdoll, "arms", 1 ); break;
-	case HITGROUP_LEFTLEG:	UH_RemoveBodygroupSide( pRagdoll, "Legs", 0 ); break;
-	case HITGROUP_RIGHTLEG:	UH_RemoveBodygroupSide( pRagdoll, "Legs", 1 ); break;
+	case HITGROUP_LEFTARM:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "arms", 0 ); break;
+	case HITGROUP_RIGHTARM:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "arms", 1 ); break;
+	case HITGROUP_LEFTLEG:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "legs", 0 ); break;
+	case HITGROUP_RIGHTLEG:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "legs", 1 ); break;
 	case HITGROUP_HEAD:
 		{
-			int iGroup = pRagdoll->FindBodygroupByName( "head" );
-			if ( iGroup >= 0 )
-				pRagdoll->SetBodygroup( iGroup, 1 );
+			int iGroup = UH_FindBodygroup( pRagdoll, "head" );
+			int iDestroyed = UH_DestroyedHeadBodygroup( pRagdoll );
+			if ( iGroup >= 0 && pRagdoll->GetBodygroup( iGroup ) != iDestroyed )
+			{
+				pRagdoll->SetBodygroup( iGroup, iDestroyed );
+				bRemoved = true;
+			}
 
-			// Respirator / gasmask knocked off with the destroyed head.
+			// Respirator / gasmask are part of the head destruction path.
 			UH_DropGearItem( pRagdoll, "respirator", "item_respirator_guard", pos, dir );
-			UH_DropGearItem( pRagdoll, "gasmask", "item_gasmask_guard", pos, dir );
+			UH_DropGearItem( pRagdoll, "gasmask",
+				V_stristr( STRING( pRagdoll->GetModelName() ), "prisonguard" ) ? "item_gasmask_prison" : "item_gasmask_guard",
+				pos, dir );
 		}
 		break;
 	}
+	if ( !bRemoved )
+		return;
 
-	// Sever the bone (falls free from the rest of the body).
-	pRagdoll->UH_SeverLimb( iPhysicsBone );
+	// sub_10031BF0 does *not* break a constraint in the source ragdoll.  It
+	// changes the source bodygroup and creates a separately simulated limb with
+	// sub_101CDCC0.  Breaking the original constraint as well made the hidden
+	// limb's physics pull the torso into a second, distorted pose.
+	// The generated sub-ragdoll below is the only detached physics object.
 
 	// Spawn a severed-limb gib at the hit position.
 	CBaseEntity *pGib = NULL;
 	if ( pszLimb )
 	{
-		const char *pszModel = UH_GibModelFor( STRING( pRagdoll->GetModelName() ), pszLimb );
+		const char *pszModel = UH_GibModelFor( pRagdoll, pszLimb );
 		if ( pszModel )
 		{
-			pGib = UH_SpawnGibProp( pszModel, pos, dir, pRagdoll );
+			Vector vecGibOrigin;
+			QAngle angGibOrigin;
+			UH_GetLimbSpawnTransform( pRagdoll, iHitGroup, pos, vecGibOrigin, angGibOrigin );
+			pGib = UH_SpawnGibProp( pszModel, vecGibOrigin, angGibOrigin, dir, pRagdoll );
+			if ( pGib )
+				UH_CopyLimbBodygroups( pRagdoll, pGib->GetBaseAnimating(), iHitGroup );
 		}
 	}
 
-	// Blood spray (1:1 with sub_10031BF0) + a blood decal at the wound.
-	UH_DispatchLimbBlood( pRagdoll, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, pos, dir );
+	pRagdoll->RemoveAllDecals();
+	pRagdoll->EmitSound( "Player.Splat" );
 
-	SpawnBlood( pos, dir, BLOOD_COLOR_RED, 24.0f );
+	UH_DispatchLimbBlood( pRagdoll, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, pos, dir );
+	if ( iHitGroup == HITGROUP_HEAD )
+	{
+		pRagdoll->EmitSound( "Player.HeadShot" );
+		UTIL_BloodSpray( pos, dir, BLOOD_COLOR_RED, 8, FX_BLOODSPRAY_ALL );
+	}
 }

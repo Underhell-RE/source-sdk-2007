@@ -256,6 +256,8 @@ public:
 	// physics interactions
 	virtual void		PickupObject( CBaseEntity *pObject, bool bLimitMassAndSize );
 	virtual	bool		IsHoldingEntity( CBaseEntity *pEnt );
+	void				UH_BeginCarryRagdoll( CBaseEntity *pRagdoll );
+	void				UH_UpdateCarryRagdollWeight( void );
 	virtual void		ForceDropOfCarriedPhysObjects( CBaseEntity *pOnlyIfHoldindThis );
 	virtual float		GetHeldObjectMass( IPhysicsObject *pHeldObject );
 	virtual CBaseEntity	*CHL2_Player::GetHeldObject( void );
@@ -398,6 +400,8 @@ public:
 	bool				UH_IsNightVisionOn( void ) const { return m_bNightVisionOn; }
 	void				UH_SetShoulderFlashlight( bool bHave ) { m_bShoulderFlashlight = bHave; }
 	void				UH_SetFlashlightOn( bool bOn ) { m_bFlashlightOn = bOn; }
+	bool				UH_IsLaserOn( void ) const { return m_bLaserToggleState; }
+	void				UH_SetLaserOn( bool bOn ) { m_bLaserToggleState = bOn; }
 
 	//-----------------------------------------------------------------------------
 	// Underhell ironsight. The "ironsight_toggle" client command toggles
@@ -421,6 +425,7 @@ public:
 	// / sub_101F0C60 (flashlight deploy) / sub_101E9580 (flare throw).
 	void				UH_ThrowNade( void );		// "Throw_Nade" — staged throw (grenade or flare)
 	void				UH_LeftArmContextThink( void );	// the delayed grenade throw
+	void				UH_FlashlightViewModelThink( void );	// finish flashlight holster anim
 	void				UH_ThrowFlare( void );		// throw the held flare
 	void				UH_UpdateLeftArm( void );	// sync left-arm viewmodel with weapon + flashlight
 	void				UH_EquipFlare( void );		// put a flare in the left hand (flare pack use)
@@ -472,6 +477,8 @@ public:
 	bool				UH_CanKick( void );
 	void				InputDisableKick( inputdata_t &inputdata );
 	void				InputEnableKick( inputdata_t &inputdata );
+	void				InputEnableBt( inputdata_t &inputdata );
+	void				InputDisableBt( inputdata_t &inputdata );
 	void				UH_SetKickViewModel( const char *pszModel );	// set + precache viewmodel 2
 
 	//-----------------------------------------------------------------------------
@@ -568,6 +575,9 @@ private:
 	float				m_flLastBleedTickBase;	// curtime of the previous think (dt accumulator base)
 	int					m_iEHealthCount;		// consecutive bleed-deaths (zeroes endurance at 10)
 	EHANDLE				m_hActiveGlowStick;		// lit glowstick prop parented to the player (original @2164)
+	EHANDLE				m_hCarryingRagdoll;		// original m_pCarryingRagdoll @2180
+	float				m_flCarryingRagdollSavedSpeed;
+	Vector				m_vecUHFreeAimTarget;	// update_freeaim world target (original player floats @526..528)
 
 	// Underhell: block the "DropWeapon" command (set by the map via
 	// InputDisableDropWeapon / InputEnableDropWeapon; original m_bDisableWeaponDrop @2136).

@@ -2,11 +2,10 @@
 //
 // Purpose: Underhell laser sight — client-side beam + impact dot.
 //
-// The server toggles CHL2_Player::m_bLaserToggleState (see uh_ironsight.cpp);
-// when it is set, this per-frame system draws a laser beam from the player's
-// eye along the aim direction to the first surface, with a glowing dot at the
-// impact point. Sprites match the original (sprites/laserbeam.vmt +
-// sprites/laserdot.vmt, precached in the original's sub_10073770).
+// CWeaponPistolSocom owns its own env_laserdot lifecycle in the original
+// server DLL (create/update on deploy, destroy on holster). The client draws
+// the matching beam from the active SOCOM; it is not a player-wide console
+// toggle. Sprites match the original laser materials.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -28,7 +27,7 @@ class CUHLaserSight : public CAutoGameSystemPerFrame
 	typedef CAutoGameSystemPerFrame BaseClass;
 
 public:
-	CUHLaserSight() : BaseClass( "CUHLaserSight" ), m_iBeamModel( -1 ), m_iDotModel( -1 ) {}
+	CUHLaserSight() : BaseClass( "CUHLaserSight" ), m_iBeamModel( -1 ), m_iDotModel( -1 ), m_flNextDraw( 0.0f ) {}
 
 	virtual void LevelInitPostEntity( void )
 	{
@@ -41,43 +40,16 @@ public:
 	// server-only). Called once per rendered frame.
 	virtual void Update( float frametime )
 	{
-		C_BaseHLPlayer *pPlayer = dynamic_cast<C_BaseHLPlayer *>( C_BasePlayer::GetLocalPlayer() );
-		if ( !pPlayer )
-			return;
-
-		if ( !pPlayer->m_bLaserToggleState )
-			return;
-
-		if ( !pPlayer->IsAlive() )
-			return;
-
-		Vector vecStart = pPlayer->EyePosition();
-		Vector forward;
-		AngleVectors( pPlayer->EyeAngles(), &forward );
-
-		trace_t tr;
-		UTIL_TraceLine( vecStart, vecStart + forward * MAX_TRACE_LENGTH, MASK_SHOT,
-			pPlayer, COLLISION_GROUP_NONE, &tr );
-
-		// Transient beam + halo dot at the impact point. A short life means it
-		// is redrawn fresh every frame and auto-expires (no leak / bookkeeping).
-		beams->CreateBeamPoints( vecStart, tr.endpos, m_iBeamModel, m_iDotModel,
-			0.0f,					// halo scale
-			0.05f,					// life
-			1.0f,					// width
-			1.0f,					// end width
-			1.0f,					// fade length
-			0.0f,					// amplitude
-			255.0f,					// brightness
-			0.0f,					// speed
-			0,						// start frame
-			0.0f,					// frame rate
-			255.0f, 0.0f, 0.0f );	// red
+		// SOCOM now owns a real server env_laserdot. Do not layer a second
+		// client-only beam on top of it; the old fake beam was the source of the
+		// incorrect/flickering laser visual.
+		return;
 	}
 
 private:
 	int m_iBeamModel;
 	int m_iDotModel;
+	float m_flNextDraw;
 };
 
 static CUHLaserSight g_UHLaserSight;
