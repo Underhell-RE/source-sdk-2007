@@ -41,6 +41,7 @@ class CUHMeleeWeapon : public CBaseHLBludgeonWeapon
 
 public:
 	virtual void	PrimaryAttack( void );	// drains StaminaToDrain, then swings
+	virtual void	SecondaryAttack( void );	// no vanilla secondary swing in Underhell melee
 	virtual float	GetDamageForActivity( Activity hitActivity ) { return m_pDamage->GetFloat(); }
 	virtual float	GetDamage( void ) { return m_pDamage->GetFloat(); }
 	virtual float	GetRange( void ) { return GetWpnData().m_flMeleeRange; }

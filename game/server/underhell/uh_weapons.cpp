@@ -49,6 +49,13 @@ void CUHMeleeWeapon::PrimaryAttack( void )
 	BaseClass::PrimaryAttack();
 }
 
+void CUHMeleeWeapon::SecondaryAttack( void )
+{
+	// CBaseHLBludgeonWeapon exposes a vanilla IN_ATTACK2 swing, but the
+	// Underhell melee vtable has only the primary sub_102B0B50 path.
+	m_flNextSecondaryAttack = gpGlobals->curtime + GetFireRate();
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: NPC melee attack — Swing() is player-only, so the NPC's melee anim
 // event routes here. Mirrors the crowbar's HandleAnimEventMeleeHit but uses
