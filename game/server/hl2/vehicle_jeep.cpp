@@ -1472,6 +1472,13 @@ void CPropJeep::EnterVehicle( CBaseCombatCharacter *pPassenger )
 	if ( !pPlayer )
 		return;
 
+	// Underhell Chapter1_16: Bryan's hidden vehicle driver remains the wheel
+	// controller while the entering player is the mounted gunner. Set this
+	// before BaseClass::EnterVehicle so entry/drive code never treats the
+	// player as a second competing driver.
+	if ( GetDriver() && GetDriver()->IsNPC() )
+		m_bPlayerAtGun = true;
+
 	CheckWater();
 	BaseClass::EnterVehicle( pPassenger );
 

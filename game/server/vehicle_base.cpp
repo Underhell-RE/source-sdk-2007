@@ -826,7 +826,7 @@ bool CPropVehicleDriveable::CanEnterVehicle( CBaseEntity *pEntity )
 	// exception: the NPC remains the physics driver while the player enters the
 	// mounted-gun position, so do not reject the player merely because Bryan's
 	// hidden vehicle-driver controller is assigned.
-	if ( GetDriver() && GetDriver() != pEntity && !m_bPlayerAtGun )
+	if ( GetDriver() && GetDriver() != pEntity && !GetDriver()->IsNPC() && !m_bPlayerAtGun )
 		return false;
 
 	// Can't enter if we're upside-down
