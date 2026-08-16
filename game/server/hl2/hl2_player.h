@@ -571,6 +571,7 @@ private:
 	float				m_flLastBleedTickBase;	// curtime of the previous think (dt accumulator base)
 	int					m_iEHealthCount;		// consecutive bleed-deaths (zeroes endurance at 10)
 	EHANDLE				m_hActiveGlowStick;		// lit glowstick prop parented to the player (original @2164)
+	Vector				m_vecUHFreeAimTarget;	// update_freeaim world target (original player floats @526..528)
 
 	// Underhell: block the "DropWeapon" command (set by the map via
 	// InputDisableDropWeapon / InputEnableDropWeapon; original m_bDisableWeaponDrop @2136).

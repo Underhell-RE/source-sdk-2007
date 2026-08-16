@@ -328,6 +328,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flLastBleedTickBase, FIELD_TIME ),
 	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_vecUHFreeAimTarget, FIELD_VECTOR ),
 	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
@@ -474,6 +475,7 @@ CHL2_Player::CHL2_Player()
 	m_bHoldingFlare = false;
 	m_bFlareMarker = false;
 	m_bFlashlightHolstered = false;
+	m_vecUHFreeAimTarget = vec3_origin;
 
 	UH_InitializeInventory();
 	UH_InitializeEndurance();
@@ -2971,6 +2973,20 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 		else
 		{
 			EmitSound( filter, entindex(), "Test.Sound" );
+		}
+		return true;
+	}
+
+	// Underhell free-aim target update. The original client sends this every
+	// free-aim paint/update pass; weapons read the stored world vector when
+	// cam_ots_freeaim_enable is active.
+	if ( !Q_stricmp( args[0], "update_freeaim" ) )
+	{
+		if ( args.ArgC() >= 4 )
+		{
+			m_vecUHFreeAimTarget.x = atof( args[1] );
+			m_vecUHFreeAimTarget.y = atof( args[2] );
+			m_vecUHFreeAimTarget.z = atof( args[3] );
 		}
 		return true;
 	}
