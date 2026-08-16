@@ -316,35 +316,29 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 //-----------------------------------------------------------------------------
 static CBaseEntity *UH_SpawnGibProp( const char *pszModel, const Vector &vecPosition, const QAngle &angPosition, const Vector &vecDir, CBaseEntity *pOwner )
 {
-	// The gib models are spawned dynamically (after the map precache phase),
-	// so force-precache them here. Without this, SetModel() fires
-	// "UTIL_SetModel: not precached" and the game crashes.
-	CBaseEntity::PrecacheModel( pszModel );
-
-	CBaseEntity *pProp = CreateEntityByName( "prop_ragdoll" );
-	if ( !pProp )
+	CBaseAnimating *pAnimatingOwner = pOwner ? pOwner->GetBaseAnimating() : NULL;
+	if ( !pAnimatingOwner )
 		return NULL;
 
-	pProp->SetModel( pszModel );
-	pProp->SetAbsOrigin( vecPosition );
-	pProp->SetAbsAngles( angPosition );
-	// sub_10031BF0 places every detached sub-ragdoll in collision group 1
-	// (debris), so the limb does not block the remaining corpse or navigation.
-	pProp->SetCollisionGroup( COLLISION_GROUP_DEBRIS );
-	DispatchSpawn( pProp );
+	// This is the SDK equivalent of serveror's sub_101CDCC0.  It copies the
+	// source skeleton through a temporary bone merge before initializing VPhysics;
+	// spawning an independent prop_ragdoll lost that pose and made detached limbs
+	// start in their reference/T pose.
+	CBaseAnimating *pGib = CreateServerRagdollSubmodel(
+		pAnimatingOwner, pszModel, vecPosition, angPosition, COLLISION_GROUP_DEBRIS );
+	if ( !pGib )
+		return NULL;
 
-	IPhysicsObject *pPhys = pProp->VPhysicsGetObject();
+	IPhysicsObject *pPhys = pGib->VPhysicsGetObject();
 	if ( pPhys )
 	{
-		// vecDir is the (unit) shot direction; scale it so the severed limb
-		// visibly flies off instead of just dropping in place.
 		Vector vecVelocity = vecDir * 150.0f;
-		AngularImpulse angImpulse( random->RandomFloat(-200,200), random->RandomFloat(-200,200), random->RandomFloat(-200,200) );
+		AngularImpulse angImpulse( random->RandomFloat( -200, 200 ), random->RandomFloat( -200, 200 ), random->RandomFloat( -200, 200 ) );
 		pPhys->SetVelocity( &vecVelocity, &angImpulse );
 	}
 
-	pProp->SetOwnerEntity( pOwner );
-	return pProp;
+	pGib->SetOwnerEntity( pOwner );
+	return pGib;
 }
 
 // The original creates a sub-ragdoll at the authored sever attachment, not
