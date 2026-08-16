@@ -332,13 +332,10 @@ static CBaseEntity *UH_SpawnGibProp( const char *pszModel, const Vector &vecPosi
 	// sub_10031BF0 explicitly copies the source skin to its sub-ragdoll.
 	pGib->m_nSkin = pAnimatingOwner->m_nSkin;
 
-	IPhysicsObject *pPhys = pGib->VPhysicsGetObject();
-	if ( pPhys )
-	{
-		Vector vecVelocity = vecDir * 150.0f;
-		AngularImpulse angImpulse( random->RandomFloat( -200, 200 ), random->RandomFloat( -200, 200 ), random->RandomFloat( -200, 200 ) );
-		pPhys->SetVelocity( &vecVelocity, &angImpulse );
-	}
+	// sub_10031BF0 leaves the sub-ragdoll with the velocity inherited during
+	// InitRagdoll.  Do not add a synthetic shot impulse here: it made every
+	// severed part launch at a fixed speed unlike the original corpse motion.
+	(void)vecDir;
 
 	pGib->SetOwnerEntity( pOwner );
 	return pGib;
