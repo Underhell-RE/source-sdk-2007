@@ -1207,29 +1207,17 @@ void CUHRadio::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useT
 	if ( !pPlayer )
 		return;
 
-	// If already active, +use picks it back into inventory
+	// An activated radio/cracker remains in the world. The original Use path
+	// arms its delayed radio think; a second +use does not put it back into
+	// inventory.
 	if ( m_bIsActive )
-	{
-		CHL2_Player *pHL2 = dynamic_cast<CHL2_Player *>( pPlayer );
-		if ( pHL2 && pHL2->UH_FindFreeSlot() >= 0 )
-		{
-			if ( m_bIsCracker )
-				pHL2->UH_GiveItem( UH_ITEM_RADIO_CRACKER );
-			else
-				pHL2->UH_GiveItem( UH_ITEM_FM_RADIO );
-
-			EmitSound( "HL2Player.PickupItems" );
-			UTIL_Remove( this );
-		}
 		return;
-	}
 
-	// Activate: start playing after 5 sec (original sets think +5)
+	// First attract sound after five seconds (sub_10173790).
 	m_bIsActive = true;
+	m_iTrack = random->RandomInt( 1, 7 );
 	SetThink( &CUHRadio::RadioThink );
 	SetNextThink( gpGlobals->curtime + 5.0f );
-
-	// Prevent immediate pickup
 	SetTouch( NULL );
 }
 
@@ -1238,29 +1226,20 @@ void CUHRadio::RadioThink( void )
 	if ( !m_bIsActive )
 		return;
 
-	// Play random track
-	m_iTrack = random->RandomInt( 1, 7 );
-	char szSound[32];
-	Q_snprintf( szSound, sizeof(szSound), "Radio.Track.%d", m_iTrack );
-	EmitSound( szSound );
-
-	// Attract NPCs – insert the Underhell radio attract sound (SOUND_FMRADIO = 0x20000),
-	// volume 1024 / duration 1.0, matching serveror.dll sub_101737E0 exactly.
-	CSoundEnt::InsertSound( SOUND_FMRADIO, GetAbsOrigin(), 1024, 1.0f, this );
-
-	// For cracker, count plays and explode after ~5 plays (~5 sec after start)
-	m_iPlays++;
-	if ( m_bIsCracker )
+	// sub_101737E0 starts one selected radio track, then keeps emitting the
+	// FMRADIO AI sound once per second. It does not pick a new track every tick.
+	if ( m_iPlays == 0 && !m_bIsCracker )
 	{
-		if ( m_iPlays >= 5 )
-		{
-			// Schedule explosion think shortly
-			SetThink( &CUHRadio::ExplodeThink );
-			SetNextThink( gpGlobals->curtime + 0.5f );
-			return;
-		}
+		char szSound[32];
+		Q_snprintf( szSound, sizeof(szSound), "Radio.Track.%d", m_iTrack );
+		EmitSound( szSound );
 	}
 
+	CSoundEnt::InsertSound( SOUND_FMRADIO, GetAbsOrigin(), 1024, 1.0f, this );
+	++m_iPlays;
+
+	// Radio cracker detonation is caused by the infected destroy-radio path
+	// (sub_10173A20), not an arbitrary five-play timer.
 	SetNextThink( gpGlobals->curtime + 1.0f );
 }
 
