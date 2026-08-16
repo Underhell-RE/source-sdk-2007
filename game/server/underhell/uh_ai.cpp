@@ -541,7 +541,9 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 			}
 
 			UH_DropGearItem( this, "respirator", "item_respirator_guard", vecPosition, vecDir );
-			UH_DropGearItem( this, "gasmask", "item_gasmask_guard", vecPosition, vecDir );
+			UH_DropGearItem( this, "gasmask",
+				V_stristr( STRING( GetModelName() ), "prisonguard" ) ? "item_gasmask_prison" : "item_gasmask_guard",
+				vecPosition, vecDir );
 		}
 		break;
 	}
@@ -1022,7 +1024,9 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 
 			// Respirator / gasmask are part of the head destruction path.
 			UH_DropGearItem( pRagdoll, "respirator", "item_respirator_guard", pos, dir );
-			UH_DropGearItem( pRagdoll, "gasmask", "item_gasmask_guard", pos, dir );
+			UH_DropGearItem( pRagdoll, "gasmask",
+				V_stristr( STRING( pRagdoll->GetModelName() ), "prisonguard" ) ? "item_gasmask_prison" : "item_gasmask_guard",
+				pos, dir );
 		}
 		break;
 	}

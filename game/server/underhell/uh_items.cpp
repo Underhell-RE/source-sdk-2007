@@ -833,6 +833,7 @@ UH_DEFINE_ITEM( CItemCapPMC,			item_cap_pmc,			"models/items/pmc_cap.mdl" )
 UH_DEFINE_ITEM( CItemHeadsetPMC,		item_headset_pmc,		"models/items/pmc_headset.mdl" )
 UH_DEFINE_ARMOR_ITEM( CItemRespiratorGuard,	item_respirator_guard,	"models/items/respirator.mdl" )
 UH_DEFINE_ARMOR_ITEM( CItemGasmaskGuard,		item_gasmask_guard,		"models/items/gasmask.mdl" )
+UH_DEFINE_ARMOR_ITEM( CItemGasmaskPrison,	item_gasmask_prison,	"models/items/gasmask.mdl" )
 
 //-----------------------------------------------------------------------------
 // item_random
