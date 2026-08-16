@@ -148,10 +148,10 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
 
 ### Added/changed
 
-- NPC companion driver bridge was added for `EnterVehicleImmediatelyAsDriver` / `EnterVehicleAsDriver` flows using a hidden `npc_vehicledriver`.
-- Player vehicle entry gates were loosened for NPC-driven driveable vehicles and gunner use.
-- Player-at-mounted-gun state is tracked (`m_bPlayerAtGun`).
-- Gunner camera attempts to use `vehicle_gunner_eyes`.
+- `Uh_Chapter1_16_d.vmf` was audited: Bryan enters through `EnterVehicleImmediatelyAsDriver`, the map toggles `ToggleGunMode`, and the map itself drives the jeep through `Throttle`, `Steer`, and `HandBrake` inputs.
+- Removed the fabricated hidden `npc_vehicledriver`, which fought the VMF controls every frame. Bryan remains the visual driver while the player occupies the independent legacy gunner passenger slot.
+- Restored separation of `m_hPlayer` and `m_hNPCDriver`; `GetDriver()` now reports the actual player passenger, while vehicle thinking independently accounts for an NPC controller.
+- Player-at-mounted-gun state is map-controlled (`m_bPlayerAtGun`) and the gunner camera uses `vehicle_gunner_eyes`.
 - Mounted jeep fire was recently reworked against server Diaphora:
   - removed custom extra full-distance `UTIL_Tracer`, which created a duplicate through-world beam;
   - restored jeep `m_nAmmoType` instead of forcing AR2 ammo type;
@@ -163,10 +163,10 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
 
 ### Still missing / high-risk
 
-- User reported inability to enter/sit in the jeep. This is not confirmed solved.
-- The current jeep changes went through a bad intermediate edit that accidentally removed charged-cannon code; it was restored before the final state, but a clean game DLL build is mandatory.
-- Exact original seat role, `Use`, `EnterVehicle`, map lock and NPC driver behavior still need runtime validation on `Uh_Chapter1_16_d`.
-- The chapter map’s rail/stuck-path issue is not solved.
+- Corrected the mounted-gun basis from stock `gun_ref` to Underhell's authored `muzzle` attachment in both aiming and firing; this addresses the sideways gun roll on entry.
+- Mounted aiming/firing now gates on `EnableMountedGun` plus map-controlled `m_bPlayerAtGun`, matching `sub_103EBB80`, `sub_103EC540`, and `sub_103EAB30`.
+- `BodyTarget` now selects `vehicle_gunner_eyes` in gun mode, matching `sub_103EA8F0`.
+- The current changes still require a clean Windows DLL build and runtime validation on `Uh_Chapter1_16_d`; the chapter map’s rail/stuck-path behavior has not been tested here.
 
 ---
 

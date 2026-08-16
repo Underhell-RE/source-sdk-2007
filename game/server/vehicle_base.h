@@ -236,7 +236,7 @@ public:
 
 protected:
 
-	virtual bool	ShouldThink() { return ( GetDriver() != NULL ); }
+	virtual bool	ShouldThink() { return ( m_hPlayer != NULL || m_hNPCDriver != NULL ); }
 
 	inline bool HasGun();
 	void DestroyServerVehicle();

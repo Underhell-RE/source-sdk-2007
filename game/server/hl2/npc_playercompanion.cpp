@@ -7,7 +7,6 @@
 #include "cbase.h"
 
 #include "npc_playercompanion.h"
-#include "npc_vehicledriver.h"
 
 #include "combine_mine.h"
 #include "fire.h"
@@ -3348,27 +3347,15 @@ void CNPC_PlayerCompanion::InputEnterVehicleImmediately( inputdata_t &inputdata 
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Underhell self-driving-jeep bridge. The map targets Bryan (a
-// companion), but the four-wheel physics controller needs CNPC_VehicleDriver,
-// not a visual passenger, to produce throttle/steering commands.
+// Purpose: Put the companion in the authored driver animation immediately.
+// Chapter1_16 drives the jeep explicitly with Throttle/Steer/HandBrake map
+// inputs; creating an npc_vehicledriver here fights those inputs every frame.
 //-----------------------------------------------------------------------------
 void CNPC_PlayerCompanion::InputEnterVehicleImmediatelyAsDriver( inputdata_t &inputdata )
 {
 	CBaseEntity *pVehicle = FindNamedEntity( inputdata.value.String() );
-	if ( !pVehicle || !pVehicle->GetServerVehicle() || !pVehicle->GetServerVehicle()->NPC_CanDrive() )
+	if ( !pVehicle || !pVehicle->GetServerVehicle() )
 		return;
-
-	CNPC_VehicleDriver *pDriver = static_cast< CNPC_VehicleDriver * >( CreateEntityByName( "npc_vehicledriver" ) );
-	if ( !pDriver )
-		return;
-
-	pDriver->KeyValue( "vehicle", STRING( pVehicle->GetEntityName() ) );
-	pDriver->SetAbsOrigin( pVehicle->WorldSpaceCenter() );
-	DispatchSpawn( pDriver );
-	pDriver->Activate();
-
-	// Retain the original citizen visual as the seated driver while the hidden
-	// controller supplies the actual wheel input.
 	EnterVehicle( pVehicle, true );
 }
 

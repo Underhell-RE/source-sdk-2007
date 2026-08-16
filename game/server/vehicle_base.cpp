@@ -387,6 +387,7 @@ CPropVehicleDriveable::CPropVehicleDriveable( void ) :
 {
 	m_vecEyeExitEndpoint.Init();
 	m_vecGunCrosshair.Init();
+	m_bPlayerAtGun = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -568,9 +569,10 @@ void CPropVehicleDriveable::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, 
 //-----------------------------------------------------------------------------
 CBaseEntity *CPropVehicleDriveable::GetDriver( void ) 
 { 
-	if ( m_hNPCDriver ) 
-		return m_hNPCDriver; 
-
+	// The player passenger and the NPC physics driver are independent in
+	// Underhell. Returning the NPC here makes the server vehicle believe its
+	// only passenger seat is occupied and also makes jeep aiming/damage use the
+	// hidden npc_vehicledriver instead of the gunner.
 	return m_hPlayer; 
 }
 
@@ -822,22 +824,14 @@ bool CPropVehicleDriveable::CanEnterVehicle( CBaseEntity *pEntity )
 	// Only drivers are supported
 	Assert( pEntity && pEntity->IsPlayer() );
 
-	// A normal vehicle rejects a second driver. Underhell gunner mode is the
-	// exception: the NPC remains the physics driver while the player enters the
-	// mounted-gun position, so do not reject the player merely because Bryan's
-	// hidden vehicle-driver controller is assigned.
-	if ( GetDriver() && GetDriver() != pEntity && !GetDriver()->IsNPC() && !m_bPlayerAtGun )
+	// m_hNPCDriver is a separate physics controller and does not occupy the
+	// player/gunner passenger slot.
+	if ( GetDriver() && GetDriver() != pEntity )
 		return false;
 
-	// Can't enter if we're upside-down
+	// Can't enter if we're upside-down.
 	if ( IsOverturned() )
 		return false;
-
-	// Mounted-gun passengers may enter the self-driving Underhell jeep while
-	// the NPC driver is already moving. Normal driver entry keeps vanilla speed
-	// and lock restrictions.
-	if ( GetDriver() && GetDriver()->IsNPC() )
-		return !m_bLocked;
 
 	return ( !m_bLocked && (m_nSpeed <= m_flMinimumSpeedToEnterExit) );
 }
