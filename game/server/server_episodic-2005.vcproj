@@ -265,6 +265,10 @@
 				Name="underhell"
 				>
 				<File
+					RelativePath=".\underhell\npc_ace.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\npc_infected.cpp"
 					>
 				</File>
