@@ -329,7 +329,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_hCarryingRagdoll, FIELD_EHANDLE ),
-	DEFINE_FIELD( m_flCarryingRagdollSavedSpeed, FIELD_FLOAT ),
+	DEFINE_FIELD( m_flCarryingRagdollSavedSensitivity, FIELD_FLOAT ),
 	DEFINE_FIELD( m_vecUHFreeAimTarget, FIELD_VECTOR ),
 	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
@@ -478,7 +478,7 @@ CHL2_Player::CHL2_Player()
 	m_bFlareMarker = false;
 	m_bFlashlightHolstered = false;
 	m_hCarryingRagdoll = NULL;
-	m_flCarryingRagdollSavedSpeed = 0.0f;
+	m_flCarryingRagdollSavedSensitivity = 0.0f;
 	m_vecUHFreeAimTarget = vec3_origin;
 
 	UH_InitializeInventory();
@@ -2701,6 +2701,13 @@ void CHL2_Player::Event_Killed( const CTakeDamageInfo &info )
 	UH_StopGasMaskBreath();
 	m_bNightVisionOn = false;
 	m_bGasMaskOn = false;
+
+	// Underhell: bullet time is cancelled on death. The original
+	// (sub_102DDB80) looks "bt_enabled" up through the cvar interface and, if
+	// it is non-zero, sets it back to 0 BEFORE firing PlayerDied. Without this
+	// the player respawns/loads into a permanently slowed world, because
+	// host_timescale is never restored.
+	UH_BulletTimePlayerDied( this );
 
 	FirePlayerProxyOutput( "PlayerDied", variant_t(), this, this );
 	NotifyScriptsOfDeath();

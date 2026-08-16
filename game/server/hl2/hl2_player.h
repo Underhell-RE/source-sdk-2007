@@ -576,7 +576,7 @@ private:
 	int					m_iEHealthCount;		// consecutive bleed-deaths (zeroes endurance at 10)
 	EHANDLE				m_hActiveGlowStick;		// lit glowstick prop parented to the player (original @2164)
 	EHANDLE				m_hCarryingRagdoll;		// original m_pCarryingRagdoll @2180
-	float				m_flCarryingRagdollSavedSpeed;
+	float				m_flCarryingRagdollSavedSensitivity;	// original player float @1343 (saved "sensitivity")
 	Vector				m_vecUHFreeAimTarget;	// update_freeaim world target (original player floats @526..528)
 
 	// Underhell: block the "DropWeapon" command (set by the map via
