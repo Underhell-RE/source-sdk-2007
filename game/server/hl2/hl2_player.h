@@ -256,6 +256,8 @@ public:
 	// physics interactions
 	virtual void		PickupObject( CBaseEntity *pObject, bool bLimitMassAndSize );
 	virtual	bool		IsHoldingEntity( CBaseEntity *pEnt );
+	void				UH_BeginCarryRagdoll( CBaseEntity *pRagdoll );
+	void				UH_UpdateCarryRagdollWeight( void );
 	virtual void		ForceDropOfCarriedPhysObjects( CBaseEntity *pOnlyIfHoldindThis );
 	virtual float		GetHeldObjectMass( IPhysicsObject *pHeldObject );
 	virtual CBaseEntity	*CHL2_Player::GetHeldObject( void );
@@ -573,6 +575,8 @@ private:
 	float				m_flLastBleedTickBase;	// curtime of the previous think (dt accumulator base)
 	int					m_iEHealthCount;		// consecutive bleed-deaths (zeroes endurance at 10)
 	EHANDLE				m_hActiveGlowStick;		// lit glowstick prop parented to the player (original @2164)
+	EHANDLE				m_hCarryingRagdoll;		// original m_pCarryingRagdoll @2180
+	float				m_flCarryingRagdollSavedSpeed;
 	Vector				m_vecUHFreeAimTarget;	// update_freeaim world target (original player floats @526..528)
 
 	// Underhell: block the "DropWeapon" command (set by the map via

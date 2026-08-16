@@ -14,6 +14,7 @@
 #include "datacache/imdlcache.h"
 #include "bone_setup.h"
 #include "physics_prop_ragdoll.h"
+#include "hl2/hl2_player.h"
 #include "KeyValues.h"
 #include "props.h"
 #include "RagdollBoogie.h"
@@ -221,6 +222,10 @@ void CRagdollProp::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 		return;
 
 	pPlayer->PickupObject( this, false );
+
+	CHL2_Player *pHL2Player = dynamic_cast< CHL2_Player * >( pPlayer );
+	if ( pHL2Player && pHL2Player->IsHoldingEntity( this ) )
+		pHL2Player->UH_BeginCarryRagdoll( this );
 }
 
 void CRagdollProp::SetSourceClassName( const char *pClassname )

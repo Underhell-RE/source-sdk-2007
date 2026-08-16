@@ -277,6 +277,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\uh_carry_ragdoll.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\npc_infected.cpp"
 					>
 				</File>

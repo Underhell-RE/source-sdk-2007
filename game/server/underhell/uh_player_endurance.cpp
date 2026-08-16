@@ -244,6 +244,8 @@ void CHL2_Player::UH_StartBleeding( float flDamage )
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_UpdateBleeding( void )
 {
+	UH_UpdateCarryRagdollWeight();
+
 	// First think has no previous timestamp; skip so dt is not huge.
 	if ( m_flLastBleedTickBase == 0.0f )
 	{
