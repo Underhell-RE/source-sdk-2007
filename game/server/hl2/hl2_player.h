@@ -398,6 +398,8 @@ public:
 	bool				UH_IsNightVisionOn( void ) const { return m_bNightVisionOn; }
 	void				UH_SetShoulderFlashlight( bool bHave ) { m_bShoulderFlashlight = bHave; }
 	void				UH_SetFlashlightOn( bool bOn ) { m_bFlashlightOn = bOn; }
+	bool				UH_IsLaserOn( void ) const { return m_bLaserToggleState; }
+	void				UH_SetLaserOn( bool bOn ) { m_bLaserToggleState = bOn; }
 
 	//-----------------------------------------------------------------------------
 	// Underhell ironsight. The "ironsight_toggle" client command toggles

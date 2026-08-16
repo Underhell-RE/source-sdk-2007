@@ -232,9 +232,9 @@ void CUHGunWeapon::SecondaryAttack( void )
 	{
 		CHL2_Player *pPlayer = dynamic_cast< CHL2_Player * >( pOwner );
 		if ( pPlayer )
-			pPlayer->m_bLaserToggleState = !pPlayer->m_bLaserToggleState;
+			pPlayer->UH_SetLaserOn( !pPlayer->UH_IsLaserOn() );
 
-		SendWeaponAnim( pPlayer && pPlayer->m_bLaserToggleState ? (Activity)12 : (Activity)13 );
+		SendWeaponAnim( pPlayer && pPlayer->UH_IsLaserOn() ? (Activity)12 : (Activity)13 );
 		m_flNextSecondaryAttack = gpGlobals->curtime + 0.2f;
 		return;
 	}
