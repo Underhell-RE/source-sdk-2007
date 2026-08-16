@@ -40,47 +40,10 @@ public:
 	// server-only). Called once per rendered frame.
 	virtual void Update( float frametime )
 	{
-		C_BaseHLPlayer *pPlayer = dynamic_cast<C_BaseHLPlayer *>( C_BasePlayer::GetLocalPlayer() );
-		if ( !pPlayer )
-			return;
-
-		C_BaseCombatWeapon *pWeapon = pPlayer->GetActiveWeapon();
-		if ( !pWeapon || !FClassnameIs( pWeapon, "weapon_pistol_socom" ) || !pPlayer->m_bLaserToggleState )
-			return;
-
-		if ( !pPlayer->IsAlive() )
-			return;
-
-		// The old implementation allocated a new transient beam every rendered
-		// frame. At high frame rates several 0.05-second beams overlapped,
-		// producing a thick flickering laser. Update at the original dot think
-		// cadence (0.1 s) and let each beam live exactly until the next update.
-		if ( gpGlobals->curtime < m_flNextDraw )
-			return;
-		m_flNextDraw = gpGlobals->curtime + 0.1f;
-
-		Vector vecStart = pPlayer->EyePosition();
-		Vector forward;
-		AngleVectors( pPlayer->EyeAngles(), &forward );
-
-		trace_t tr;
-		UTIL_TraceLine( vecStart, vecStart + forward * MAX_TRACE_LENGTH, MASK_SHOT,
-			pPlayer, COLLISION_GROUP_NONE, &tr );
-
-		// Transient beam + halo dot at the impact point. A short life means it
-		// is redrawn fresh every frame and auto-expires (no leak / bookkeeping).
-		beams->CreateBeamPoints( vecStart, tr.endpos, m_iBeamModel, m_iDotModel,
-			0.0f,					// halo scale
-			0.10f,					// life
-			1.0f,					// width
-			1.0f,					// end width
-			1.0f,					// fade length
-			0.0f,					// amplitude
-			255.0f,					// brightness
-			0.0f,					// speed
-			0,						// start frame
-			0.0f,					// frame rate
-			255.0f, 0.0f, 0.0f );	// red
+		// SOCOM now owns a real server env_laserdot. Do not layer a second
+		// client-only beam on top of it; the old fake beam was the source of the
+		// incorrect/flickering laser visual.
+		return;
 	}
 
 private:

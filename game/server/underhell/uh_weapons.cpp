@@ -20,6 +20,7 @@
 #include "hl2_player.h"
 #include "uh_weapons.h"
 #include "underhell/uh_bullettime.h"
+#include "hl2/weapon_rpg.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -231,10 +232,21 @@ void CUHGunWeapon::SecondaryAttack( void )
 	if ( pOwner && FClassnameIs( this, "weapon_pistol_socom" ) )
 	{
 		CHL2_Player *pPlayer = dynamic_cast< CHL2_Player * >( pOwner );
+		m_bSocomLaserOn = !m_bSocomLaserOn;
 		if ( pPlayer )
-			pPlayer->UH_SetLaserOn( !pPlayer->UH_IsLaserOn() );
+			pPlayer->UH_SetLaserOn( m_bSocomLaserOn );
 
-		SendWeaponAnim( pPlayer && pPlayer->UH_IsLaserOn() ? (Activity)12 : (Activity)13 );
+		if ( !m_bSocomLaserOn )
+		{
+			UTIL_Remove( m_hLaserDot.Get() );
+			m_hLaserDot = NULL;
+		}
+		else if ( !m_hLaserDot.Get() )
+		{
+			m_hLaserDot = CreateLaserDot( pOwner->Weapon_ShootPosition(), this, true );
+		}
+
+		SendWeaponAnim( m_bSocomLaserOn ? (Activity)12 : (Activity)13 );
 		m_flNextSecondaryAttack = gpGlobals->curtime + 0.2f;
 		return;
 	}
@@ -289,6 +301,19 @@ void CUHGunWeapon::ItemPostFrame( void )
 		m_bNeedPump = false;
 		WeaponSound( SPECIAL1 );
 		SendWeaponAnim( ACT_SHOTGUN_PUMP );
+	}
+
+	if ( m_bSocomLaserOn && m_hLaserDot.Get() )
+	{
+		CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
+		if ( pOwner )
+		{
+			Vector start = pOwner->Weapon_ShootPosition();
+			Vector dir = pOwner->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );
+			trace_t tr;
+			UTIL_TraceLine( start, start + dir * MAX_TRACE_LENGTH, MASK_SHOT, pOwner, COLLISION_GROUP_NONE, &tr );
+			SetLaserDotPosition( m_hLaserDot.Get(), tr.endpos, tr.plane.normal );
+		}
 	}
 
 	BaseClass::ItemPostFrame();
@@ -581,7 +606,7 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bFireModeInitialized = false; m_bNeedPump = false; m_flPumpTime = 0.0f; }
+	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bFireModeInitialized = false; m_bNeedPump = false; m_flPumpTime = 0.0f; m_hLaserDot = NULL; m_bSocomLaserOn = false; }
 
 #define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
 	acttable_t _className::m_acttable[] = \

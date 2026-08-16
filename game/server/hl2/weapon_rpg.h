@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -107,6 +107,7 @@ private:
 //-----------------------------------------------------------------------------
 CBaseEntity *CreateLaserDot( const Vector &origin, CBaseEntity *pOwner, bool bVisibleDot );
 void SetLaserDotTarget( CBaseEntity *pLaserDot, CBaseEntity *pTarget );
+void SetLaserDotPosition( CBaseEntity *pLaserDot, const Vector &origin, const Vector &normal );
 void EnableLaserDot( CBaseEntity *pLaserDot, bool bEnable );
 
 

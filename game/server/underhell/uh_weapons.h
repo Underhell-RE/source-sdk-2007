@@ -114,6 +114,8 @@ public:
 	bool			m_bFireModeInitialized;	// weapon-script FireMode applied once
 	bool			m_bNeedPump;				// pending shotgun pump animation
 	float			m_flPumpTime;				// time to play the pump after firing
+	CHandle< CBaseEntity > m_hLaserDot;		// SOCOM env_laserdot
+	bool			m_bSocomLaserOn;
 };
 
 //-----------------------------------------------------------------------------

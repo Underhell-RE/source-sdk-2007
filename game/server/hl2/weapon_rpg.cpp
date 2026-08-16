@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -2242,6 +2242,12 @@ void SetLaserDotTarget( CBaseEntity *pLaserDot, CBaseEntity *pTarget )
 {
 	CLaserDot *pDot = assert_cast< CLaserDot* >(pLaserDot );
 	pDot->SetTargetEntity( pTarget );
+}
+
+void SetLaserDotPosition( CBaseEntity *pLaserDot, const Vector &origin, const Vector &normal )
+{
+	CLaserDot *pDot = assert_cast< CLaserDot* >( pLaserDot );
+	pDot->SetLaserPosition( origin, normal );
 }
 
 void EnableLaserDot( CBaseEntity *pLaserDot, bool bEnable )
