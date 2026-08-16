@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:
 //
@@ -7,6 +7,7 @@
 #include "cbase.h"
 
 #include "npc_playercompanion.h"
+#include "npc_vehicledriver.h"
 
 #include "combine_mine.h"
 #include "fire.h"
@@ -92,6 +93,7 @@ BEGIN_DATADESC( CNPC_PlayerCompanion )
 
 	DEFINE_INPUTFUNC( FIELD_STRING,	"EnterVehicle",				InputEnterVehicle ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "EnterVehicleImmediately",	InputEnterVehicleImmediately ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "EnterVehicleImmediatelyAsDriver", InputEnterVehicleImmediatelyAsDriver ),
 	DEFINE_INPUTFUNC( FIELD_VOID,	"ExitVehicle",				InputExitVehicle ),
 	DEFINE_INPUTFUNC( FIELD_VOID,	"CancelEnterVehicle",		InputCancelEnterVehicle ),
 #endif	// HL2_EPISODIC
@@ -3343,6 +3345,31 @@ void CNPC_PlayerCompanion::InputEnterVehicleImmediately( inputdata_t &inputdata 
 {
 	CBaseEntity *pEntity = FindNamedEntity( inputdata.value.String() );
 	EnterVehicle( pEntity, true );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Underhell self-driving-jeep bridge. The map targets Bryan (a
+// companion), but the four-wheel physics controller needs CNPC_VehicleDriver,
+// not a visual passenger, to produce throttle/steering commands.
+//-----------------------------------------------------------------------------
+void CNPC_PlayerCompanion::InputEnterVehicleImmediatelyAsDriver( inputdata_t &inputdata )
+{
+	CBaseEntity *pVehicle = FindNamedEntity( inputdata.value.String() );
+	if ( !pVehicle || !pVehicle->GetServerVehicle() || !pVehicle->GetServerVehicle()->NPC_CanDrive() )
+		return;
+
+	CNPC_VehicleDriver *pDriver = static_cast< CNPC_VehicleDriver * >( CreateEntityByName( "npc_vehicledriver" ) );
+	if ( !pDriver )
+		return;
+
+	pDriver->KeyValue( "vehicle", STRING( pVehicle->GetEntityName() ) );
+	pDriver->SetAbsOrigin( pVehicle->WorldSpaceCenter() );
+	DispatchSpawn( pDriver );
+	pDriver->Activate();
+
+	// Retain the original citizen visual as the seated driver while the hidden
+	// controller supplies the actual wheel input.
+	EnterVehicle( pVehicle, true );
 }
 
 //-----------------------------------------------------------------------------
