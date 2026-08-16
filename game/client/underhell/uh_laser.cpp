@@ -2,11 +2,10 @@
 //
 // Purpose: Underhell laser sight — client-side beam + impact dot.
 //
-// The server toggles CHL2_Player::m_bLaserToggleState (see uh_ironsight.cpp);
-// when it is set, this per-frame system draws a laser beam from the player's
-// eye along the aim direction to the first surface, with a glowing dot at the
-// impact point. Sprites match the original (sprites/laserbeam.vmt +
-// sprites/laserdot.vmt, precached in the original's sub_10073770).
+// CWeaponPistolSocom owns its own env_laserdot lifecycle in the original
+// server DLL (create/update on deploy, destroy on holster). The client draws
+// the matching beam from the active SOCOM; it is not a player-wide console
+// toggle. Sprites match the original laser materials.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -45,7 +44,8 @@ public:
 		if ( !pPlayer )
 			return;
 
-		if ( !pPlayer->m_bLaserToggleState )
+		C_BaseCombatWeapon *pWeapon = pPlayer->GetActiveWeapon();
+		if ( !pWeapon || !FClassnameIs( pWeapon, "weapon_pistol_socom" ) )
 			return;
 
 		if ( !pPlayer->IsAlive() )
