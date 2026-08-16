@@ -12,8 +12,7 @@
 //     the trigger and a linear fade to 0 over 3.0 s; skipped while iron-sighted
 //     (m_bIronSighted @4140).
 //   * the trigger timestamp is a client-local float at player offset 3456,
-//     stamped by the free-aim input code. We stamp it here on the +use press
-//     edge instead (see .cpp note) for a clean, self-contained port.
+//     stamped every CreateMove command containing IN_USE.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -51,8 +50,6 @@ private:
 	CPanelAnimationVarAliasType( float, m_fdotwide, "dotwide", "4", "proportional_float" );
 	CPanelAnimationVarAliasType( float, m_fdottall, "dottall", "4", "proportional_float" );
 
-	float	m_flTriggerTime;	// curtime of the last +use press (fade anchor)
-	bool	m_bUseHeld;			// +use held last think (press-edge detection)
 };
 
 #endif // HUD_DOTRETICLE_H

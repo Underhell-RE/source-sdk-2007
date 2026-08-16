@@ -253,15 +253,17 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
 
 - Free-aim cvars/cursor movement and viewmodel screen-ray tilt were added.
 - `update_freeaim x y z` client-to-server route stores a target vector on `CHL2_Player`.
-- Dot reticle uses +use edge timing, 3-second visibility, fixed tick geometry and ironsight hide behavior.
+- Dot reticle now stores its trigger timestamp on `C_BaseHLPlayer` and refreshes it from every `CreateMove` command containing `IN_USE`, matching client `sub_10044590`; the previously corrupted include line was also repaired.
 
 **Not complete:** custom weapon shots/muzzle paths do not all consume the server free-aim target, so this is not full original free aim.
 
 ### HUD
 
-- Battery disabled-chunk alpha now follows panel fade.
+- Battery HUD now uses original hidden bits, panel alpha lifecycle and integer fade behavior from `sub_100BDF90`.
+- The charge bar reads the original `m_HL2Local.m_flFlashBattery`; flashlight and night vision share that authoritative charge, consume discrete batteries and no longer fight Episodic's rechargeable flashlight path.
+- Flashlight on/off now updates the networked `m_bFlashlightOn` flag used by the HUD.
 - Hermit cards use binary 255/0 alpha at three seconds instead of gradual fade.
-- Battery implementation and reticle still need in-game visual verification.
+- Battery implementation and reticle still require in-game visual verification after rebuilding `client.dll` and `server.dll`. Disable and enabled bar geometry continues to come from the original `HudLayout.res` values.
 
 ### Mirror model
 

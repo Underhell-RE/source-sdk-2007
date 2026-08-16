@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -101,6 +101,7 @@ C_BaseHLPlayer::C_BaseHLPlayer()
 	m_flZoomRate		= 0.0f;
 	m_flZoomStartTime	= 0.0f;
 	m_flSpeedMod		= cl_forwardspeed.GetFloat();
+	m_flUseReticleTime = -1.0f;
 }
 
 //-----------------------------------------------------------------------------
@@ -662,6 +663,11 @@ void C_BaseHLPlayer::PerformClientSideNPCSpeedModifiers( float flFrameTime, CUse
 bool C_BaseHLPlayer::CreateMove( float flInputSampleTime, CUserCmd *pCmd )
 {
 	bool bResult = BaseClass::CreateMove( flInputSampleTime, pCmd );
+
+	// Original client stamps player+3456 every generated command while +use is
+	// held. The reticle reads this timestamp directly during Paint.
+	if ( pCmd->buttons & IN_USE )
+		m_flUseReticleTime = gpGlobals->curtime;
 
 	if ( !IsInAVehicle() )
 	{

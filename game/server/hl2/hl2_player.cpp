@@ -2259,16 +2259,22 @@ void CHL2_Player::FlashlightTurnOn( void )
 	}
 
 	AddEffects( EF_DIMLIGHT );
+	m_bFlashlightOn = true;
 	EmitSound( "HL2Player.FlashLightOn" );
 
 	// Underhell: raise the left-arm flashlight viewmodel.
 	UH_UpdateLeftArm();
 
 	// Start draining the current battery.
-	if ( m_flUHBatteryCharge <= 0.0f )
+#ifdef HL2_EPISODIC
+	if ( m_HL2Local.m_flFlashBattery <= 0.0f )
 	{
+		m_HL2Local.m_flFlashBattery = 100.0f;
 		m_flUHBatteryCharge = 100.0f;
 	}
+#else
+	if ( m_flUHBatteryCharge <= 0.0f ) m_flUHBatteryCharge = 100.0f;
+#endif
 
 	variant_t flashlighton;
 	flashlighton.SetFloat( m_HL2Local.m_flSuitPower / 100.0f );
@@ -2281,6 +2287,7 @@ void CHL2_Player::FlashlightTurnOn( void )
 void CHL2_Player::FlashlightTurnOff( void )
 {
 	RemoveEffects( EF_DIMLIGHT );
+	m_bFlashlightOn = false;
 	EmitSound( "HL2Player.FlashLightOff" );
 
 	// Underhell: holster the left-arm flashlight viewmodel.
@@ -3549,33 +3556,8 @@ void CHL2_Player::UpdateClientData( void )
 		m_bitsDamageType &= iTimeBasedDamage;
 	}
 
-	// Update Flashlight
-#ifdef HL2_EPISODIC
-	if ( Flashlight_UseLegacyVersion() == false )
-	{
-		if ( FlashlightIsOn() && sv_infinite_aux_power.GetBool() == false )
-		{
-			m_HL2Local.m_flFlashBattery -= FLASH_DRAIN_TIME * gpGlobals->frametime;
-			if ( m_HL2Local.m_flFlashBattery < 0.0f )
-			{
-				FlashlightTurnOff();
-				m_HL2Local.m_flFlashBattery = 0.0f;
-			}
-		}
-		else
-		{
-			m_HL2Local.m_flFlashBattery += FLASH_CHARGE_TIME * gpGlobals->frametime;
-			if ( m_HL2Local.m_flFlashBattery > 100.0f )
-			{
-				m_HL2Local.m_flFlashBattery = 100.0f;
-			}
-		}
-	}
-	else
-	{
-		m_HL2Local.m_flFlashBattery = -1.0f;
-	}
-#endif // HL2_EPISODIC
+	// Underhell battery charge is drained by UH_UpdateFlashlightBattery from
+	// ClientThink. Do not run Episodic's rechargeable flashlight path here.
 
 	BaseClass::UpdateClientData();
 }

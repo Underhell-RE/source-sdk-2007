@@ -9,11 +9,8 @@
 //     the original paint sub_100BC870),
 //   * hidden while iron-sighted.
 //
-// Divergence (documented): the original stores the trigger timestamp on the
-// player (client offset 3456) and stamps it from the free-aim input path;
-// that free-aim camera is still TODO. This port detects the +use press edge
-// directly in OnThink and keeps the timestamp on the panel, so the dot behaves
-// identically without the free-aim dependency.
+// The trigger timestamp is stored on C_BaseHLPlayer and stamped from CreateMove
+// whenever the generated command contains IN_USE, matching client+3456.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -23,9 +20,8 @@
 #include "hud_macros.h"
 #include "hud_dotreticle.h"
 #include "underhell/uh_freeaim.h"
-#include "c_basehlplayer.h"}ાજેતળીажәлар to=functions.edit_file  天天中彩票中了和天天中彩票】【。】【”】【av不卡免费播放  手机天天彩票Error? Let's see result.numerusform to=functions.edit_file 񹚒 ฝ่ายขายละคร  天天中彩票无法  彩神争霸的={
+#include "c_basehlplayer.h"
 #include "iclientmode.h"
-#include "in_buttons.h"
 #include <vgui/ISurface.h>
 
 void ScreenToWorld( int mousex, int mousey, float fov, const Vector& vecRenderOrigin,
@@ -57,9 +53,7 @@ CHudDotReticle::CHudDotReticle( const char *pElementName ) : CHudElement( pEleme
 	SetParent( pParent );
 
 	SetHiddenBits( HIDEHUD_UH_RETICLE );
-
-	m_flTriggerTime = -100.0f;
-	m_bUseHeld = false;
+	SetAlpha( 128 );
 }
 
 //-----------------------------------------------------------------------------
@@ -67,8 +61,6 @@ CHudDotReticle::CHudDotReticle( const char *pElementName ) : CHudElement( pEleme
 //-----------------------------------------------------------------------------
 void CHudDotReticle::Init( void )
 {
-	m_flTriggerTime = -100.0f;
-	m_bUseHeld = false;
 }
 
 void CHudDotReticle::Reset( void )
@@ -100,20 +92,11 @@ bool CHudDotReticle::ShouldDraw( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Stamp the fade anchor on the +use press edge.
+// Purpose: Timestamping is performed by C_BaseHLPlayer::CreateMove.
 //-----------------------------------------------------------------------------
 void CHudDotReticle::OnThink( void )
 {
-	C_BaseHLPlayer *pPlayer = (C_BaseHLPlayer *)C_BasePlayer::GetLocalPlayer();
-	if ( !pPlayer )
-		return;
-
-	bool bUse = ( pPlayer->m_nButtons & IN_USE ) != 0;
-	if ( bUse && !m_bUseHeld )
-	{
-		m_flTriggerTime = gpGlobals->curtime;
-	}
-	m_bUseHeld = bUse;
+	// Timestamping happens in C_BaseHLPlayer::CreateMove, as in the original.
 }
 
 //-----------------------------------------------------------------------------
@@ -148,7 +131,7 @@ void CHudDotReticle::Paint()
 	if ( pPlayer->m_bIronSighted )
 		return;
 
-	float flElapsed = gpGlobals->curtime - m_flTriggerTime;
+	float flElapsed = gpGlobals->curtime - pPlayer->m_flUseReticleTime;
 	if ( flElapsed < 0.0f || flElapsed >= UH_DOTRETICLE_FADE_TIME )
 		return;
 
