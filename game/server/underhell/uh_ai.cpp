@@ -96,30 +96,63 @@ static const char *UH_GibModelFor( const char *pszNPC, const char *pszLimb )
 // combine_soldier table; the transition removes the named side. If the model
 // lacks the bodygroup, fail soft (the original would crash here).
 //-----------------------------------------------------------------------------
-static bool UH_RemoveBodygroupSide( CBaseAnimating *pNPC, const char *pszGroup, int iSide )
+// sub_10031BF0 does not use a generic left/right bitfield.  The authored
+// combine models encode arm-loss states differently: regular soldiers use
+// 0/2/4/6 while prison/worker/PMC variants use 0/1/2/3.  Treating them as
+// bits 1/2 (the old implementation) selected intact or wrong geometry.
+static int UH_FindBodygroup( CBaseAnimating *pBody, const char *pszName )
 {
-	int iGroup = pNPC->FindBodygroupByName( pszGroup );
+	int i = pBody->FindBodygroupByName( pszName );
+	if ( i >= 0 )
+		return i;
+
+	char alternate[64];
+	V_strncpy( alternate, pszName, sizeof( alternate ) );
+	if ( alternate[0] >= 'a' && alternate[0] <= 'z' )
+		alternate[0] -= 'a' - 'A';
+	else if ( alternate[0] >= 'A' && alternate[0] <= 'Z' )
+		alternate[0] += 'a' - 'A';
+	return pBody->FindBodygroupByName( alternate );
+}
+
+static bool UH_RemoveBodygroupSide( CBaseAnimating *pBody, const char *pszGroup, int iSide )
+{
+	int iGroup = UH_FindBodygroup( pBody, pszGroup );
 	if ( iGroup < 0 )
 		return false;
 
-	int iCur = pNPC->GetBodygroup( iGroup );
+	const int iCurrent = pBody->GetBodygroup( iGroup );
+	const int iCount = pBody->GetBodygroupCount( iGroup );
+	const char *pszModel = STRING( pBody->GetModelName() );
+	int iNew = iCurrent;
 
-	// Left = bit 1, right = bit 2 (of the low two "regular" bits). Heavy legs
-	// repeat the pattern in bits 3-4 (values 4-7), so mask off that bit too.
-	int iNew = iCur;
-	if ( iSide == 0 )		// left
+	if ( !V_stricmp( pszGroup, "arms" ) )
 	{
-		iNew |= 1;
+		// From sub_10031BF0 cases 4/5.  Soldier arm bodygroups reserve bit 0
+		// for the intact variant, therefore left/right loss is +2/+4.  The
+		// 4-state families use +1/+2.
+		const bool bSixStateSoldier =
+			V_stristr( pszModel, "combine_soldier" ) &&
+			!V_stristr( pszModel, "prisonguard" ) && iCount > 4;
+		const int iMask = bSixStateSoldier ? ( iSide == 0 ? 2 : 4 ) : ( iSide == 0 ? 1 : 2 );
+		iNew = iCurrent | iMask;
 	}
-	else					// right
+	else if ( !V_stricmp( pszGroup, "legs" ) )
 	{
-		iNew |= 2;
+		// The leg bodygroup has ordinary and heavy sets.  Preserve the heavy
+		// base (bit 2) and mark the severed side in its low bits.
+		const int iMask = iSide == 0 ? 1 : 2;
+		iNew = iCurrent | iMask;
+	}
+	else
+	{
+		iNew = iCurrent | ( iSide == 0 ? 1 : 2 );
 	}
 
-	if ( iNew == iCur )
+	if ( iNew == iCurrent || iNew >= iCount )
 		return false;
-
-	pNPC->SetBodygroup( iGroup, iNew );
+	pBody->SetBodygroup( iGroup, iNew );
+	pBody->ResetSequenceInfo();
 	return true;
 }
 
@@ -137,8 +170,13 @@ static int UH_DestroyedHeadBodygroup( CBaseAnimating *pBody )
 		// CNPC_CombineS path in sub_10031BF0: normal combine variants use
 		// destroyed head 10, or 11 when their current head is already one of
 		// the high (helmet/gear) variants. Value 9 belongs to other NPC types.
-		int iHead = pBody->FindBodygroupByName( "head" );
-		return ( iHead >= 0 && pBody->GetBodygroup( iHead ) >= 9 ) ? 11 : 10;
+		int iHead = UH_FindBodygroup( pBody, "head" );
+		const int iDestroyed = ( iHead >= 0 && pBody->GetBodygroup( iHead ) >= 9 ) ? 11 : 10;
+		// Some map replacements use a reduced combine model.  Never assign an
+		// out-of-range studio body value: that leaves the networked ragdoll in
+		// an invalid state rather than producing the destroyed head.
+		if ( iHead >= 0 && iDestroyed < pBody->GetBodygroupCount( iHead ) )
+			return iDestroyed;
 	}
 	return 1;
 }
@@ -371,7 +409,7 @@ static void UH_DispatchLimbBlood( CBaseAnimating *pBody, int iHitGroup, CBaseAni
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &vecDir )
 {
-	int iGroup = FindBodygroupByName( "helmet" );
+	int iGroup = UH_FindBodygroup( this, "helmet" );
 	if ( iGroup < 0 || GetBodygroup( iGroup ) < 1 )
 		return;	// no helmet worn
 
@@ -414,7 +452,7 @@ void CAI_BaseNPC::UH_ShootOffHelmet( const Vector &vecPosition, const Vector &ve
 //-----------------------------------------------------------------------------
 static void UH_DropGearItem( CBaseAnimating *pNPC, const char *pszBodygroup, const char *pszItem, const Vector &vecPosition, const Vector &vecDir )
 {
-	int iGroup = pNPC->FindBodygroupByName( pszBodygroup );
+	int iGroup = UH_FindBodygroup( pNPC, pszBodygroup );
 	if ( iGroup < 0 || pNPC->GetBodygroup( iGroup ) < 1 )
 		return;	// not worn
 
@@ -449,11 +487,11 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 	{
 	case HITGROUP_LEFTARM:	bRemoved = UH_RemoveBodygroupSide( this, "arms", 0 ); break;
 	case HITGROUP_RIGHTARM:	bRemoved = UH_RemoveBodygroupSide( this, "arms", 1 ); break;
-	case HITGROUP_LEFTLEG:	bRemoved = UH_RemoveBodygroupSide( this, "Legs", 0 ); break;
-	case HITGROUP_RIGHTLEG:	bRemoved = UH_RemoveBodygroupSide( this, "Legs", 1 ); break;
+	case HITGROUP_LEFTLEG:	bRemoved = UH_RemoveBodygroupSide( this, "legs", 0 ); break;
+	case HITGROUP_RIGHTLEG:	bRemoved = UH_RemoveBodygroupSide( this, "legs", 1 ); break;
 	case HITGROUP_HEAD:
 		{
-			int iGroup = FindBodygroupByName( "head" );
+			int iGroup = UH_FindBodygroup( this, "head" );
 			int iDestroyed = UH_DestroyedHeadBodygroup( this );
 			if ( iGroup >= 0 && GetBodygroup( iGroup ) != iDestroyed )
 			{
@@ -522,7 +560,7 @@ bool CAI_BaseNPC::UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &v
 	// Head: a worn helmet absorbs the damage until it is shot off.
 	if ( iHitGroup == HITGROUP_HEAD )
 	{
-		int iHelmet = FindBodygroupByName( "helmet" );
+		int iHelmet = UH_FindBodygroup( this, "helmet" );
 		if ( iHelmet >= 0 && GetBodygroup( iHelmet ) >= 1 )
 		{
 			m_flHelmetDamage += flDamage;
@@ -880,7 +918,7 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 	// living-NPC path in sub_10031BF0.
 	if ( iHitGroup == HITGROUP_HEAD )
 	{
-		int iHelmet = pRagdoll->FindBodygroupByName( "helmet" );
+		int iHelmet = UH_FindBodygroup( pRagdoll, "helmet" );
 		if ( iHelmet >= 0 && pRagdoll->GetBodygroup( iHelmet ) >= 1 )
 		{
 			pRagdoll->m_flGibDamage[0] += flDamage;
@@ -940,11 +978,11 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 	{
 	case HITGROUP_LEFTARM:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "arms", 0 ); break;
 	case HITGROUP_RIGHTARM:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "arms", 1 ); break;
-	case HITGROUP_LEFTLEG:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "Legs", 0 ); break;
-	case HITGROUP_RIGHTLEG:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "Legs", 1 ); break;
+	case HITGROUP_LEFTLEG:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "legs", 0 ); break;
+	case HITGROUP_RIGHTLEG:	bRemoved = UH_RemoveBodygroupSide( pRagdoll, "legs", 1 ); break;
 	case HITGROUP_HEAD:
 		{
-			int iGroup = pRagdoll->FindBodygroupByName( "head" );
+			int iGroup = UH_FindBodygroup( pRagdoll, "head" );
 			int iDestroyed = UH_DestroyedHeadBodygroup( pRagdoll );
 			if ( iGroup >= 0 && pRagdoll->GetBodygroup( iGroup ) != iDestroyed )
 			{
