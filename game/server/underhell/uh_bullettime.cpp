@@ -30,10 +30,10 @@ BEGIN_DATADESC( CUHBullet )
 END_DATADESC()
 
 bool UH_BulletTimeActive() { return bt_enabled.GetBool(); }
+void UH_SetBulletTime( bool bEnabled ) { bt_enabled.SetValue( bEnabled ? 1 : 0 ); }
 
 static const char *UH_BulletModel( int ammoType )
 {
-	// serveror sub_10107970: Pistol/AR2, 357, buckshot, default rifle.
 	switch ( ammoType )
 	{
 	case 3: case 4: return "models/weapons/bt_9mm.mdl";
@@ -78,3 +78,6 @@ void UH_BulletTimePlayerDied( CBasePlayer *pPlayer )
 {
 	if ( bt_enabled.GetBool() ) bt_enabled.SetValue( 0 );
 }
+
+void CHL2_Player::InputEnableBt( inputdata_t &inputdata ) { UH_SetBulletTime( true ); }
+void CHL2_Player::InputDisableBt( inputdata_t &inputdata ) { UH_SetBulletTime( false ); }

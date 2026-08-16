@@ -473,6 +473,8 @@ public:
 	bool				UH_CanKick( void );
 	void				InputDisableKick( inputdata_t &inputdata );
 	void				InputEnableKick( inputdata_t &inputdata );
+	void				InputEnableBt( inputdata_t &inputdata );
+	void				InputDisableBt( inputdata_t &inputdata );
 	void				UH_SetKickViewModel( const char *pszModel );	// set + precache viewmodel 2
 
 	//-----------------------------------------------------------------------------

@@ -9,6 +9,7 @@ class CBasePlayer;
 class Vector;
 
 bool UH_BulletTimeActive();
+void UH_SetBulletTime( bool bEnabled );
 void UH_BulletTimeSpawnTracer( CBaseCombatCharacter *pShooter, const Vector &start, const Vector &direction, int ammoType, bool bEnemyBullet );
 void UH_BulletTimePlayerDied( CBasePlayer *pPlayer );
 

@@ -49,6 +49,7 @@
 #include "tier0/icommandline.h"
 
 #include "underhell/uh_weapons.h"
+#include "underhell/uh_bullettime.h"
 
 #ifdef HL2_EPISODIC
 #include "npc_alyx_episodic.h"
@@ -422,6 +423,8 @@ BEGIN_DATADESC( CHL2_Player )
 	// Underhell kick (uh_jake_kick).
 	DEFINE_INPUTFUNC( FIELD_VOID, "DisableKick", InputDisableKick ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "EnableKick", InputEnableKick ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "EnableBt", InputEnableBt ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "DisableBt", InputDisableBt ),
 	DEFINE_FIELD( m_bKickMarker, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bKickActive, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bKickDisabled, FIELD_BOOLEAN ),
@@ -1906,6 +1909,12 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 			DevMsg( 1,"3D Distance: %.4f units  (%.2f feet) --- 2D Distance: %.4f units  (%.2f feet)\n", flDist, flDist / 12.0, flDist2D, flDist2D / 12.0 );
 		}
 
+		break;
+	}
+
+	case 110:
+	{
+		UH_SetBulletTime( !UH_BulletTimeActive() );
 		break;
 	}
 
