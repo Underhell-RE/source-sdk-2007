@@ -1,7 +1,7 @@
 # Arena session implementation ledger — `arena/01a007ab-source-sdk-2007`
 
 > ## MANDATORY VERIFICATION WARNING
-> **This document and the changes it describes were produced by an automated LLM during an Arena session — in the user's words, "the dumbest LLM". Nothing in this file is proof of correctness, completeness, buildability, or 1:1 Underhell parity. Every entry requires source review, a clean client/server rebuild, and in-game comparison with the original before merge into `master`.**
+> **This document and the changes it describes were produced by the dumbest LLM during an Arena session. Nothing in this file is proof of correctness, completeness, buildability, or 1:1 Underhell parity. Every entry requires source review, a clean client/server rebuild, and in-game comparison with the original before merge into `master`.**
 >
 > This warning is intentionally prominent because the session included speculative implementations, several follow-up corrections, and two reverted false interpretations. Treat this document as an audit ledger, not release notes.
 
