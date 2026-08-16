@@ -329,6 +329,9 @@ static CBaseEntity *UH_SpawnGibProp( const char *pszModel, const Vector &vecPosi
 	if ( !pGib )
 		return NULL;
 
+	// sub_10031BF0 explicitly copies the source skin to its sub-ragdoll.
+	pGib->m_nSkin = pAnimatingOwner->m_nSkin;
+
 	IPhysicsObject *pPhys = pGib->VPhysicsGetObject();
 	if ( pPhys )
 	{
@@ -547,6 +550,11 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 			pGib = UH_SpawnGibProp( pszModel, vecGibOrigin, angGibOrigin, vecDir, this );
 		}
 	}
+
+	// The original clears old decals and emits the splat once a limb is actually
+	// severed (not while merely accumulating damage).
+	RemoveAllDecals();
+	EmitSound( "Player.Splat" );
 
 	// Blood spray (1:1 with sub_10031BF0) + a blood decal at the wound.
 	UH_DispatchLimbBlood( this, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, vecPosition, vecDir );
@@ -1039,6 +1047,9 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 			pGib = UH_SpawnGibProp( pszModel, vecGibOrigin, angGibOrigin, dir, pRagdoll );
 		}
 	}
+
+	pRagdoll->RemoveAllDecals();
+	pRagdoll->EmitSound( "Player.Splat" );
 
 	// Blood spray (1:1 with sub_10031BF0) + a blood decal at the wound.
 	UH_DispatchLimbBlood( pRagdoll, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, pos, dir );
