@@ -320,7 +320,7 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 	PrecacheParticleSystem( "blood_advisor_puncture_withdraw" );
 	PrecacheScriptSound( "Player.Helmet" );
 	PrecacheScriptSound( "Player.Splat" );
-	PrecacheScriptSound( "Player.Headshot" );
+	PrecacheScriptSound( "Player.HeadShot" );
 }
 
 //-----------------------------------------------------------------------------
@@ -578,12 +578,13 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 	RemoveAllDecals();
 	EmitSound( "Player.Splat" );
 
-	// Blood spray (1:1 with sub_10031BF0) + a blood decal at the wound.
+	// Arms/legs use their authored particles. The original uses the separate
+	// headshot spray and sentence only when the head transition succeeds.
 	UH_DispatchLimbBlood( this, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, vecPosition, vecDir );
-
-	if ( BloodColor() != DONT_BLEED )
+	if ( iHitGroup == HITGROUP_HEAD )
 	{
-		SpawnBlood( vecPosition, vecDir, BloodColor(), 24.0f );
+		EmitSound( "Player.HeadShot" );
+		UTIL_BloodSpray( vecPosition, vecDir, BLOOD_COLOR_RED, 8, FX_BLOODSPRAY_ALL );
 	}
 }
 
@@ -1051,8 +1052,10 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 	pRagdoll->RemoveAllDecals();
 	pRagdoll->EmitSound( "Player.Splat" );
 
-	// Blood spray (1:1 with sub_10031BF0) + a blood decal at the wound.
 	UH_DispatchLimbBlood( pRagdoll, iHitGroup, pGib ? pGib->GetBaseAnimating() : NULL, pos, dir );
-
-	SpawnBlood( pos, dir, BLOOD_COLOR_RED, 24.0f );
+	if ( iHitGroup == HITGROUP_HEAD )
+	{
+		pRagdoll->EmitSound( "Player.HeadShot" );
+		UTIL_BloodSpray( pos, dir, BLOOD_COLOR_RED, 8, FX_BLOODSPRAY_ALL );
+	}
 }
