@@ -221,39 +221,6 @@ void CRagdollProp::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 	if ( !pPlayer || pPlayer->GetGroundEntity() == this || HasNPCsOnIt() )
 		return;
 
-	// Original CRagdollProp::Use (sub_101CB850) strips a wearable helmet on
-	// the first +use, then continues to the normal pickup-controller path.
-	int iHelmet = FindBodygroupByName( "helmet" );
-	if ( iHelmet < 0 )
-		iHelmet = FindBodygroupByName( "Helmet" );
-	if ( iHelmet >= 0 )
-	{
-		int iVariant = GetBodygroup( iHelmet );
-		if ( iVariant > 0 && iVariant <= 3 )
-		{
-			const char *pszModel = STRING( GetModelName() );
-			const char *pszItem = V_stristr( pszModel, "pmc" ) ? "item_helmet_pmc" :
-				V_stristr( pszModel, "prisonguard" ) ? "item_helmet_prison" :
-				V_stristr( pszModel, "worker" ) ? "item_helmet_worker" : "item_helmet_guard";
-			Vector vecOrigin;
-			QAngle angOrigin;
-			if ( !GetAttachment( "Eyes", vecOrigin, angOrigin ) )
-			{
-				vecOrigin = WorldSpaceCenter();
-				angOrigin = GetAbsAngles();
-			}
-			CBaseEntity *pHelmet = CreateEntityByName( pszItem );
-			if ( pHelmet )
-			{
-				pHelmet->SetAbsOrigin( vecOrigin );
-				pHelmet->SetAbsAngles( angOrigin );
-				DispatchSpawn( pHelmet );
-				SetBodygroup( iHelmet, 0 );
-				ResetSequenceInfo();
-			}
-		}
-	}
-
 	pPlayer->PickupObject( this, false );
 
 	CHL2_Player *pHL2Player = dynamic_cast< CHL2_Player * >( pPlayer );
