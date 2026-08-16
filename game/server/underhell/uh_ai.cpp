@@ -314,6 +314,8 @@ void CAI_BaseNPC::UH_PrecacheGibModels( void )
 		PrecacheModel( "models/items/helmet_visor.mdl" );
 		PrecacheModel( "models/items/respirator.mdl" );
 	}
+	if ( V_stristr( pszModel, "pmc" ) )
+		PrecacheModel( "models/items/pmc_helmet.mdl" );
 
 	// Dismemberment blood sprays + sounds (1:1 with sub_10021D80 precache).
 	PrecacheParticleSystem( "blood_zombie_split_spray" );
@@ -373,6 +375,25 @@ static void UH_GetLimbSpawnTransform( CBaseAnimating *pBody, int iHitGroup, cons
 	angOrigin = vec3_angle;
 	if ( pszAttachment )
 		pBody->GetAttachment( pszAttachment, vecOrigin, angOrigin );
+}
+
+// sub_10031BF0 copies the relevant glove variant to an arm sub-ragdoll.
+// Without this, a gloved soldier leaves behind a bare detached hand because a
+// new prop starts with model bodygroups at zero.
+static void UH_CopyLimbBodygroups( CBaseAnimating *pSource, CBaseAnimating *pGib, int iHitGroup )
+{
+	const char *pszGlove = NULL;
+	if ( iHitGroup == HITGROUP_LEFTARM )
+		pszGlove = "Glove_L";
+	else if ( iHitGroup == HITGROUP_RIGHTARM )
+		pszGlove = "Glove_R";
+	if ( !pszGlove )
+		return;
+
+	int iSource = UH_FindBodygroup( pSource, pszGlove );
+	int iGib = UH_FindBodygroup( pGib, pszGlove );
+	if ( iSource >= 0 && iGib >= 0 )
+		pGib->SetBodygroup( iGib, min( pSource->GetBodygroup( iSource ), pGib->GetBodygroupCount( iGib ) - 1 ) );
 }
 
 //-----------------------------------------------------------------------------
@@ -577,6 +598,8 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 			QAngle angGibOrigin;
 			UH_GetLimbSpawnTransform( this, iHitGroup, vecPosition, vecGibOrigin, angGibOrigin );
 			pGib = UH_SpawnGibProp( pszModel, vecGibOrigin, angGibOrigin, vecDir, this );
+			if ( pGib )
+				UH_CopyLimbBodygroups( this, pGib->GetBaseAnimating(), iHitGroup );
 		}
 	}
 
@@ -1054,6 +1077,8 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 			QAngle angGibOrigin;
 			UH_GetLimbSpawnTransform( pRagdoll, iHitGroup, pos, vecGibOrigin, angGibOrigin );
 			pGib = UH_SpawnGibProp( pszModel, vecGibOrigin, angGibOrigin, dir, pRagdoll );
+			if ( pGib )
+				UH_CopyLimbBodygroups( pRagdoll, pGib->GetBaseAnimating(), iHitGroup );
 		}
 	}
 
