@@ -710,9 +710,19 @@ void CAI_BaseNPC::UH_InitGibHealth( void )
 bool CAI_BaseNPC::UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &vecPosition, const Vector &vecDir )
 {
 	// Original gate @130572: byte 1713 is "dismemberment enabled for this NPC",
-	// checked before anything else. It is NOT an IsAlive() test.
+	// checked before anything else. It is NOT an IsAlive() test. Only
+	// CNPC_UH_Infected sets it; every other NPC keeps the vanilla damage path.
 	if ( !m_bUhGibEnabled )
 		return false;
+
+	// Safety net: if the pools were never seeded (an NPC that enabled gibbing
+	// without going through Activate) they would all read 0 and the very first
+	// hit would sever a limb. Seed on demand rather than dismembering.
+	if ( m_iGibHealth[0] <= 0 && m_iGibHealth[1] <= 0 && m_iGibHealth[2] <= 0 &&
+		 m_iGibHealth[3] <= 0 && m_iGibHealth[4] <= 0 && m_iHelmetHealth <= 0 )
+	{
+		UH_InitGibHealth();
+	}
 
 	int idx = -1;
 	switch ( iHitGroup )
@@ -1045,6 +1055,12 @@ static int UH_RagdollBoneToHitgroup( CRagdollProp *pRagdoll, int iPhysicsBone )
 void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage, int iPhysicsBone, const Vector &pos, const Vector &dir )
 {
 	if ( !pRagdoll )
+		return;
+
+	// Same byte-@1713 gate as the living NPC: only corpses inherited from an
+	// NPC that had the Underhell limb system can be dismembered. Combine and
+	// other vanilla corpses keep their limbs.
+	if ( !pRagdoll->m_bUhGibEnabled )
 		return;
 
 	// A bullet trace against a ragdoll reports hitgroup = generic (see

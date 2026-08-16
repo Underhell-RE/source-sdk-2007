@@ -97,6 +97,7 @@ BEGIN_DATADESC(CRagdollProp)
 	// Underhell dismemberment damage accumulation / dragged-body trail state.
 	DEFINE_ARRAY( m_iGibHealth, FIELD_INTEGER, 5 ),
 	DEFINE_FIELD( m_iHelmetHealth, FIELD_INTEGER ),
+	DEFINE_FIELD( m_bUhGibEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_vecUHDraggedLastPos, FIELD_POSITION_VECTOR ),
 	DEFINE_FIELD( m_bUHDragged, FIELD_BOOLEAN ),
 
@@ -307,6 +308,7 @@ CRagdollProp::CRagdollProp( void )
 	m_flDefaultFadeScale = 1;
 
 	UH_InitGibHealth();
+	m_bUhGibEnabled = false;
 	m_vecUHDraggedLastPos.Init();
 	m_bUHDragged = false;
 }
@@ -1404,6 +1406,8 @@ CBaseEntity *CreateServerRagdoll( CBaseAnimating *pAnimating, int forceBone, con
 		for ( int i = 0; i < 5; i++ )
 			pRagdoll->m_iGibHealth[i] = pNPC->m_iGibHealth[i];
 		pRagdoll->m_iHelmetHealth = pNPC->m_iHelmetHealth;
+		// Carry the enable flag too: a combine corpse must stay intact.
+		pRagdoll->m_bUhGibEnabled = pNPC->m_bUhGibEnabled;
 	}
 
 	// NPC_STATE_DEAD npc's will have their COND_IN_PVS cleared, so this needs to force SetupBones to happen

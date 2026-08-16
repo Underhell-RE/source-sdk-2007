@@ -699,6 +699,13 @@ void CNPC_UH_Infected::Spawn( void )
 	// Give weapon
 	GiveAdditionalEquipment();
 
+	// Underhell limb system. The original enables it (byte @1713 = 1) only in
+	// the CNPC_UH_Infected constructor @463688 and seeds the per-bodypart
+	// health pools right after it @463689-463693; every other NPC class zeroes
+	// that byte. Enable it before BaseClass::Spawn so the pools are seeded
+	// during Activate.
+	m_bUhGibEnabled = true;
+
 	BaseClass::Spawn();
 
 	// Touch for climbing (original set touch to ClimbTouch)

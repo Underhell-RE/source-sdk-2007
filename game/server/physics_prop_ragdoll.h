@@ -94,6 +94,9 @@ public:
 	// dealt while alive is not forgotten.
 	int				m_iGibHealth[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
 	int				m_iHelmetHealth;			// remaining helmet health
+	// Mirrors CAI_BaseNPC::m_bUhGibEnabled (original byte @1713): only corpses
+	// that came from an NPC with the Underhell limb system can be shot apart.
+	bool			m_bUhGibEnabled;
 	void			UH_InitGibHealth( void );
 	Vector			m_vecUHDraggedLastPos;		// original DraggedThink trail anchor
 	bool			m_bUHDragged;

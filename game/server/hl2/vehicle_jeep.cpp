@@ -223,10 +223,17 @@ void CPropJeep::Spawn( void )
 
 	m_flMinimumSpeedToEnterExit = LOCK_SPEED;
 
-	m_nBulletType = GetAmmoDef()->Index("GaussEnergy");
+	// Original Spawn (sub_103EAxxx @950783-950795) picks the ammo by whether
+	// this jeep carries the Underhell mounted gun:
+	//     m_nBulletType = m_bEnableMountedGun ? "AR2"        : "GaussEnergy";
+	//     m_nAmmoType   = m_bEnableMountedGun ? "AirboatGun" : "GaussEnergy";
+	// This matters for more than damage: "GaussEnergy" is registered with
+	// TRACER_NONE, while "AirboatGun" is TRACER_LINE. Leaving the mounted gun
+	// on GaussEnergy is exactly why its tracers were invisible.
+	m_nBulletType = GetAmmoDef()->Index( m_bEnableMountedGun ? "AR2" : "GaussEnergy" );
 
 	CAmmoDef *pAmmoDef = GetAmmoDef();
-	m_nAmmoType = pAmmoDef->Index("GaussEnergy");
+	m_nAmmoType = pAmmoDef->Index( m_bEnableMountedGun ? "AirboatGun" : "GaussEnergy" );
 
 	if ( m_bHasGun )
 	{
@@ -922,17 +929,26 @@ void CPropJeep::FireCannon( void )
 	m_bCannonCharging = false;
 	DispatchParticleEffect( "muzzle_star_uh", PATTACH_POINT_FOLLOW, this, "muzzle_uh" );
 
-	// The original traces from the "muzzle" attachment, not from "gun_ref"
-	// (@950518: GetAttachment( LookupAttachment("muzzle") ) then AngleVectors).
-	// gun_ref is the aiming pivot; firing from it put the bullet origin inside
-	// the vehicle body, so shots hit the jeep itself and the gun read as dead.
-	Vector vecMuzzleOrigin = m_vecGunOrigin;
+	// sub_10312E60( info, 1, (float *)(this + 1748), v13, spread, 56755.84,
+	//               m_nAmmoType, 1 )
+	// Decoded argument by argument:
+	//   * vecSrc  = the m_vecGunOrigin FIELD at offset 1748 — NOT the position
+	//               returned by GetAttachment. The attachment lookup right
+	//               above it is only used for the ANGLES: the decompile calls
+	//               GetAttachment(..., v12, v16) and then AngleVectors(v16,
+	//               v13), so v12 (the origin) is discarded.
+	//   * vecDir  = v13 = AngleVectors( muzzle attachment angles )
+	//   * flDistance = 56755.84 (MAX_TRACE_LENGTH)
+	// Firing from the attachment origin (as an earlier revision of this port
+	// did) shifts the muzzle and skews the aim, which is what made the gun
+	// point the wrong way.
 	QAngle angMuzzle;
-	int iMuzzle = LookupAttachment( "muzzle" );
+	Vector vecUnusedOrigin;
 	Vector aimDir;
+	int iMuzzle = LookupAttachment( "muzzle" );
 	if ( iMuzzle > 0 )
 	{
-		GetAttachment( iMuzzle, vecMuzzleOrigin, angMuzzle );
+		GetAttachment( iMuzzle, vecUnusedOrigin, angMuzzle );
 		AngleVectors( angMuzzle, &aimDir );
 	}
 	else
@@ -940,9 +956,19 @@ void CPropJeep::FireCannon( void )
 		GetCannonAim( &aimDir );
 	}
 
-	FireBulletsInfo_t info( 1, vecMuzzleOrigin, aimDir, Vector( 0.0087299999f, 0.0087299999f, 0.0087299999f ),
+	// m_vecGunOrigin is refreshed from the "Muzzle" attachment in
+	// CreateDangerSounds, which only runs from ProcessMovement — i.e. only
+	// while a PLAYER is driving. With Bryan at the wheel the player never
+	// drives, so the field kept its stale spawn-time value and the bullets
+	// came out of the wrong place. Refresh it here before firing.
+	QAngle angDummy;
+	GetAttachment( "Muzzle", m_vecGunOrigin, angDummy );
+
+	FireBulletsInfo_t info( 1, m_vecGunOrigin, aimDir, Vector( 0.0087299999f, 0.0087299999f, 0.0087299999f ),
 		MAX_TRACE_LENGTH, m_nAmmoType );
 	info.m_iDamage = sk_jeep_gun_damage.GetInt();
+	// v11[16] = 4 — the original explicitly sets a tracer every 4th shot.
+	info.m_iTracerFreq = 4;
 	info.m_nFlags = FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS;
 	info.m_pAttacker = m_hPlayer;
 	FireBullets( info );

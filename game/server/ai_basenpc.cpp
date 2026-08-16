@@ -11430,7 +11430,12 @@ CAI_BaseNPC::CAI_BaseNPC(void)
 	for ( int i = 0; i < 5; i++ )
 		m_iGibHealth[i]			= 0;
 	m_iHelmetHealth				= 0;
-	m_bUhGibEnabled				= true;		// original byte @1713 is set to 1 on construction
+	// Original byte @1713. It is set to 1 in exactly ONE constructor —
+	// CNPC_UH_Infected (@463688) — and explicitly zeroed in every other NPC
+	// constructor in the binary. Defaulting it to true here handed the
+	// infected-only limb system to combine soldiers, whose pools are never
+	// seeded, so their parts sat at 0 and the first bullet tore them apart.
+	m_bUhGibEnabled				= false;
 	m_bUhCanUseWeapons			= true;		// original byte @1712
 	m_flNextSpotBodiesTime		= 0.0f;
 	m_flNextTempSquadTime		= 0.0f;

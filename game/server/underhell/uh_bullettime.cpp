@@ -44,6 +44,7 @@
 #include "cbase.h"
 #include "underhell/uh_bullettime.h"
 #include "hl2_player.h"
+#include "igamesystem.h"
 
 #include "tier0/memdbgon.h"
 
@@ -61,6 +62,10 @@ ConVar bt_plr_speed( "bt_plr_speed", "250", FCVAR_NONE, "player speed during bul
 #define UH_BTBULLET_TRIGGER_BLOAT	36.0f
 
 bool UH_BulletTimeActive() { return bt_enabled.GetBool(); }
+
+// NOTE: FCVAR_CHEAT is enforced by the console command path, not by
+// ConVar::InternalSetValue, so writing these convars from code works even
+// while sv_cheats is 0. No flag juggling is needed here.
 void UH_SetBulletTime( bool bEnabled ) { bt_enabled.SetValue( bEnabled ? 1 : 0 ); }
 
 //-----------------------------------------------------------------------------
@@ -80,6 +85,55 @@ static const char *UH_BulletModel( int ammoType )
 //-----------------------------------------------------------------------------
 // CBtBullet — the visible bullet-time projectile.
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// host_timescale keeper.
+//
+// Uh_Chapter1_16_d toggles sv_cheats INSIDE the bullet-time window:
+//     t+3  !player,EnableBt      t+3  sv_cheats 1
+//     t+4  bt                    t+9  sv_cheats 0    t+9  !player,DisableBt
+// The engine reverts FCVAR_CHEAT convars to their defaults when sv_cheats
+// changes, so a one-shot write of host_timescale from the bt_enabled callback
+// is wiped the moment the map flips sv_cheats — the slowdown either never
+// takes hold or dies almost immediately, which matches the reported "bullet
+// time doesn't slow anything" / "lasts a second" behaviour. Re-assert the
+// value every frame while bullet time is active and restore 1.0 once it ends.
+//-----------------------------------------------------------------------------
+class CUHTimescaleKeeper : public CAutoGameSystemPerFrame
+{
+public:
+	CUHTimescaleKeeper() : CAutoGameSystemPerFrame( "CUHTimescaleKeeper" ), m_bWasActive( false ) {}
+
+	virtual void LevelInitPostEntity( void )
+	{
+		m_bWasActive = false;
+	}
+
+	virtual void FrameUpdatePostEntityThink( void )
+	{
+		ConVar *pScale = cvar->FindVar( "host_timescale" );
+		if ( !pScale )
+			return;
+
+		const bool bActive = UH_BulletTimeActive();
+		if ( bActive )
+		{
+			const float flWanted = bt_timescale.GetFloat();
+			if ( pScale->GetFloat() != flWanted )
+				pScale->SetValue( flWanted );
+		}
+		else if ( m_bWasActive )
+		{
+			pScale->SetValue( 1.0f );
+		}
+
+		m_bWasActive = bActive;
+	}
+
+private:
+	bool m_bWasActive;
+};
+static CUHTimescaleKeeper g_UHTimescaleKeeper;
+
 class CBtBullet : public CBaseAnimating
 {
 	DECLARE_CLASS( CBtBullet, CBaseAnimating );
@@ -172,7 +226,11 @@ void CBtBullet::BulletThink( void )
 {
 	SetNextThink( gpGlobals->curtime + UH_BTBULLET_THINK_INTERVAL );
 
-	// Raw m_flSpeed while BT is on — NOT scaled by bt_timescale.
+	// sub_101078D0 decoded:
+	//     if ( bt_enabled ) { v5 = m_flSpeed; v4 = m_vforward.x * v5; }
+	//     else              { v4 = m_vforward.x * 2500.0; v5 = 2500.0; }
+	//     SetAbsVelocity( { v4, m_vforward.y * v5, m_vforward.z * v5 } );
+	// m_flSpeed is the cached per-bullet speed, applied raw.
 	const float flSpeed = UH_BulletTimeActive() ? m_flSpeed : UH_BTBULLET_NORMAL_SPEED;
 	SetAbsVelocity( m_vforward * flSpeed );
 }
@@ -189,8 +247,25 @@ void CBtBullet::Touch( CBaseEntity *pOther )
 	if ( dynamic_cast< CBtBullet * >( pOther ) )
 		return;
 
-	if ( !pOther->IsSolid() && !pOther->IsSolidFlagSet( FSOLID_TRIGGER ) )
+	// The original ignores anything that is not actually blocking: it only
+	// ends the bullet on a real solid. An earlier revision of this port also
+	// accepted FSOLID_TRIGGER touchers, which meant the bullet died on the
+	// first trigger volume, ladder or vehicle bounds it crossed — usually
+	// within a few units of the muzzle. That is why bullet-time tracers
+	// stopped being visible.
+	if ( !pOther->IsSolid() )
 		return;
+
+	// Never die on the shooter's own vehicle or on the player riding it.
+	if ( CBaseEntity *pOwner = GetOwnerEntity() )
+	{
+		if ( pOther == pOwner->GetOwnerEntity() || pOther->GetOwnerEntity() == pOwner )
+			return;
+
+		CBasePlayer *pPlayer = ToBasePlayer( pOwner );
+		if ( pPlayer && pPlayer->GetVehicleEntity() == pOther )
+			return;
+	}
 
 	// The original traces a short segment (origin - forward*8 .. origin +
 	// forward*4) to place the impact, then removes itself. Damage is already
@@ -235,6 +310,13 @@ static void UH_BulletTimeChanged( IConVar *pVar, const char *pOldValue, float fl
 	ConVar *pNormalSpeed = cvar->FindVar( "hl2_normspeed" );
 	const bool bOn = bt_enabled.GetBool();
 
+	// Uh_Chapter1_16_d drives bullet time from a scripted_sequence:
+	//     !player,EnableBt       at t+3     Command,"sv_cheats 1"  at t+3
+	//     Command,"bt"           at t+4     Command,"sv_cheats 0"  at t+9
+	//     !player,DisableBt      at t+9
+	// i.e. the slowdown is expected to last ~6 seconds of REAL time. The map
+	// delays are counted in scaled time, so host_timescale must be driven from
+	// here and restored exactly on DisableBt.
 	if ( pScale )
 		pScale->SetValue( bOn ? bt_timescale.GetFloat() : 1.0f );
 
