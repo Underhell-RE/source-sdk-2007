@@ -27,7 +27,7 @@ class CUHLaserSight : public CAutoGameSystemPerFrame
 	typedef CAutoGameSystemPerFrame BaseClass;
 
 public:
-	CUHLaserSight() : BaseClass( "CUHLaserSight" ), m_iBeamModel( -1 ), m_iDotModel( -1 ) {}
+	CUHLaserSight() : BaseClass( "CUHLaserSight" ), m_iBeamModel( -1 ), m_iDotModel( -1 ), m_flNextDraw( 0.0f ) {}
 
 	virtual void LevelInitPostEntity( void )
 	{
@@ -51,6 +51,14 @@ public:
 		if ( !pPlayer->IsAlive() )
 			return;
 
+		// The old implementation allocated a new transient beam every rendered
+		// frame. At high frame rates several 0.05-second beams overlapped,
+		// producing a thick flickering laser. Update at the original dot think
+		// cadence (0.1 s) and let each beam live exactly until the next update.
+		if ( gpGlobals->curtime < m_flNextDraw )
+			return;
+		m_flNextDraw = gpGlobals->curtime + 0.1f;
+
 		Vector vecStart = pPlayer->EyePosition();
 		Vector forward;
 		AngleVectors( pPlayer->EyeAngles(), &forward );
@@ -63,7 +71,7 @@ public:
 		// is redrawn fresh every frame and auto-expires (no leak / bookkeeping).
 		beams->CreateBeamPoints( vecStart, tr.endpos, m_iBeamModel, m_iDotModel,
 			0.0f,					// halo scale
-			0.05f,					// life
+			0.10f,					// life
 			1.0f,					// width
 			1.0f,					// end width
 			1.0f,					// fade length
@@ -78,6 +86,7 @@ public:
 private:
 	int m_iBeamModel;
 	int m_iDotModel;
+	float m_flNextDraw;
 };
 
 static CUHLaserSight g_UHLaserSight;
