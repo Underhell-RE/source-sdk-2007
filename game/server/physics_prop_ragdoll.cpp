@@ -94,8 +94,13 @@ BEGIN_DATADESC(CRagdollProp)
 	DEFINE_FIELD( m_hUnragdoll, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_bFirstCollisionAfterLaunch, FIELD_BOOLEAN ),
 
-	// Underhell dismemberment damage accumulation / dragged-body trail state.
-	DEFINE_ARRAY( m_flGibDamage, FIELD_FLOAT, 5 ),
+	// Underhell dismemberment state copied from the source NPC.
+	DEFINE_FIELD( m_bUHGibable, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_iUHGibType, FIELD_INTEGER ),
+	DEFINE_ARRAY( m_iUHPartHealth, FIELD_INTEGER, 5 ),
+	DEFINE_FIELD( m_iUHHelmetHealth, FIELD_INTEGER ),
+	DEFINE_FIELD( m_nUHSeveredParts, FIELD_INTEGER ),
+	DEFINE_ARRAY( m_iszUHGibModel, FIELD_STRING, 4 ),
 	DEFINE_FIELD( m_vecUHDraggedLastPos, FIELD_POSITION_VECTOR ),
 	DEFINE_FIELD( m_bUHDragged, FIELD_BOOLEAN ),
 
@@ -305,8 +310,14 @@ CRagdollProp::CRagdollProp( void )
 	m_flFadeScale = 1;
 	m_flDefaultFadeScale = 1;
 
+	m_bUHGibable = false;
+	m_iUHGibType = 0;
 	for ( int i = 0; i < 5; i++ )
-		m_flGibDamage[i] = 0.0f;
+		m_iUHPartHealth[i] = 0;
+	m_iUHHelmetHealth = 0;
+	m_nUHSeveredParts = 0;
+	for ( int i = 0; i < 4; i++ )
+		m_iszUHGibModel[i] = NULL_STRING;
 	m_vecUHDraggedLastPos.Init();
 	m_bUHDragged = false;
 }
@@ -857,27 +868,6 @@ void CRagdollProp::TraceAttack( const CTakeDamageInfo &info, const Vector &dir, 
 	// Underhell: shoot limbs off a dead body (uh_gibhealth / uh_headhealth).
 	extern void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage, int iPhysicsBone, const Vector &pos, const Vector &dir );
 	UH_RagdollDismember( this, ptr->hitgroup, info.GetDamage(), ptr->physicsbone, ptr->endpos, dir );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Sever a ragdoll limb by destroying its physics constraint, so the
-// bone falls free (Underhell dismemberment).
-//-----------------------------------------------------------------------------
-void CRagdollProp::UH_SeverLimb( int iPhysicsBone )
-{
-	if ( iPhysicsBone <= 0 || iPhysicsBone >= m_ragdoll.listCount )
-		return;	// root bone (0) is the body — can't sever it
-
-	ragdollelement_t &el = m_ragdoll.list[iPhysicsBone];
-	if ( el.pConstraint )
-	{
-		physenv->DestroyConstraint( el.pConstraint );
-		el.pConstraint = NULL;
-	}
-	if ( el.pObject )
-	{
-		el.pObject->Wake();
-	}
 }
 
 void CRagdollProp::SetupBones( matrix3x4_t *pBoneToWorld, int boneMask )
@@ -1498,6 +1488,10 @@ CBaseEntity *CreateServerRagdoll( CBaseAnimating *pAnimating, int forceBone, con
 	mins = pAnimating->CollisionProp()->OBBMins();
 	maxs = pAnimating->CollisionProp()->OBBMaxs();
 	pRagdoll->CollisionProp()->SetCollisionBounds( mins, maxs );
+
+	// Preserve the original per-part state in the corpse.
+	extern void UH_TransferDismembermentState( CBaseAnimating *, CRagdollProp * );
+	UH_TransferDismembermentState( pAnimating, pRagdoll );
 
 	return pRagdoll;
 }

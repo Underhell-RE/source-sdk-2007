@@ -87,10 +87,10 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
 
 ### Still missing / high-risk
 
-- Full `CNPC_CombineS` `sub_10031BF0` behavior is not ported. In particular, original living-NPC weapon/animation/schedule changes after arm/leg loss, all family-specific state transitions, and exact bodypart attachment/constraint behavior still need exact work.
-- Current limb physics was adjusted repeatedly and needs in-game testing. The user reported legs flying in a comedic/unphysical manner; the latest velocity inheritance patch has not been runtime verified.
-- Infected corpse state and gib transfer are not complete.
-- Ragdoll lifetime/LRU and all original client visual paths have not been fully audited.
+- Dismemberment was reworked against `underhell-hexrays` functions `sub_10031BF0`, `sub_101CE6F0`, `sub_101CDCC0`, `sub_1035AAA0`, `sub_101A7B70`, and the NPC-to-ragdoll transfer callers. It now keeps remaining-health counters, variant/type state, sever flags and authored gib paths, and transfers them to server ragdolls.
+- Family-specific arm/head transitions, infected thresholds, heavy-leg health, corpse physics-bone remapping, helmet overflow, PMC headgear, weapon loss, exact proximal/distal attachment transforms and independent body-part ragdolls are implemented.
+- `uh_ai.cpp` and `physics_prop_ragdoll.cpp` pass Linux permissive syntax checks. A standalone `ai_basenpc.cpp` check is blocked by unrelated GCC 12 errors in the legacy `tier1/functors.h`; Windows DLL compilation and in-game physics/animation comparison remain mandatory.
+- Original client-ragdoll conversion at LRU retirement is still represented by the SDK server-ragdoll LRU/fade behavior rather than a proven byte-for-byte equivalent client conversion.
 
 ---
 

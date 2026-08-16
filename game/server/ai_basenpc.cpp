@@ -1128,6 +1128,16 @@ void CAI_BaseNPC::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 
 	CTakeDamageInfo subInfo = info;
 
+	// Original TraceAttack turns hits on an already absent arm into generic
+	// 0.01 damage instead of applying the arm multiplier again.
+	if ( m_bUHGibable &&
+		( ( ptr->hitgroup == HITGROUP_LEFTARM && ( m_nUHSeveredParts & ( 1u << 1 ) ) ) ||
+		  ( ptr->hitgroup == HITGROUP_RIGHTARM && ( m_nUHSeveredParts & ( 1u << 2 ) ) ) ) )
+	{
+		ptr->hitgroup = HITGROUP_GENERIC;
+		subInfo.SetDamage( 0.01f );
+	}
+
 	SetLastHitGroup( ptr->hitgroup );
 	m_nForceBone = ptr->physicsbone;		// save this bone for physics forces
 
@@ -4179,6 +4189,8 @@ int CAI_BaseNPC::CapabilitiesGet( void ) const
 	{
 		capability |= GetActiveWeapon()->CapabilitiesGet();
 	}
+	if ( m_bUHGibable && ( m_nUHSeveredParts & ( 1u << 2 ) ) )
+		capability &= ~( bits_CAP_RANGE_ATTACK_GROUP | bits_CAP_AIM_GUN | bits_CAP_MOVE_SHOOT );
 	return capability;
 }
 
@@ -4196,6 +4208,13 @@ int CAI_BaseNPC::CapabilitiesRemove( int capability )
 	m_afCapability &= ~capability;
 
 	return m_afCapability;
+}
+
+bool CAI_BaseNPC::Weapon_CanUse( CBaseCombatWeapon *pWeapon )
+{
+	if ( m_bUHGibable && ( m_nUHSeveredParts & ( 1u << 2 ) ) )
+		return false;
+	return BaseClass::Weapon_CanUse( pWeapon );
 }
 
 // Clear capability mask
@@ -10698,8 +10717,12 @@ BEGIN_DATADESC( CAI_BaseNPC )
 	DEFINE_KEYFIELD( m_flUhViewDistance,		FIELD_FLOAT,  "uh_viewdistance" ),
 	DEFINE_KEYFIELD( m_bUhSquadTemp,			FIELD_BOOLEAN, "squadtemp" ),
 	DEFINE_KEYFIELD( m_bUhSpotBodies,			FIELD_BOOLEAN, "uh_spotbodies" ),
-	DEFINE_ARRAY( m_flGibDamage,				FIELD_FLOAT, 5 ),
-	DEFINE_FIELD( m_flHelmetDamage,				FIELD_FLOAT ),
+	DEFINE_FIELD( m_bUHGibable,				FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_iUHGibType,				FIELD_INTEGER ),
+	DEFINE_ARRAY( m_iUHPartHealth,			FIELD_INTEGER, 5 ),
+	DEFINE_FIELD( m_iUHHelmetHealth,		FIELD_INTEGER ),
+	DEFINE_FIELD( m_nUHSeveredParts,		FIELD_INTEGER ),
+	DEFINE_ARRAY( m_iszUHGibModel,			FIELD_STRING, 4 ),
 	DEFINE_FIELD( m_flNextSpotBodiesTime,		FIELD_TIME ),
 	DEFINE_FIELD( m_flNextTempSquadTime,		FIELD_TIME ),
   	DEFINE_FIELD( m_hStoredPathTarget,			FIELD_EHANDLE ),
@@ -11420,9 +11443,14 @@ CAI_BaseNPC::CAI_BaseNPC(void)
 	m_flUhViewDistance			= -1.0f;
 	m_bUhSquadTemp				= true;		// temp squads on by default ("SquadTemp : 1")
 	m_bUhSpotBodies				= false;
+	m_bUHGibable					= false;
+	m_iUHGibType					= 0;
 	for ( int i = 0; i < 5; i++ )
-		m_flGibDamage[i]		= 0.0f;
-	m_flHelmetDamage			= 0.0f;
+		m_iUHPartHealth[i]		= 0;
+	m_iUHHelmetHealth			= 0;
+	m_nUHSeveredParts			= 0;
+	for ( int i = 0; i < 4; i++ )
+		m_iszUHGibModel[i]		= NULL_STRING;
 	m_flNextSpotBodiesTime		= 0.0f;
 	m_flNextTempSquadTime		= 0.0f;
 	m_flEyeIntegRate			= 0.95;
