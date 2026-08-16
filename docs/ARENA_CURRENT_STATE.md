@@ -152,13 +152,11 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
 - Removed the fabricated hidden `npc_vehicledriver`, which fought the VMF controls every frame. Bryan remains the visual driver while the player occupies the independent legacy gunner passenger slot.
 - Restored separation of `m_hPlayer` and `m_hNPCDriver`; `GetDriver()` now reports the actual player passenger, while vehicle thinking independently accounts for an NPC controller.
 - Player-at-mounted-gun state is map-controlled (`m_bPlayerAtGun`) and the gunner camera uses `vehicle_gunner_eyes`.
-- Mounted jeep fire was recently reworked against server Diaphora:
-  - removed custom extra full-distance `UTIL_Tracer`, which created a duplicate through-world beam;
-  - restored jeep `m_nAmmoType` instead of forcing AR2 ammo type;
-  - restores `sk_jeep_gauss_damage` through SDK 2007 `FireBulletsInfo_t::m_iDamage`;
-  - fire interval set to `0.1`;
-  - spread set to decoded `0.0087299999` vector;
-  - precaches and dispatches `muzzle_star_uh` on attachment `muzzle_uh`.
+- Mounted jeep fire was reworked against server Hex-Rays:
+  - mounted mode uses `AR2Tracer`, generic impact behavior, `muzzle_star_uh`, and `FuncTank.Fire` rather than the stock Gauss beam/explosion and `PropJeep.FireCannon`;
+  - restored jeep `m_nAmmoType` and `sk_jeep_gauss_damage` through SDK 2007 `FireBulletsInfo_t::m_iDamage`;
+  - fire interval is `0.1`, spread is `0.0087299999`, and the muzzle basis is the authored `muzzle` attachment;
+  - decoded aim clamps are ±200 yaw and ±20 pitch; the model's pose-parameter ranges provide the final visual clamp.
 - A compile correction changed invalid `FireBulletsInfo_t::m_flDamage` to `m_iDamage`.
 
 ### Still missing / high-risk

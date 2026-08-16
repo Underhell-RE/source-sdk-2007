@@ -1,4 +1,4 @@
-//====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =======
+//====== Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. =======
 //
 // Purpose: 
 //
@@ -84,7 +84,7 @@ public:
 	bool			NPC_HasPrimaryWeapon( void ) { return true; }
 	void			NPC_AimPrimaryWeapon( Vector vecTarget );
 
-	const char		*GetTracerType( void ) { return "AR2Tracer"; }
+	const char		*GetTracerType( void ) { return m_bEnableMountedGun ? "AR2Tracer" : NULL; }
 	void			DoImpactEffect( trace_t &tr, int nDamageType );
 
 	bool HeadlightIsOn( void ) { return m_bHeadlightIsOn; }

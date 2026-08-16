@@ -42,8 +42,8 @@
 
 #define CANNON_MAX_UP_PITCH			20
 #define CANNON_MAX_DOWN_PITCH		20
-#define CANNON_MAX_LEFT_YAW			90
-#define CANNON_MAX_RIGHT_YAW		90
+#define CANNON_MAX_LEFT_YAW			200
+#define CANNON_MAX_RIGHT_YAW		200
 
 #define OVERTURNED_EXIT_WAITTIME	2.0f
 
@@ -193,6 +193,7 @@ void CPropJeep::Precache( void )
 
 	PrecacheScriptSound( "PropJeep.AmmoClose" );
 	PrecacheScriptSound( "PropJeep.FireCannon" );
+	PrecacheScriptSound( "FuncTank.Fire" );
 	PrecacheScriptSound( "PropJeep.FireChargedCannon" );
 	PrecacheScriptSound( "PropJeep.AmmoOpen" );
 
@@ -267,6 +268,14 @@ void CPropJeep::Activate()
 //-----------------------------------------------------------------------------
 void CPropJeep::DoImpactEffect( trace_t &tr, int nDamageType )
 {
+	// Mounted Underhell gun uses the ordinary AR2 tracer/impact path. The
+	// Gauss beam and explosion below belong only to the stock tau cannon.
+	if ( m_bEnableMountedGun )
+	{
+		BaseClass::DoImpactEffect( tr, nDamageType );
+		return;
+	}
+
 	//Draw our beam
 	DrawBeam( tr.startpos, tr.endpos, 2.4 );
 
@@ -933,8 +942,9 @@ void CPropJeep::FireCannon( void )
 		m_hPlayer->RumbleEffect( RUMBLE_PISTOL, 0, RUMBLE_FLAG_RESTART	);
 	}
 
-	CPASAttenuationFilter sndFilter( this, "PropJeep.FireCannon" );
-	EmitSound( sndFilter, entindex(), "PropJeep.FireCannon" );
+	const char *pszFireSound = m_bEnableMountedGun ? "FuncTank.Fire" : "PropJeep.FireCannon";
+	CPASAttenuationFilter sndFilter( this, pszFireSound );
+	EmitSound( sndFilter, entindex(), pszFireSound );
 	
 	// make cylinders of gun spin a bit
 	m_nSpinPos += JEEP_GUN_SPIN_RATE;
