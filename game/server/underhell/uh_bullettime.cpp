@@ -2,6 +2,7 @@
 #include "cbase.h"
 #include "underhell/uh_bullettime.h"
 #include "hl2_player.h"
+#include "igamesystem.h"
 
 #include "tier0/memdbgon.h"
 
@@ -43,6 +44,71 @@ static const char *UH_BulletModel( int ammoType )
 	}
 }
 
+struct UHBulletMotion_t
+{
+	EHANDLE hBullet;
+	Vector direction;
+	bool bEnemy;
+};
+
+// CBullet::Think (sub_101078D0) re-applies velocity every 0.05 seconds. A
+// one-shot VPhysics velocity is not equivalent: it is consumed on the first
+// contact and the visible bullet freezes, which made bullet time appear to
+// end almost immediately. Keep stock prop_physics networking, but run the
+// original velocity lifecycle for every registered visual bullet.
+class CUHBulletMotionSystem : public CAutoGameSystemPerFrame
+{
+public:
+	CUHBulletMotionSystem() : CAutoGameSystemPerFrame( "CUHBulletMotionSystem" ), m_flNextUpdate( 0.0f ) {}
+
+	virtual void LevelInitPostEntity( void )
+	{
+		m_Bullets.RemoveAll();
+		m_flNextUpdate = gpGlobals->curtime;
+	}
+
+	void Add( CBaseEntity *pBullet, const Vector &direction, bool bEnemy )
+	{
+		UHBulletMotion_t state;
+		state.hBullet = pBullet;
+		state.direction = direction;
+		state.bEnemy = bEnemy;
+		m_Bullets.AddToTail( state );
+	}
+
+	virtual void FrameUpdatePostEntityThink( void )
+	{
+		if ( gpGlobals->curtime < m_flNextUpdate )
+			return;
+		m_flNextUpdate = gpGlobals->curtime + 0.05f;
+
+		for ( int i = m_Bullets.Count() - 1; i >= 0; --i )
+		{
+			CBaseEntity *pBullet = m_Bullets[i].hBullet.Get();
+			if ( !pBullet )
+			{
+				m_Bullets.FastRemove( i );
+				continue;
+			}
+
+			IPhysicsObject *pPhysics = pBullet->VPhysicsGetObject();
+			if ( pPhysics )
+			{
+				const float flSpeed = UH_BulletTimeActive()
+					? ( m_Bullets[i].bEnemy ? bt_enemybulletspeed.GetFloat() : bt_playerbulletspeed.GetFloat() ) * bt_timescale.GetFloat()
+					: 2500.0f;
+				Vector velocity = m_Bullets[i].direction * flSpeed;
+				pPhysics->SetVelocity( &velocity, NULL );
+			}
+		}
+	}
+
+private:
+	CUtlVector<UHBulletMotion_t> m_Bullets;
+	float m_flNextUpdate;
+};
+static CUHBulletMotionSystem g_UHBulletMotionSystem;
+
 void UH_BulletTimeSpawnTracer( CBaseCombatCharacter *pShooter, const Vector &start, const Vector &direction, int ammoType, bool bEnemyBullet )
 {
 	if ( !UH_BulletTimeActive() || !pShooter ) return;
@@ -63,14 +129,9 @@ void UH_BulletTimeSpawnTracer( CBaseCombatCharacter *pShooter, const Vector &sta
 	pBullet->SetAbsAngles( bulletAngles );
 	pBullet->SetOwnerEntity( pShooter );
 	DispatchSpawn( pBullet );
-	IPhysicsObject *pPhysics = pBullet->VPhysicsGetObject();
-	if ( pPhysics )
-	{
-		float speed = ( bEnemyBullet ? bt_enemybulletspeed.GetFloat() : bt_playerbulletspeed.GetFloat() ) * bt_timescale.GetFloat();
-		Vector velocity = dir * speed;
-		pPhysics->SetVelocity( &velocity, NULL );
-	}
-	pBullet->SetContextThink( &CBaseEntity::SUB_Remove, gpGlobals->curtime + 120.0f, "BulletTimeLifetime" );
+	g_UHBulletMotionSystem.Add( pBullet, dir, bEnemyBullet );
+	// No fabricated fixed lifetime: original CBullet::Think has no four/120
+	// second expiry and keeps updating until its real entity lifecycle ends.
 }
 
 static void UH_BulletTimeChanged( IConVar *pVar, const char *pOldValue, float flOldValue )
