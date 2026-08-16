@@ -64,6 +64,8 @@ struct UHGibFolder_t
 	const char *pszLimbPrefix;		// "" or a prefix like "pmc_" / "inmate_"
 };
 
+static int UH_FindBodygroup( CBaseAnimating *pBody, const char *pszName );
+
 static const UHGibFolder_t s_GibFolders[] =
 {
 	{ "combine_soldier_prisonguard",	"models/gibs/bodyparts/soldier_prisonguard",	"" },
@@ -79,12 +81,25 @@ static const UHGibFolder_t s_GibFolders[] =
 	{ "pmc",							"models/gibs/bodyparts/pmc",					"pmc_" },
 };
 
-static const char *UH_GibModelFor( const char *pszNPC, const char *pszLimb )
+static const char *UH_GibModelFor( CBaseAnimating *pBody, const char *pszLimb )
 {
+	const char *pszNPC = STRING( pBody->GetModelName() );
 	for ( int i = 0; i < ARRAYSIZE( s_GibFolders ); i++ )
 	{
 		if ( V_stristr( pszNPC, s_GibFolders[i].pszModelSubstring ) )
 		{
+			// CNPC_CombineS selects the second leg meshes whenever its authored
+			// Legs bodygroup is the heavy variant (value 4).  They are soldier
+			// meshes even for the heavy prison model.
+			if ( !V_stricmp( pszLimb, "leftleg" ) || !V_stricmp( pszLimb, "rightleg" ) )
+			{
+				int iLegs = UH_FindBodygroup( pBody, "legs" );
+				if ( iLegs >= 0 && pBody->GetBodygroup( iLegs ) >= 4 &&
+					( V_stristr( pszNPC, "combine_soldier" ) || V_stristr( pszNPC, "prisonguard" ) ) )
+				{
+					return UTIL_VarArgs( "models/gibs/bodyparts/soldier/%s2.mdl", pszLimb );
+				}
+			}
 			return UTIL_VarArgs( "%s/%s%s.mdl", s_GibFolders[i].pszFolder, s_GibFolders[i].pszLimbPrefix, pszLimb );
 		}
 	}
@@ -548,7 +563,7 @@ void CAI_BaseNPC::UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, cons
 	CBaseEntity *pGib = NULL;
 	if ( pszLimb )
 	{
-		const char *pszModel = UH_GibModelFor( STRING( GetModelName() ), pszLimb );
+		const char *pszModel = UH_GibModelFor( this, pszLimb );
 		if ( pszModel )
 		{
 			Vector vecGibOrigin;
@@ -1023,7 +1038,7 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 	CBaseEntity *pGib = NULL;
 	if ( pszLimb )
 	{
-		const char *pszModel = UH_GibModelFor( STRING( pRagdoll->GetModelName() ), pszLimb );
+		const char *pszModel = UH_GibModelFor( pRagdoll, pszLimb );
 		if ( pszModel )
 		{
 			Vector vecGibOrigin;

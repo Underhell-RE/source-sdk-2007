@@ -112,6 +112,23 @@ void CNPC_CombineS::Precache()
 
 	PrecacheModel( STRING( GetModelName() ) );
 
+	// Underhell CNPC_CombineS precaches every possible detached bodypart at
+	// spawn. Ragdoll submodels are created after the level precache phase.
+	PrecacheModel( "models/gibs/bodyparts/soldier/leftarm.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/soldier/rightarm.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/soldier/leftleg.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/soldier/rightleg.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/soldier/leftleg2.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/soldier/rightleg2.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/soldier_prisonguard/leftarm.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/soldier_prisonguard/rightarm.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/soldier_prisonguard/leftleg.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/soldier_prisonguard/rightleg.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/pmc/pmc_leftarm.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/pmc/pmc_rightarm.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/pmc/pmc_leftleg.mdl" );
+	PrecacheModel( "models/gibs/bodyparts/pmc/pmc_rightleg.mdl" );
+
 	UTIL_PrecacheOther( "item_healthvial" );
 	UTIL_PrecacheOther( "weapon_frag" );
 	UTIL_PrecacheOther( "item_ammo_ar2_altfire" );
