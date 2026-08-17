@@ -266,6 +266,7 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
 - Battery HUD now uses original hidden bits, panel alpha lifecycle and integer fade behavior from `sub_100BDF90`.
 - The charge bar reads the original `m_HL2Local.m_flFlashBattery`; flashlight and night vision share that authoritative charge, consume discrete batteries and no longer fight Episodic's rechargeable flashlight path.
 - Flashlight on/off now updates the networked `m_bFlashlightOn` flag used by the HUD.
+- `+use` item pickups explicitly forward `CItem::OnPlayerPickup`. In `uh_house_0_tutorial_d`, four batteries plus two packs must increment `Counter_Batteries_Drawers` to 6; bypassing `ItemTouch` previously prevented scene 11 and the subsequent door unlock.
 - Hermit cards use binary 255/0 alpha at three seconds instead of gradual fade.
 - Battery implementation and reticle still require in-game visual verification after rebuilding `client.dll` and `server.dll`. Disable and enabled bar geometry continues to come from the original `HudLayout.res` values.
 

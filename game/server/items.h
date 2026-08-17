@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -71,6 +71,7 @@ public:
 	void	SetOriginalSpawnAngles( const QAngle& angles ) { m_vOriginalSpawnAngles = angles; }
 	bool	CreateItemVPhysicsObject( void );
 	bool	ItemCanBeTouchedByPlayer( CBasePlayer *pPlayer );
+	void	FirePlayerPickupOutput( CBasePlayer *pPlayer ) { m_OnPlayerTouch.FireOutput( pPlayer, this ); }
 
 #if defined( HL2MP )
 	void	FallThink( void );

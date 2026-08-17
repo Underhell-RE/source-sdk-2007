@@ -46,9 +46,11 @@ public:
 	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 	{
 		CBasePlayer *pPlayer = ToBasePlayer( pActivator );
-		if ( pPlayer )
+		if ( pPlayer && MyTouch( pPlayer ) )
 		{
-			MyTouch( pPlayer );
+			// +use bypasses CItem::ItemTouch, which normally fires the VMF
+			// OnPlayerPickup output used by tutorial counters.
+			FirePlayerPickupOutput( pPlayer );
 		}
 	}
 	bool MyTouch( CBasePlayer *pPlayer )

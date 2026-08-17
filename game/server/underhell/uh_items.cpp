@@ -64,9 +64,11 @@ void CUHItem::Spawn( void )
 void CUHItem::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( pActivator );
-	if ( pPlayer )
+	if ( pPlayer && MyTouch( pPlayer ) )
 	{
-		MyTouch( pPlayer );
+		// CItem::ItemTouch normally emits this output. +use pickups bypass
+		// ItemTouch, so forward it explicitly for VMF OnPlayerPickup counters.
+		FirePlayerPickupOutput( pPlayer );
 	}
 }
 
