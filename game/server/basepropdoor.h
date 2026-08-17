@@ -63,6 +63,8 @@ public:
 	inline bool IsOpener(CBaseEntity *pEnt);
 
 	bool NPCOpenDoor(CAI_BaseNPC *pNPC);
+	// Underhell dedicated kick/breach path (original CBasePropDoor vtable +852).
+	void UHBreachDoor( CBaseEntity *pActivator, CBaseEntity *pCaller, bool bNPCBreach, const Vector &vecImpact );
 	bool TestCollision( const Ray_t &ray, unsigned int mask, trace_t& trace );
 	// }
 
@@ -183,6 +185,12 @@ private:
 	bool	m_bFirstBlocked;		// Marker for being the first door (in a group) to be blocked (needed for motion control)
 
 	bool m_bForceClosed;			// True if this door must close no matter what.
+
+	// Presentation state saved while an Underhell breach forces the authored door animation.
+	bool  m_bUHBreachPresentation;
+	float m_flUHSavedSpeed;
+	int   m_iUHSavedSequence;
+	int   m_iUHSavedSpawnFlags;
 
 	string_t m_SoundMoving;
 	string_t m_SoundOpen;

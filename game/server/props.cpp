@@ -51,6 +51,8 @@
 
 #define DOOR_HARDWARE_GROUP 1
 
+ConVar uh_door_bash_speed( "uh_door_bash_speed", "500", 0 );
+
 // Any barrel farther away than this is ignited rather than exploded.
 #define PROP_EXPLOSION_IGNITE_RADIUS	32.0f
 
@@ -3552,6 +3554,10 @@ BEGIN_DATADESC(CBasePropDoor)
 	DEFINE_FIELD(m_bLocked, FIELD_BOOLEAN),
 	//DEFINE_KEYFIELD(m_flBlockDamage, FIELD_FLOAT, "dmg"),
 	DEFINE_KEYFIELD( m_bForceClosed, FIELD_BOOLEAN, "forceclosed" ),
+	DEFINE_FIELD( m_bUHBreachPresentation, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_flUHSavedSpeed, FIELD_FLOAT ),
+	DEFINE_FIELD( m_iUHSavedSequence, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iUHSavedSpawnFlags, FIELD_INTEGER ),
 	DEFINE_FIELD(m_eDoorState, FIELD_INTEGER),
 	DEFINE_FIELD( m_hMaster, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_hBlocker, FIELD_EHANDLE ),
@@ -3588,6 +3594,10 @@ END_SEND_TABLE()
 CBasePropDoor::CBasePropDoor( void )
 {
 	m_hMaster = NULL;
+	m_bUHBreachPresentation = false;
+	m_flUHSavedSpeed = 0.0f;
+	m_iUHSavedSequence = 0;
+	m_iUHSavedSpawnFlags = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -3654,6 +3664,7 @@ int	CBasePropDoor::ObjectCaps()
 void CBasePropDoor::Precache(void)
 {
 	BaseClass::Precache();
+	PrecacheScriptSound( "Metal.Door_Breach" );
 
 	RegisterPrivateActivities();
 }
@@ -4553,6 +4564,63 @@ bool CBasePropDoor::NPCOpenDoor( CAI_BaseNPC *pNPC )
 	}
 
 	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Underhell door breach. Reconstructed from original sub_102146D0.
+//-----------------------------------------------------------------------------
+void CBasePropDoor::UHBreachDoor( CBaseEntity *pActivator, CBaseEntity *pCaller,
+	bool bNPCBreach, const Vector &vecImpact )
+{
+	// A second kick restores presentation fields saved by an earlier breach
+	// before beginning the next transition.
+	if ( m_bUHBreachPresentation )
+	{
+		m_flSpeed = m_flUHSavedSpeed;
+		SetSequence( m_iUHSavedSequence );
+		ClearSpawnFlags();
+		AddSpawnFlags( m_iUHSavedSpawnFlags );
+		m_bUHBreachPresentation = false;
+	}
+
+	if ( IsDoorLocked() )
+		return;
+
+#ifdef HL2_DLL
+	if ( !bNPCBreach )
+	{
+		CHL2_Player *pPlayer = dynamic_cast<CHL2_Player *>( pCaller );
+		if ( pPlayer )
+			pPlayer->SuitPower_Drain( 20.0f );
+	}
+#endif
+
+	bool bForceOpen = bNPCBreach || ( !IsDoorOpening() && !IsDoorOpen() );
+	if ( !bForceOpen )
+	{
+		Vector forward;
+		GetVectors( &forward, NULL, NULL );
+		Vector toImpact = vecImpact - GetAbsOrigin();
+		// Kicking from the opposite face reverses an already moving/open door.
+		bForceOpen = DotProduct( forward, toImpact ) >= 0.0f;
+		if ( !bForceOpen )
+		{
+			DoorClose();
+			EmitSound( "Metal.Door_Breach" );
+			return;
+		}
+	}
+
+	m_flUHSavedSpeed = m_flSpeed;
+	m_iUHSavedSequence = GetSequence();
+	m_iUHSavedSpawnFlags = GetSpawnFlags();
+	m_bUHBreachPresentation = true;
+	m_bForceClosed = true;
+	m_flSpeed = uh_door_bash_speed.GetFloat();
+	ResetSequenceInfo();
+	AddSpawnFlags( SF_DOOR_SILENT );
+	DoorOpen( pCaller ? pCaller : pActivator );
+	EmitSound( "Metal.Door_Breach" );
 }
 
 bool CBasePropDoor::TestCollision( const Ray_t &ray, unsigned int mask, trace_t& trace )

@@ -20,6 +20,7 @@
 #include "baseviewmodel_shared.h"
 #include "entityoutput.h"
 #include "soundent.h"
+#include "basepropdoor.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -144,26 +145,17 @@ void CHL2_Player::UH_DoKickStrike( void )
 
 	// The impact path adds its own, lighter rumble pulse after a real hit.
 	RumbleEffect( 4, 0, 4 );
-	// Fire this before applying damage force. The VMF's breakaway doors use
-	// OnKicked -> EnableMotion; applying force while motion is still disabled
-	// discards the impulse and leaves the door standing in place.
+
+	// sub_101E5A60 calls the dedicated CBasePropDoor breach virtual before the
+	// generic OnKicked output and damage-force path.
+	CBasePropDoor *pPropDoor = dynamic_cast<CBasePropDoor *>( pHit );
+	if ( pPropDoor && pHit->IsUHKickableDoor() && !pPropDoor->IsDoorLocked() )
+		pPropDoor->UHBreachDoor( this, this, false, tr.endpos );
+
+	// The VMF's breakaway doors use OnKicked -> EnableMotion. Fire it before
+	// applying damage so the subsequent impulse reaches an enabled physbox.
 	pHit->FireOnKicked( this );
 	pHit->TakeDamage( info );
-
-	// Original sub_101E5A60 has a dedicated CBasePropDoor kick path gated by
-	// the FGD "kickable" key. Reproduce it for model and brush doors instead
-	// of relying on damage (stock doors ignore DMG_CLUB).
-	if ( pHit->IsUHKickableDoor() &&
-		( FClassnameIs( pHit, "prop_door_rotating" ) ||
-		  FClassnameIs( pHit, "func_door" ) || FClassnameIs( pHit, "func_door_rotating" ) ) )
-	{
-		variant_t speed; speed.SetFloat( 1000.0f );
-		pHit->AcceptInput( "SetSpeed", this, this, speed, USE_SET );
-		variant_t empty;
-		pHit->AcceptInput( "Unlock", this, this, empty, USE_TOGGLE );
-		pHit->AcceptInput( FClassnameIs( pHit, "prop_door_rotating" ) ? "OpenAwayFrom" : "Open",
-			this, this, empty, USE_TOGGLE );
-	}
 
 }
 
