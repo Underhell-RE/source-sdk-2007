@@ -1,6 +1,7 @@
 // Underhell standalone grenade-ammo HUD (original CHudGrenadeAmmo).
 #include "cbase.h"
 #include "hud.h"
+#include "hudelement.h"
 #include "hud_macros.h"
 #include "hud_numericdisplay.h"
 #include "c_basehlplayer.h"
