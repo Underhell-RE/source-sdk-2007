@@ -12,6 +12,7 @@
 #include "dlight.h"
 #include "iviewrender.h"
 #include "view.h"
+#include "viewrender.h"
 #include "iefx.h"
 #include "c_team.h"
 #include "clientmode.h"
