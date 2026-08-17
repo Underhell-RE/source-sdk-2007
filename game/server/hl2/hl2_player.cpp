@@ -1320,19 +1320,18 @@ void CHL2_Player::PlayerRunCommand(CUserCmd *ucmd, IMoveHelper *moveHelper)
 void CHL2_Player::Spawn(void)
 {
 
+	BaseClass::Spawn();
+
 #ifndef HL2MP
 #ifndef PORTAL
-	// Original player spawn function at 0x102E4B10 installs Jake's model
-	// directly. Chapter 1 map 11 does not send SetPlayerModel itself, so using
-	// the SDK placeholder models/player.mdl leaves mirrors and its webcam with
-	// no drawable player model.
+	// CBasePlayer::Spawn restores the SDK placeholder model, so apply the
+	// original Underhell default afterwards. Chapter 1 map 11 does not send a
+	// SetPlayerModel input of its own.
 	PrecacheModel( "models/player/jake_casual.mdl" );
 	SetModel( "models/player/jake_casual.mdl" );
 	SetMirrorOnly( true );
 #endif
 #endif
-
-	BaseClass::Spawn();
 
 	//
 	// Our player movement speed is set once here. This will override the cl_xxxx
