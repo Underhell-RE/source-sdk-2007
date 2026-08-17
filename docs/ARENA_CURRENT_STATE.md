@@ -266,7 +266,8 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
 - Battery HUD now uses original hidden bits, panel alpha lifecycle and integer fade behavior from `sub_100BDF90`.
 - The charge bar reads the original `m_HL2Local.m_flFlashBattery`; flashlight and night vision share that authoritative charge, consume discrete batteries and no longer fight Episodic's rechargeable flashlight path.
 - Flashlight on/off now updates the networked `m_bFlashlightOn` flag used by the HUD.
-- `+use` item pickups explicitly forward `CItem::OnPlayerPickup`. In `uh_house_0_tutorial_d`, four batteries plus two packs must increment `Counter_Batteries_Drawers` to 6; bypassing `ItemTouch` previously prevented scene 11 and the subsequent door unlock.
+- `+use` item pickups fire `CItem::OnPlayerPickup` inside the successful MyTouch path, before `UTIL_Remove`, matching Diaphora. In `uh_house_0_tutorial_d`, four batteries plus two packs increment `Counter_Batteries_Drawers` to 6, start scene 11 and unlock the tutorial lever door.
+- Added original `CHudGrenadeAmmo`: independent numeric grenade-ammo display, `sprites/hud/weapons/frag`, original hide mask and GrenadeIncreased/Decreased/Empty animation events.
 - Hermit cards use binary 255/0 alpha at three seconds instead of gradual fade.
 - Battery implementation and reticle still require in-game visual verification after rebuilding `client.dll` and `server.dll`. Disable and enabled bar geometry continues to come from the original `HudLayout.res` values.
 
@@ -289,7 +290,7 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
   - inmate 0, worker 1, doctor 2, uniform 3, urban 4, rural 5, guard 6, office 7.
 - Rebuilt per-family skin/head/arm/glove/helmet/respirator randomization from `sub_101A6620`, including the distinct 0/1/2/3 versus 0..7 arm-state families.
 - Corrected original defaults (`uh_infected_door_dist 37`, efficiency 1), SpeedModifier semantics, Zombine sound set, duplicate NPCInit, efficiency/cower handling and short door probe.
-- Existing custom schedules cover climb unstick, door bash, radio investigation/destruction, sprint slots and melee; shared dismemberment now transfers infected part state into corpses.
+- Existing custom schedules cover climb unstick, door bash, radio investigation/destruction, sprint slots and melee; shared dismemberment transfers infected part state into corpses. Speculative cower selection and the fabricated forward door hull probe were removed because they are not present in the matched Diaphora functions.
 - Removed an incorrect fabricated head-hit call in `OnTakeDamage_Alive`; base `TraceAttack` remains responsible for actual hitgroup routing.
 
 **Still runtime-sensitive:** exact animation availability, radio navigation edge cases, equipment choice and door-break timing require in-game comparison across all eight models.

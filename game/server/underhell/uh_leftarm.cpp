@@ -260,6 +260,8 @@ void CHL2_Player::UH_ThrowNade( void )
 	// Original sends authored sequence 1 on the left-arm grenade model.
 	CBaseViewModel *pGrenadeVM = GetViewModel( 1 );
 	if ( pGrenadeVM ) { pGrenadeVM->SetCycle( 0.0f ); pGrenadeVM->SetPlaybackRate( 1.0f ); pGrenadeVM->SendViewModelMatchingSequence( 1 ); }
+	CBaseCombatWeapon *pCurrentWeapon = GetActiveWeapon();
+	if ( pCurrentWeapon ) pCurrentWeapon->SendWeaponAnim( ACT_VM_IDLE );
 
 	SetContextThink( &CHL2_Player::UH_LeftArmContextThink, gpGlobals->curtime + UH_THROW_STAGE_DELAY, "FlashLightContext" );
 }

@@ -157,6 +157,8 @@ void CHL2_Player::UH_DoKickStrike( void )
 		( FClassnameIs( pHit, "prop_door_rotating" ) ||
 		  FClassnameIs( pHit, "func_door" ) || FClassnameIs( pHit, "func_door_rotating" ) ) )
 	{
+		variant_t speed; speed.SetFloat( 1000.0f );
+		pHit->AcceptInput( "SetSpeed", this, this, speed, USE_SET );
 		variant_t empty;
 		pHit->AcceptInput( "Unlock", this, this, empty, USE_TOGGLE );
 		pHit->AcceptInput( FClassnameIs( pHit, "prop_door_rotating" ) ? "OpenAwayFrom" : "Open",

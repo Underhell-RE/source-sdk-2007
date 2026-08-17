@@ -313,6 +313,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\hud_grenadeammo.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\shared\underhell\uh_inventory.cpp"
 					>
 				</File>

@@ -64,12 +64,7 @@ void CUHItem::Spawn( void )
 void CUHItem::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( pActivator );
-	if ( pPlayer && MyTouch( pPlayer ) )
-	{
-		// CItem::ItemTouch normally emits this output. +use pickups bypass
-		// ItemTouch, so forward it explicitly for VMF OnPlayerPickup counters.
-		FirePlayerPickupOutput( pPlayer );
-	}
+	if ( pPlayer ) MyTouch( pPlayer );
 }
 
 //-----------------------------------------------------------------------------
@@ -91,6 +86,7 @@ bool CUHItem::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
 	pHL2Player->UH_GiveItem( iItem );
@@ -522,6 +518,7 @@ bool CItemBatteryPack::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->UH_GetBatteryCount() >= UH_MAX_BATTERIES )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->UH_AddBattery( UH_BATTERY_PACK_COUNT );
 
 	pHL2Player->EmitSound( "ItemBattery.Touch" );

@@ -832,25 +832,6 @@ void CNPC_UH_Infected::GatherConditions( void )
 		ClearCondition( COND_ENEMY_UNREACHABLE );
 	}
 
-	// Original infected checks a short 37-unit door probe before selecting its
-	// bash-door schedule.
-	Vector forward; AngleVectors( GetAbsAngles(), &forward );
-	trace_t doorTrace;
-	UTIL_TraceHull( WorldSpaceCenter(), WorldSpaceCenter() + forward * uh_infected_door_dist.GetFloat(),
-		WorldAlignMins(), WorldAlignMaxs(), MASK_NPCSOLID, this, COLLISION_GROUP_NPC, &doorTrace );
-	if ( doorTrace.m_pEnt &&
-		( dynamic_cast<CBasePropDoor *>( doorTrace.m_pEnt ) || dynamic_cast<CBaseDoor *>( doorTrace.m_pEnt ) ) )
-	{
-		m_hBlockingDoor = doorTrace.m_pEnt;
-		m_flDoorBashYaw = GetAbsAngles().y;
-		SetCondition( COND_BLOCKED_BY_DOOR );
-	}
-	else if ( m_hBlockingDoor && !m_hBlockingDoor->IsAlive() )
-	{
-		m_hBlockingDoor = NULL;
-		ClearCondition( COND_BLOCKED_BY_DOOR );
-	}
-
 	// Random run condition
 	if ( random->RandomInt( 0, 100 ) < 5 )
 	{
@@ -937,9 +918,6 @@ int CNPC_UH_Infected::SelectSchedule( void )
 		// Investigate radio (original also listened for COND_HEAR_FMRADIO = 60)
 		return SCHED_UH_INFECTED_INVESTIGATE_RADIO;
 	}
-
-	if ( uh_infectedcower.GetBool() && HasCondition( COND_SEE_ENEMY ) )
-		return SCHED_RUN_FROM_ENEMY;
 
 	if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
 	{
@@ -1268,24 +1246,15 @@ Activity CNPC_UH_Infected::NPC_TranslateActivity( Activity baseAct )
 // ---------------------------------------------------------------------------
 int CNPC_UH_Infected::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
-	if ( info.GetDamage() > 0.0f )
-	{
-		PainSound( info );
-	}
-
-	// TraceAttack in CAI_BaseNPC already sends the real hitgroup and impact
-	// position to UH_ConsiderGib.  Do not manufacture a head hit here: damage
-	// callbacks contain no hitgroup and the old code removed infected heads on
-	// any damage above 10.
-
+	// Base NPC damage processing invokes the virtual PainSound once. Calling it
+	// here as well produced doubled sounds and reactions.
 	return BaseClass::OnTakeDamage_Alive( info );
 }
 
 void CNPC_UH_Infected::Event_Killed( const CTakeDamageInfo &info )
 {
-	DeathSound( info );
-	m_OnSpotInfectedBody.FireOutput( this, this );
-
+	// BaseClass ultimately invokes the virtual DeathSound. OnSpotInfectedBody
+	// belongs to observers, not the corpse being created.
 	BaseClass::Event_Killed( info );
 }
 
