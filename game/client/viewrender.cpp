@@ -1,4 +1,4 @@
-//===== Copyright © 1996-2005, Valve Corporation, All rights reserved. ======//
+//===== Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: Responsible for drawing the scene
 //
@@ -2892,8 +2892,6 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 	// FIXME: this should check for the ability to do a render target maybe instead.
 	// FIXME: shouldn't have to truck through all of the visible entities for this!!!!
 	ITexture *pCameraTarget = GetCameraTexture();
-	int width = pCameraTarget->GetActualWidth();
-	int height = pCameraTarget->GetActualHeight();
 
 	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
 	
@@ -2903,7 +2901,12 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 		if ( !pCameraEnt->IsActive() || pCameraEnt->IsDormant() )
 			continue;
 
-		if ( !DrawOneMonitor( pCameraTarget, cameraNum, pCameraEnt, cameraView, player, 0, 0, width, height ) )
+		ITexture *pThisTarget = pCameraEnt->UsesCustomRenderTarget()
+			? GetCustomCameraTexture( pCameraEnt->GetRenderTargetIndex() ) : pCameraTarget;
+		int width = pThisTarget->GetActualWidth();
+		int height = pThisTarget->GetActualHeight();
+
+		if ( !DrawOneMonitor( pThisTarget, cameraNum, pCameraEnt, cameraView, player, 0, 0, width, height ) )
 			continue;
 
 		++cameraNum;

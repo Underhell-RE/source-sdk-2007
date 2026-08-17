@@ -188,6 +188,7 @@ public:
 
 	// Should this object cast shadows?
 	virtual ShadowType_t		ShadowCastType() { return SHADOWS_RENDER_TO_TEXTURE_DYNAMIC; }
+	virtual const QAngle&		GetRenderAngles( void );
 
 	virtual bool				ShouldReceiveProjectedTextures( int flags )
 	{
@@ -556,6 +557,7 @@ protected:
 	surfacedata_t*	m_pSurfaceData;
 	float			m_surfaceFriction;
 	char			m_chTextureType;
+	QAngle			m_angOTSRenderAngles;
 
 	bool			m_bSentFreezeFrame;
 	float			m_flFreezeZOffset;

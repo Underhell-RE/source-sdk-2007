@@ -375,6 +375,7 @@ C_BasePlayer::C_BasePlayer() : m_iv_vecViewOffset( "C_BasePlayer::m_iv_vecViewOf
 #endif
 
 	m_pFlashlight = NULL;
+	m_angOTSRenderAngles.Init();
 
 	m_pCurrentVguiScreen = NULL;
 	m_pCurrentCommand = NULL;
@@ -1650,6 +1651,19 @@ bool C_BasePlayer::IsLocalPlayer( void ) const
 bool C_BasePlayer::AllowOvertheShoulderView( void )
 {
 	return IsAlive() && !IsObserver() && !IsInAVehicle() && ::input->CAM_IsThirdPerson();
+}
+
+const QAngle& C_BasePlayer::GetRenderAngles( void )
+{
+	const QAngle &angles = BaseClass::GetRenderAngles();
+	if ( IsLocalPlayer() && AllowOvertheShoulderView() )
+	{
+		// Eye pitch belongs in the aim pose, not in the root transform. Keeping
+		// it on the root tilted Jake's whole body when looking up/down.
+		m_angOTSRenderAngles.Init( 0.0f, angles.y, 0.0f );
+		return m_angOTSRenderAngles;
+	}
+	return angles;
 }
 
 int	C_BasePlayer::GetUserID( void )
