@@ -317,6 +317,13 @@ BEGIN_DATADESC( CHL2_Player )
 	// Underhell inventory save data (original datamap, hexrays sub_102E21B0)
 	DEFINE_ARRAY( m_iInventory, FIELD_INTEGER, UH_INVENTORY_SLOTS ),
 	DEFINE_FIELD( m_bShoulderFlashlight, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bFlashlightOn, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bInventoryEnabled, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_iUHBatteryCount, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iUHHermitCardsCount, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iUHHermitCurrentQuestCount, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iUHHermitTotalQuestCount, FIELD_INTEGER ),
+	DEFINE_FIELD( m_bDisplayHermitCard, FIELD_BOOLEAN ),
 
 	// Underhell endurance / hunger save data (names match the original save format).
 	DEFINE_FIELD( m_iEndurance, FIELD_INTEGER ),
@@ -422,6 +429,13 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetPlayerSkin", InputSetPlayerSkin ),
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "ViewModelSkin", InputViewModelSkin ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetPlayerKickModel", InputSetPlayerKickModel ),
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "Bleedplayer", InputBleedPlayer ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "DisableInventory", InputDisableInventory ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "EnableInventory", InputEnableInventory ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "DisplayHermitCards", InputDisplayHermitCards ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "RemoveEndurance", InputRemoveEndurance ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "RemoveLitGlowstick", InputRemoveLitGlowstick ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetStatusVisibility", InputSetStatusVisibility ),
 
 	// Underhell "give" inputs (classname parameter).
 	DEFINE_INPUTFUNC( FIELD_STRING, "Give", InputGive ),

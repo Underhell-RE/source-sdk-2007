@@ -10826,6 +10826,8 @@ BEGIN_DATADESC( CAI_BaseNPC )
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetViewDistance", InputSetViewDistance ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "SetSpotBodiesOn", InputSetSpotBodiesOn ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "SetSpotBodiesOff", InputSetSpotBodiesOff ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "RushEntity", InputRushEntity ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "WalkToEntity", InputWalkToEntity ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "GibHead", InputGibHead ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "GibLeftArm", InputGibLeftArm ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "GibRightArm", InputGibRightArm ),

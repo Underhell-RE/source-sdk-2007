@@ -1289,3 +1289,34 @@ void UH_RagdollDismember( CRagdollProp *pRagdoll, int iHitGroup, float flDamage,
 		UH_DispatchAttachedBlood( "blood_zombie_split_spray", pRagdoll, "Neck", pos );
 	}
 }
+
+//-----------------------------------------------------------------------------
+// Underhell BaseNPC map movement inputs (FGD: RushEntity / WalkToEntity).
+//-----------------------------------------------------------------------------
+static CBaseEntity *UH_FindNPCMoveTarget( CAI_BaseNPC *pNPC, inputdata_t &inputdata )
+{
+	const char *name = inputdata.value.String();
+	if ( !name || !*name )
+		return NULL;
+	return gEntList.FindEntityByName( NULL, name, pNPC, inputdata.pActivator, inputdata.pCaller );
+}
+
+void CAI_BaseNPC::InputRushEntity( inputdata_t &inputdata )
+{
+	CBaseEntity *target = UH_FindNPCMoveTarget( this, inputdata );
+	if ( !target )
+		return;
+	SetTarget( target );
+	SetGoalEnt( target );
+	SetSchedule( SCHED_FORCED_GO_RUN );
+}
+
+void CAI_BaseNPC::InputWalkToEntity( inputdata_t &inputdata )
+{
+	CBaseEntity *target = UH_FindNPCMoveTarget( this, inputdata );
+	if ( !target )
+		return;
+	SetTarget( target );
+	SetGoalEnt( target );
+	SetSchedule( SCHED_FORCED_GO );
+}

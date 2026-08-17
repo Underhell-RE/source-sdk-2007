@@ -631,6 +631,8 @@ public:
 	void InputAlternativeSorting( inputdata_t &inputdata );
 	void InputAlpha( inputdata_t &inputdata );
 	void InputColor( inputdata_t &inputdata );
+	void InputGlow( inputdata_t &inputdata );
+	void InputSetGlowColor( inputdata_t &inputdata );
 	void InputSetParent( inputdata_t &inputdata );
 	void SetParentAttachment( const char *szInputName, const char *szAttachment, bool bMaintainOffset );
 	void InputSetParentAttachment( inputdata_t &inputdata );
@@ -1661,6 +1663,9 @@ private:
 	// Underhell: fired when the player kicks this entity (uh_jake_kick).
 	COutputEvent m_OnKicked;
 	bool m_bUHKickableDoor;
+	bool m_bUHGlow;
+	color32 m_UHGlowColor;
+	color32 m_UHGlowOriginalColor;
 
 	QAngle			m_angAbsRotation;
 

@@ -361,10 +361,9 @@ public:
 
 	//-----------------------------------------------------------------------------
 	// Underhell hermit-cards quest state. The counters are networked and drawn
-	// by CHudUHHermitCards. The original reads them from the game stats
-	// (GC_HermitCards / GC_HermitQuest_Total / GC_HermitQuest_Current,
-	// sub_102E1B60) — that stat system is not yet ported, so map logic drives
-	// these directly via UH_SetHermitCards.
+	// by CHudUHHermitCards. InputDisplayHermitCards refreshes them from the
+	// persistent GC_HermitCards / GC_HermitQuest_Total / GC_HermitQuest_Current
+	// env_global counters, matching sub_102E1B60.
 	//-----------------------------------------------------------------------------
 	void				UH_SetHermitCards( int iCards, int iQuestCurrent, int iQuestTotal )
 	{
@@ -386,7 +385,7 @@ public:
 	// batteries (m_iUHBatteryCount) rather than suit power.
 	//-----------------------------------------------------------------------------
 	int					UH_GetBatteryCount( void ) const { return m_iUHBatteryCount; }
-	void				UH_AddBattery( int iCount ) { m_iUHBatteryCount = m_iUHBatteryCount + iCount; }
+	void				UH_AddBattery( int iCount ) { m_iUHBatteryCount = clamp( m_iUHBatteryCount + iCount, 0, 20 ); }
 	void				UH_UpdateFlashlightBattery( void );	// drain a battery while the flashlight is on
 
 	// Underhell gear ownership accessors (the fields themselves are private;
@@ -463,6 +462,15 @@ public:
 	void				InputViewModelSkin( inputdata_t &inputdata );
 	void				InputSetPlayerKickModel( inputdata_t &inputdata );
 
+	// Map-facing Underhell player state inputs used throughout Chapter 1.
+	void				InputBleedPlayer( inputdata_t &inputdata );
+	void				InputDisableInventory( inputdata_t &inputdata );
+	void				InputEnableInventory( inputdata_t &inputdata );
+	void				InputDisplayHermitCards( inputdata_t &inputdata );
+	void				InputRemoveEndurance( inputdata_t &inputdata );
+	void				InputRemoveLitGlowstick( inputdata_t &inputdata );
+	void				InputSetStatusVisibility( inputdata_t &inputdata );
+
 	// Underhell "give" inputs (fired at !player from the maps). "Give" mirrors
 	// the vanilla "give" ConCommand (item_suit is special-cased); "GiveInv"
 	// hands a weapon/item to the player's arsenal. Both take the entity
@@ -518,10 +526,10 @@ private:
 	CNetworkArray( int, m_iInventory, UH_INVENTORY_SLOTS );	// item ids, 0 = empty slot
 	CNetworkVar( bool, m_bShoulderFlashlight );					// shoulder-mounted flashlight fitted
 	CNetworkVar( int, m_iUHBatteryCount );						// battery items held
-	CNetworkVar( int, m_iUHHermitCardsCount );					// TODO: hermit card system
-	CNetworkVar( int, m_iUHHermitCurrentQuestCount );			// TODO: hermit card system
-	CNetworkVar( int, m_iUHHermitTotalQuestCount );				// TODO: hermit card system
-	CNetworkVar( bool, m_bDisplayHermitCard );					// TODO: hermit card system
+	CNetworkVar( int, m_iUHHermitCardsCount );
+	CNetworkVar( int, m_iUHHermitCurrentQuestCount );
+	CNetworkVar( int, m_iUHHermitTotalQuestCount );
+	CNetworkVar( bool, m_bDisplayHermitCard );
 	CNetworkVar( bool, m_bFlashlightOn );					// inventory flashlight state
 	CNetworkVar( bool, m_bInventoryEnabled );				// inventory system enabled
 

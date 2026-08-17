@@ -296,6 +296,12 @@ CBaseEntity::CBaseEntity( bool bServerOnly )
 	m_bAlternateSorting = false;
 	m_bIsMirrorOnly = false;
 	m_bUHKickableDoor = true;
+	m_bUHGlow = false;
+	m_UHGlowColor.r = 100;
+	m_UHGlowColor.g = 200;
+	m_UHGlowColor.b = 100;
+	m_UHGlowColor.a = 100;
+	m_UHGlowOriginalColor.r = m_UHGlowOriginalColor.g = m_UHGlowOriginalColor.b = m_UHGlowOriginalColor.a = 255;
 	m_CollisionGroup = COLLISION_GROUP_NONE;
 	m_iParentAttachment = 0;
 	CollisionProp()->Init( this );
@@ -1770,6 +1776,8 @@ BEGIN_DATADESC_NO_BASE( CBaseEntity )
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "Alpha", InputAlpha ),
 	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "AlternativeSorting", InputAlternativeSorting ),
 	DEFINE_INPUTFUNC( FIELD_COLOR32, "Color", InputColor ),
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "Glow", InputGlow ),
+	DEFINE_INPUTFUNC( FIELD_COLOR32, "SetGlowColor", InputSetGlowColor ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetParent", InputSetParent ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetParentAttachment", InputSetParentAttachment ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetParentAttachmentMaintainOffset", InputSetParentAttachmentMaintainOffset ),
@@ -1805,6 +1813,9 @@ BEGIN_DATADESC_NO_BASE( CBaseEntity )
 	// Underhell: fired when the player kicks this entity (uh_jake_kick).
 	DEFINE_OUTPUT( m_OnKicked, "OnKicked" ),
 	DEFINE_KEYFIELD( m_bUHKickableDoor, FIELD_BOOLEAN, "kickable" ),
+	DEFINE_FIELD( m_bUHGlow, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_UHGlowColor, FIELD_COLOR32 ),
+	DEFINE_FIELD( m_UHGlowOriginalColor, FIELD_COLOR32 ),
 
 	// Function Pointers
 	DEFINE_FUNCTION( SUB_Remove ),
@@ -3842,6 +3853,36 @@ void CBaseEntity::InputColor( inputdata_t &inputdata )
 	SetRenderColor( clr.r, clr.g, clr.b );
 }
 
+
+//-----------------------------------------------------------------------------
+// Underhell objective glow inputs. The original networks a separate glow color
+// and flag; this SDK fallback uses render tint plus EF_BRIGHTLIGHT so mapped
+// pickups remain visibly highlighted.
+//-----------------------------------------------------------------------------
+void CBaseEntity::InputSetGlowColor( inputdata_t &inputdata )
+{
+	m_UHGlowColor = inputdata.value.Color32();
+	if ( m_bUHGlow )
+		SetRenderColor( m_UHGlowColor.r, m_UHGlowColor.g, m_UHGlowColor.b );
+}
+
+void CBaseEntity::InputGlow( inputdata_t &inputdata )
+{
+	const bool enable = inputdata.value.Bool();
+	if ( enable && !m_bUHGlow )
+		m_UHGlowOriginalColor = GetRenderColor();
+	m_bUHGlow = enable;
+	if ( m_bUHGlow )
+	{
+		SetRenderColor( m_UHGlowColor.r, m_UHGlowColor.g, m_UHGlowColor.b );
+		AddEffects( EF_BRIGHTLIGHT );
+	}
+	else
+	{
+		SetRenderColor( m_UHGlowOriginalColor.r, m_UHGlowOriginalColor.g, m_UHGlowOriginalColor.b, m_UHGlowOriginalColor.a );
+		RemoveEffects( EF_BRIGHTLIGHT );
+	}
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Called whenever the entity is 'Used'.  This can be when a player hits

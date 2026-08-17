@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -72,6 +72,8 @@ public:
 	void InputSetMaxChildren( inputdata_t &inputdata );
 	void InputAddMaxChildren( inputdata_t &inputdata );
 	void InputSetMaxLiveChildren( inputdata_t &inputdata );
+	void InputAddMaxChildrenHard( inputdata_t &inputdata );
+	void InputSetMaxLiveChildrenHard( inputdata_t &inputdata );
 	void InputSetSpawnFrequency( inputdata_t &inputdata );
 
 	// State changers

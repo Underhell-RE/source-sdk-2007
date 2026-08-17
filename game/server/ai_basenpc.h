@@ -1908,6 +1908,8 @@ public:
 	void					InputSetViewDistance( inputdata_t &inputdata );
 	void					InputSetSpotBodiesOn( inputdata_t &inputdata );
 	void					InputSetSpotBodiesOff( inputdata_t &inputdata );
+	void					InputRushEntity( inputdata_t &inputdata );
+	void					InputWalkToEntity( inputdata_t &inputdata );
 	void					InputGibHead( inputdata_t &inputdata );
 	void					InputGibLeftArm( inputdata_t &inputdata );
 	void					InputGibRightArm( inputdata_t &inputdata );

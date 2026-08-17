@@ -564,8 +564,12 @@ bool CItemFlashlight::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
-	pHL2Player->UH_SetFlashlightOn( true );
-	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	// Original CItemFlashlight::Use (sub_10173320): fire OnPlayerPickup,
+	// play ItemBattery.Touch, add two batteries, then remove the world item.
+	// The map's Branch_Player_Flashlight output grants/enables flashlight use.
+	FirePlayerPickupOutput( pHL2Player );
+	pHL2Player->UH_AddBattery( 2 );
+	pHL2Player->EmitSound( "ItemBattery.Touch" );
 	SetOwnerEntity( pHL2Player );
 	UTIL_Remove( this );
 
@@ -982,6 +986,7 @@ BEGIN_DATADESC( CItemRandom )
 	DEFINE_KEYFIELD( m_bitem_heavyarmor,			FIELD_BOOLEAN,	"item_heavyarmor" ),
 	DEFINE_KEYFIELD( m_bitem_battery,			FIELD_BOOLEAN,	"item_battery" ),
 	DEFINE_KEYFIELD( m_bitem_batterypack,		FIELD_BOOLEAN,	"item_battery_pack" ),
+	DEFINE_KEYFIELD( m_bitem_batterypack,		FIELD_BOOLEAN,	"item_batterypack" ),
 	DEFINE_KEYFIELD( m_bitem_healthkit,			FIELD_BOOLEAN,	"item_healthkit" ),
 	DEFINE_KEYFIELD( m_bitem_healthvial,			FIELD_BOOLEAN,	"item_healthvial" ),
 	DEFINE_KEYFIELD( m_bitem_nightvision,		FIELD_BOOLEAN,	"item_nightvision" ),
