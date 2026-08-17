@@ -9,6 +9,7 @@
 #include "cbase.h"
 #include "screenspaceeffects.h"
 #include "cliententitylist.h"
+#include "model_types.h"
 #include "studio.h"
 #include "materialsystem/MaterialSystemUtil.h"
 #include "materialsystem/IMaterialVar.h"
