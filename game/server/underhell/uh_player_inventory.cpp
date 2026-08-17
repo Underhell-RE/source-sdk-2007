@@ -196,19 +196,19 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 		break;
 
 	default:
-		{
-			// Original raw +212 (CBaseAnimating +848) is m_nSkin, not a
-			// bodygroup. Using SetBodygroup selected unrelated geometry.
-			int iSkin = UH_GetDropBodyGroup( iItem );
-			if ( iSkin >= 0 && pItem->GetBaseAnimating() )
-				pItem->GetBaseAnimating()->m_nSkin = iSkin;
-		}
 		break;
 	}
 
 	pItem->SetAbsOrigin( vecOrigin );
 	pItem->SetAbsAngles( angItem );
 	pItem->Spawn();
+
+	// The original dispatches Spawn first, then overwrites m_nSkin. This is
+	// significant for apple/soda skin 0 because both Spawn functions randomize
+	// their default skin.
+	int iSkin = UH_GetDropBodyGroup( iItem );
+	if ( iSkin >= 0 && pItem->GetBaseAnimating() )
+		pItem->GetBaseAnimating()->m_nSkin = iSkin;
 }
 
 //-----------------------------------------------------------------------------
@@ -356,9 +356,27 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 	}
 
 	// The original item virtual returns success before the slot is cleared. The
-	// SDK CItem::Use signature is void, so preserve the known deny gates here.
-	// In particular, a full-health/non-bleeding bandage must remain in inventory.
-	if ( iItem == UH_ITEM_BANDAGES && GetHealth() >= 100 && UH_GetBleedCounter() <= 0 )
+	// SDK CItem::Use signature is void, so reproduce its refusal gates here.
+	const bool bFoodOrDrink =
+		( iItem >= UH_ITEM_APPLE_RED && iItem <= UH_ITEM_SODA_LAST ) ||
+		iItem == UH_ITEM_CHOCOBAR || iItem == UH_ITEM_ORANGE;
+	if ( UH_IsGasMaskOn() && ( bFoodOrDrink || iItem == UH_ITEM_PAINKILLERS ) )
+	{
+		EmitSound( "HL2Player.UseDeny" );
+		engine->ClientCommand( edict(), "UpdateInventory" );
+		return false;
+	}
+
+	if ( iItem == UH_ITEM_BANDAGES && GetHealth() >= GetMaxHealth() && UH_GetBleedCounter() <= 0 )
+	{
+		EmitSound( "HL2Player.UseDeny" );
+		engine->ClientCommand( edict(), "UpdateInventory" );
+		return false;
+	}
+
+	if ( ( iItem == UH_ITEM_PAINKILLERS || iItem == UH_ITEM_SYRINGE ||
+		   iItem == UH_ITEM_HEALTHKIT || iItem == UH_ITEM_HEALTH_VIAL ) &&
+		 GetHealth() >= GetMaxHealth() )
 	{
 		EmitSound( "HL2Player.UseDeny" );
 		engine->ClientCommand( edict(), "UpdateInventory" );

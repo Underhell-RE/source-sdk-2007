@@ -109,10 +109,6 @@ static CHL2_Player *UH_GetItemConsumer( CBaseEntity *pActivator )
 	if ( !pPlayer || !pPlayer->IsAlive() )
 		return NULL;
 
-	// Can't eat / drink through a gas mask.
-	if ( pPlayer->UH_IsGasMaskOn() )
-		return NULL;
-
 	return pPlayer;
 }
 
@@ -131,7 +127,7 @@ void CUHFoodItem::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE u
 	}
 
 	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
-	if ( !pPlayer )
+	if ( !pPlayer || pPlayer->UH_IsGasMaskOn() )
 		return;
 
 	pPlayer->UH_Eat( GetEnduranceGain(), GetHealthGain(), GetEatSound() );
@@ -153,7 +149,7 @@ void CItemUHSoda::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE u
 	}
 
 	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
-	if ( !pPlayer )
+	if ( !pPlayer || pPlayer->UH_IsGasMaskOn() )
 		return;
 
 	// Original sub_101772F0: flavour = item id - 7 (0..5).
@@ -254,8 +250,8 @@ bool CItemApple::MyTouch( CBasePlayer *pPlayer )
 }
 
 //-----------------------------------------------------------------------------
-// Sodas: six flavours, ids 7..12.
-// TODO: verify the original picks the flavour on spawn (skin) or on pickup.
+// Sodas: six flavours, ids 7..12. sub_10177380 randomizes skin 0 at
+// Spawn; sub_10177230 converts skin 0..4 to id 7..11 and skin 5 to id 12.
 //-----------------------------------------------------------------------------
 LINK_ENTITY_TO_CLASS( item_uhsoda, CItemUHSoda );
 
@@ -595,6 +591,7 @@ bool CItemNightVision::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->UH_SetHaveNightVision( true );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
@@ -609,6 +606,7 @@ bool CItemGasMask::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->UH_SetHaveGasMask( true );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
@@ -623,6 +621,7 @@ bool CItemShoulderFlashlight::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->UH_SetShoulderFlashlight( true );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
@@ -646,6 +645,8 @@ static bool UH_GiveArmorPickup( CBasePlayer *pPlayer, CBaseEntity *pItem, int iA
 	if ( pHL2Player->ArmorValue() >= iMax )
 		return false;
 
+	CItem *pWorldItem = dynamic_cast<CItem *>( pItem );
+	if ( pWorldItem ) pWorldItem->FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
 	pItem->SetOwnerEntity( pHL2Player );
 	pHL2Player->IncrementArmorValue( iAmount, iMax );
@@ -758,7 +759,7 @@ void CItemPainkillers::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_T
 	}
 
 	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
-	if ( !pPlayer )
+	if ( !pPlayer || pPlayer->UH_IsGasMaskOn() )
 		return;
 
 	pPlayer->TakeHealth( 10.0f, DMG_GENERIC );
@@ -808,13 +809,10 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
-	// A bandage is always collectable. Its health/bleeding condition belongs to
-	// the consumption path below, not to the inventory pickup path.
+	// sub_101724D0 uses the same free-slot gate as every inventory pickup.
+	if ( pHL2Player->UH_FindFreeSlot() < 0 )
+		return false;
 
-	// Unlike the generic inventory pickups, bandages do not reject the touch
-	// merely because every slot is occupied. UH_GiveItem owns the full-inventory
-	// fallback and recreates the world item when required, matching the original
-	// item's pickup route.
 	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupBandages" );
 	SetOwnerEntity( pHL2Player );
