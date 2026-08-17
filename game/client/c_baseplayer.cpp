@@ -1273,13 +1273,6 @@ bool C_BasePlayer::ShouldDraw()
 
 int C_BasePlayer::DrawModel( int flags )
 {
-	// Original sub_10046070: hide the local body in normal first person, but
-	// allow it while a mirror/monitor target is rendering. The cvar is a master
-	// switch for player reflections.
-	if ( ( IsLocalPlayer() && !g_bRenderingCameraView && !::input->CAM_IsThirdPerson() ) ||
-		 !cl_player_render_mirror.GetBool() )
-		return 0;
-
 	// if local player is spectating this player in first person mode, don't draw it
 	C_BasePlayer * player = C_BasePlayer::GetLocalPlayer();
 

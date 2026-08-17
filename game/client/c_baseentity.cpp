@@ -1928,6 +1928,11 @@ int C_BaseEntity::DrawModel( int flags )
 	if ( !m_bReadyToDraw )
 		return 0;
 
+	// Working mirror gate from 1781e2a: entities marked
+	// uh_rendermirrorsonly draw only while a mirror/monitor target is active.
+	if ( m_bIsMirrorOnly && ( !cl_player_render_mirror.GetBool() || !g_bRenderingReflectiveGlass ) )
+		return 0;
+
 	int drawn = 0;
 	if ( !model )
 	{

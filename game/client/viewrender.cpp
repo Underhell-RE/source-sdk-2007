@@ -2885,9 +2885,11 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 	if ( !pCameraEnt )
 		return;
 
-	// Original byte_10407398: mirror-only entities are drawable for the whole
-	// monitor render pass in release builds as well as debug builds.
-	g_bRenderingCameraView = true;
+	// Reuse the working 1781e2a mirror gate for func_monitor targets too.
+	// Preserve the old value because monitor rendering can be nested in a
+	// reflective-glass pass.
+	const bool bOldMirrorPass = g_bRenderingReflectiveGlass;
+	g_bRenderingReflectiveGlass = true;
 
 	// FIXME: this should check for the ability to do a render target maybe instead.
 	// FIXME: shouldn't have to truck through all of the visible entities for this!!!!
@@ -2932,7 +2934,7 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 		pRenderContext->PopRenderTargetAndViewport();
 	}
 
-	g_bRenderingCameraView = false;
+	g_bRenderingReflectiveGlass = bOldMirrorPass;
 
 #endif // USE_MONITORS
 }
@@ -5647,13 +5649,10 @@ void CReflectiveGlassView::Draw()
 	bool bVisOcclusion = r_visocclusion.GetInt();
 	r_visocclusion.SetValue( 0 );
 		   
-	// Original CReflectiveGlassView::Draw toggles the same camera-pass byte
-	// used by DrawMonitors (byte_10407398 / g_bRenderingCameraView).
-	g_bRenderingCameraView = true;
+	// Working implementation from 1781e2a.
 	g_bRenderingReflectiveGlass = true;
 	BaseClass::Draw();
 	g_bRenderingReflectiveGlass = false;
-	g_bRenderingCameraView = false;
 
 	r_visocclusion.SetValue( bVisOcclusion );
 

@@ -2781,10 +2781,9 @@ int C_BaseAnimating::DrawModel( int flags )
 	if ( !m_bReadyToDraw )
 		return 0;
 
-	// Mirror-only entities normally draw only in reflective passes. The local
-	// player is the exception while OTS/third-person is active: the same body
-	// must be visible to the main camera.
-	if ( IsMirrorOnly() && !g_bRenderingCameraView )
+	// Same gate as the working mirror implementation in 1781e2a. OTS is the
+	// only main-view exception for the local player body.
+	if ( IsMirrorOnly() && ( !cl_player_render_mirror.GetBool() || !g_bRenderingReflectiveGlass ) )
 	{
 		C_BasePlayer *pLocal = C_BasePlayer::GetLocalPlayer();
 		if ( this != pLocal || !pLocal->AllowOvertheShoulderView() )
