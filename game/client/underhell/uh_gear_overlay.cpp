@@ -21,7 +21,6 @@
 #include "materialsystem/imaterial.h"
 #include "view_scene.h"
 #include "c_basehlplayer.h"
-#include "tier1/KeyValues.h"
 #include "underhell/shadereditor/uh_shadereditor_system.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -68,30 +67,36 @@ void CUHGearOverlayEffect::Shutdown( void )
 }
 
 //-----------------------------------------------------------------------------
-// Create materials only after ShaderEditor005 has registered the procedural
-// shaders. This avoids caching an error material during early client startup
-// and removes the need for hand-authored wrapper VMT files.
+// Resolve the original wrapper VMTs only after ShaderEditor005 has registered
+// editor_shader. This avoids caching an error material during early startup.
 //-----------------------------------------------------------------------------
 void CUHGearOverlayEffect::EnsureRuntimeMaterials()
 {
 	if ( m_bRuntimeMaterialsCreated || !g_UHShaderEditorSystem.IsReady() )
 		return;
 
-	KeyValues *pNightVisionVMT = new KeyValues( "postproc_nightvision" );
-	IMaterial *pNightVision = materials->CreateMaterial(
-		"underhell/runtime_nightvision", pNightVisionVMT );
-	if ( pNightVision && !IsErrorMaterial( pNightVision ) )
-		m_NightVisionMaterial.Init( pNightVision );
-	else
-		Warning( "[UH shader] postproc_nightvision material creation failed\n" );
+	// The original materials are thin wrappers around Shader Editor's single
+	// registered CPU-side shader. Their $shadername selects the compiled graph:
+	//
+	// "editor_shader" { "$shadername" "postproc_nightvision" }
+	//
+	// The graph name itself is not a Source shader and cannot be used as the
+	// KeyValues root.
+	m_NightVisionMaterial.Init( "shader/nightvision", TEXTURE_GROUP_OTHER );
+	IMaterial *pNightVision = m_NightVisionMaterial;
+	if ( !pNightVision || IsErrorMaterial( pNightVision ) )
+	{
+		m_NightVisionMaterial.Shutdown();
+		Warning( "[UH shader] shader/nightvision.vmt failed to resolve after ShaderEditor startup\n" );
+	}
 
-	KeyValues *pGasMaskVMT = new KeyValues( "uh_gasmask" );
-	IMaterial *pGasMask = materials->CreateMaterial(
-		"underhell/runtime_gasmask", pGasMaskVMT );
-	if ( pGasMask && !IsErrorMaterial( pGasMask ) )
-		m_GasMaskMaterial.Init( pGasMask );
-	else
-		Warning( "[UH shader] uh_gasmask material creation failed\n" );
+	m_GasMaskMaterial.Init( "shader/gasmask", TEXTURE_GROUP_OTHER );
+	IMaterial *pGasMask = m_GasMaskMaterial;
+	if ( !pGasMask || IsErrorMaterial( pGasMask ) )
+	{
+		m_GasMaskMaterial.Shutdown();
+		Warning( "[UH shader] shader/gasmask.vmt failed to resolve after ShaderEditor startup\n" );
+	}
 
 	m_bRuntimeMaterialsCreated = true;
 }
