@@ -49,13 +49,15 @@ ITexture* CBaseClientRenderTargets::CreateCustomCameraTexture( IMaterialSystem* 
 {
 	char name[64];
 	Q_snprintf( name, sizeof( name ), "_rt_CustomCamera_%d", index );
-	// sub_101299B0 calls IMaterialSystem vtable slot 84, which is Ex2 in this
-	// Orange Box interface, with size mode 5 (RT_SIZE_OFFSCREEN).
+	// sub_101299B0 calls IMaterialSystem vtable slot 84 (Ex2) with size mode
+	// 5 (RT_SIZE_OFFSCREEN). Its recovered call supplies only name, dimensions,
+	// mode and format; the remaining arguments are defaults, including RT flags
+	// 0. Marking these camera textures HDR produced the solid brown/grey sample.
 	return pMaterialSystem->CreateNamedRenderTargetTextureEx2(
 		name, size, size, RT_SIZE_OFFSCREEN,
 		pMaterialSystem->GetBackBufferFormat(), MATERIAL_RT_DEPTH_SHARED,
 		TEXTUREFLAGS_CLAMPS | TEXTUREFLAGS_CLAMPT,
-		CREATERENDERTARGETFLAGS_HDR );
+		0 );
 }
 
 //-----------------------------------------------------------------------------

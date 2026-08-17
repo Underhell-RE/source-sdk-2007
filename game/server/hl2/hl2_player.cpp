@@ -1320,18 +1320,13 @@ void CHL2_Player::PlayerRunCommand(CUserCmd *ucmd, IMoveHelper *moveHelper)
 void CHL2_Player::Spawn(void)
 {
 
-	BaseClass::Spawn();
-
 #ifndef HL2MP
 #ifndef PORTAL
-	// CBasePlayer::Spawn restores the SDK placeholder model, so apply the
-	// original Underhell default afterwards. Chapter 1 map 11 does not send a
-	// SetPlayerModel input of its own.
-	PrecacheModel( "models/player/jake_casual.mdl" );
-	SetModel( "models/player/jake_casual.mdl" );
-	SetMirrorOnly( true );
+	SetModel( "models/player.mdl" );
 #endif
 #endif
+
+	BaseClass::Spawn();
 
 	//
 	// Our player movement speed is set once here. This will override the cl_xxxx
@@ -3619,18 +3614,6 @@ void CHL2_Player::UpdateClientData( void )
 void CHL2_Player::OnRestore()
 {
 	BaseClass::OnRestore();
-
-	// House 1 explicitly sends SetPlayerModel on map spawn, while chapter 1
-	// map 11 relies on the transitioned player's model. Old saves/base SDK
-	// transitions can restore the placeholder model and a cleared mirror flag.
-	const char *pszModel = STRING( GetModelName() );
-	if ( !pszModel || !pszModel[0] || !Q_stricmp( pszModel, "models/player.mdl" ) )
-	{
-		PrecacheModel( "models/player/jake_casual.mdl" );
-		SetModel( "models/player/jake_casual.mdl" );
-	}
-	SetMirrorOnly( true );
-
 	m_pPlayerAISquad = g_AI_SquadManager.FindCreateSquad(AllocPooledString(PLAYER_SQUADNAME));
 }
 
