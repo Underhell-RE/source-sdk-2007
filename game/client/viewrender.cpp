@@ -2937,6 +2937,21 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 				pCameraEnt->UsesCustomRenderTarget(), pCameraEnt->GetRenderTargetIndex(),
 				pThisTarget->GetName(), pThisTarget->GetActualWidth(), pThisTarget->GetActualHeight(),
 				camOrigin.x, camOrigin.y, camOrigin.z, camAngles.x, camAngles.y, camAngles.z );
+
+			if ( pCameraEnt->UsesCustomRenderTarget() )
+			{
+				IMaterial *pMonitorMaterial = materials->FindMaterial( "dev/dev_monitor_256a", TEXTURE_GROUP_WORLD, false );
+				bool bFoundBaseTexture = false;
+				IMaterialVar *pBaseTextureVar = pMonitorMaterial ?
+					pMonitorMaterial->FindVar( "$basetexture", &bFoundBaseTexture, false ) : NULL;
+				ITexture *pMaterialTexture = ( bFoundBaseTexture && pBaseTextureVar ) ?
+					pBaseTextureVar->GetTextureValue() : NULL;
+				Msg( "[UH render] material dev/dev_monitor_256a ptr=%p error=%d shader=%s baseFound=%d base=%s sameRT=%d\n",
+					pMonitorMaterial, IsErrorMaterial( pMonitorMaterial ),
+					pMonitorMaterial ? pMonitorMaterial->GetShaderName() : "<null>",
+					bFoundBaseTexture, pMaterialTexture ? pMaterialTexture->GetName() : "<null>",
+					pMaterialTexture == pThisTarget );
+			}
 		}
 		int width = pThisTarget->GetActualWidth();
 		int height = pThisTarget->GetActualHeight();
