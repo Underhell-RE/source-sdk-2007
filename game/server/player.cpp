@@ -1780,8 +1780,17 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 		}
 		Q_strncat( szAnim, m_szAnimExtension ,sizeof(szAnim), COPY_ALL_CHARACTERS );
 		animDesired = LookupSequence( szAnim );
-		if (animDesired == -1)
-			animDesired = 0;
+		if ( animDesired == -1 )
+		{
+			// Underhell mirrors render the first-person player body. With no
+			// weapon animation extension, the named sequence is incomplete.
+			// Jake sequence 0 is a bind pose, so use an authored activity.
+			animDesired = SelectWeightedSequence( ACT_RANGE_ATTACK1 );
+			if ( animDesired == -1 )
+				animDesired = SelectWeightedSequence( ACT_IDLE );
+			if ( animDesired == -1 )
+				animDesired = 0;
+		}
 
 		if ( GetSequence() != animDesired || !SequenceLoops() )
 		{
@@ -1811,8 +1820,22 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 			}
 			Q_strncat( szAnim, m_szAnimExtension,sizeof(szAnim), COPY_ALL_CHARACTERS );
 			animDesired = LookupSequence( szAnim );
-			if (animDesired == -1)
-				animDesired = 0;
+			if ( animDesired == -1 )
+			{
+				// Keep the named aim sequence when it exists. Inventory items
+				// can leave the extension empty, so fall back to locomotion.
+				Activity fallbackActivity;
+				if ( GetFlags() & FL_DUCKING )
+					fallbackActivity = ( speed > 1.0f ) ? ACT_CROUCH : ACT_CROUCHIDLE;
+				else
+					fallbackActivity = ( speed > 1.0f ) ? ACT_WALK : ACT_IDLE;
+
+				animDesired = SelectWeightedSequence( fallbackActivity );
+				if ( animDesired == -1 && fallbackActivity != ACT_IDLE )
+					animDesired = SelectWeightedSequence( ACT_IDLE );
+				if ( animDesired == -1 )
+					animDesired = 0;
+			}
 			SetActivity( ACT_WALK );
 		}
 		else
