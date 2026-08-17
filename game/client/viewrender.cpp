@@ -2931,11 +2931,12 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 		if ( bLogMonitorPass )
 		{
 			const Vector &camOrigin = pCameraEnt->GetAbsOrigin();
-			Msg( "[UH render] camera ent=%d active=%d dormant=%d custom=%d index=%d rt=%s size=%dx%d origin=%.1f %.1f %.1f\n",
+			const QAngle &camAngles = pCameraEnt->GetAbsAngles();
+			Msg( "[UH render] camera ent=%d active=%d dormant=%d custom=%d index=%d rt=%s size=%dx%d origin=%.1f %.1f %.1f angles=%.1f %.1f %.1f\n",
 				pCameraEnt->entindex(), pCameraEnt->IsActive(), pCameraEnt->IsDormant(),
 				pCameraEnt->UsesCustomRenderTarget(), pCameraEnt->GetRenderTargetIndex(),
 				pThisTarget->GetName(), pThisTarget->GetActualWidth(), pThisTarget->GetActualHeight(),
-				camOrigin.x, camOrigin.y, camOrigin.z );
+				camOrigin.x, camOrigin.y, camOrigin.z, camAngles.x, camAngles.y, camAngles.z );
 		}
 		int width = pThisTarget->GetActualWidth();
 		int height = pThisTarget->GetActualHeight();

@@ -3619,6 +3619,18 @@ void CHL2_Player::UpdateClientData( void )
 void CHL2_Player::OnRestore()
 {
 	BaseClass::OnRestore();
+
+	// House 1 explicitly sends SetPlayerModel on map spawn, while chapter 1
+	// map 11 relies on the transitioned player's model. Old saves/base SDK
+	// transitions can restore the placeholder model and a cleared mirror flag.
+	const char *pszModel = STRING( GetModelName() );
+	if ( !pszModel || !pszModel[0] || !Q_stricmp( pszModel, "models/player.mdl" ) )
+	{
+		PrecacheModel( "models/player/jake_casual.mdl" );
+		SetModel( "models/player/jake_casual.mdl" );
+	}
+	SetMirrorOnly( true );
+
 	m_pPlayerAISquad = g_AI_SquadManager.FindCreateSquad(AllocPooledString(PLAYER_SQUADNAME));
 }
 

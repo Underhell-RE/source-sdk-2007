@@ -2782,6 +2782,22 @@ int C_BaseAnimating::DrawModel( int flags )
 		return 0;
 
 	C_BasePlayer *pLocalPlayer = C_BasePlayer::GetLocalPlayer();
+	if ( cl_uh_render_debug.GetBool() && g_bRenderingReflectiveGlass )
+	{
+		const model_t *pDebugModel = GetModel();
+		const char *pszDebugModel = pDebugModel ? modelinfo->GetModelName( pDebugModel ) : "<null>";
+		if ( V_stristr( pszDebugModel, "jake" ) )
+		{
+			static float s_flNextJakeTargetLog = 0.0f;
+			if ( gpGlobals->curtime >= s_flNextJakeTargetLog )
+			{
+				s_flNextJakeTargetLog = gpGlobals->curtime + 1.0f;
+				Msg( "[UH render] Jake target DrawModel ent=%d local=%d mirrorOnly=%d pass=%d model=%s origin=%.1f %.1f %.1f\n",
+					entindex(), this == pLocalPlayer, IsMirrorOnly(), g_bRenderingReflectiveGlass,
+					pszDebugModel, GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z );
+			}
+		}
+	}
 	if ( cl_uh_render_debug.GetBool() && this == pLocalPlayer )
 	{
 		static float s_flNextPlayerRenderLog = 0.0f;
