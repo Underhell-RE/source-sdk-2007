@@ -2781,6 +2781,20 @@ int C_BaseAnimating::DrawModel( int flags )
 	if ( !m_bReadyToDraw )
 		return 0;
 
+	C_BasePlayer *pLocalPlayer = C_BasePlayer::GetLocalPlayer();
+	if ( cl_uh_render_debug.GetBool() && this == pLocalPlayer )
+	{
+		static float s_flNextPlayerRenderLog = 0.0f;
+		if ( gpGlobals->curtime >= s_flNextPlayerRenderLog )
+		{
+			s_flNextPlayerRenderLog = gpGlobals->curtime + 1.0f;
+			const model_t *pModel = GetModel();
+			Msg( "[UH render] player DrawModel mirrorOnly=%d pass=%d cvar=%d ots=%d model=%s\n",
+				IsMirrorOnly(), g_bRenderingReflectiveGlass, cl_player_render_mirror.GetBool(),
+				pLocalPlayer->AllowOvertheShoulderView(), pModel ? modelinfo->GetModelName( pModel ) : "<null>" );
+		}
+	}
+
 	// Same gate as the working mirror implementation in 1781e2a. OTS is the
 	// only main-view exception for the local player body.
 	if ( IsMirrorOnly() && ( !cl_player_render_mirror.GetBool() || !g_bRenderingReflectiveGlass ) )

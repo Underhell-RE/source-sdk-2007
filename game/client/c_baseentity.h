@@ -40,6 +40,7 @@
 extern bool g_bRenderingReflectiveGlass;
 // Underhell: master enable for mirror/monitor-only rendering (FCVAR_CHEAT).
 extern ConVar cl_player_render_mirror;
+extern ConVar cl_uh_render_debug;
 
 class C_Team;
 class IPhysicsObject;

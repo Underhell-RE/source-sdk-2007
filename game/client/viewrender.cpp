@@ -2896,6 +2896,19 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 	ITexture *pCameraTarget = GetCameraTexture();
 
 	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
+	bool bLogMonitorPass = false;
+	if ( cl_uh_render_debug.GetBool() )
+	{
+		static float s_flNextMonitorLog = 0.0f;
+		if ( gpGlobals->curtime >= s_flNextMonitorLog )
+		{
+			s_flNextMonitorLog = gpGlobals->curtime + 1.0f;
+			bLogMonitorPass = true;
+			Msg( "[UH render] DrawMonitors begin player=%p mirrorOnly=%d model=%s\n",
+				player, player ? player->IsMirrorOnly() : 0,
+				( player && player->GetModel() ) ? modelinfo->GetModelName( player->GetModel() ) : "<null>" );
+		}
+	}
 	
 	int cameraNum;
 	for ( cameraNum = 0; pCameraEnt != NULL; pCameraEnt = pCameraEnt->m_pNext )
@@ -2914,6 +2927,15 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 		{
 			Warning( "Error Texture in Monitor Drawing\n" );
 			continue;
+		}
+		if ( bLogMonitorPass )
+		{
+			const Vector &camOrigin = pCameraEnt->GetAbsOrigin();
+			Msg( "[UH render] camera ent=%d active=%d dormant=%d custom=%d index=%d rt=%s size=%dx%d origin=%.1f %.1f %.1f\n",
+				pCameraEnt->entindex(), pCameraEnt->IsActive(), pCameraEnt->IsDormant(),
+				pCameraEnt->UsesCustomRenderTarget(), pCameraEnt->GetRenderTargetIndex(),
+				pThisTarget->GetName(), pThisTarget->GetActualWidth(), pThisTarget->GetActualHeight(),
+				camOrigin.x, camOrigin.y, camOrigin.z );
 		}
 		int width = pThisTarget->GetActualWidth();
 		int height = pThisTarget->GetActualHeight();
@@ -5649,6 +5671,19 @@ void CReflectiveGlassView::Draw()
 	bool bVisOcclusion = r_visocclusion.GetInt();
 	r_visocclusion.SetValue( 0 );
 		   
+	if ( cl_uh_render_debug.GetBool() )
+	{
+		static float s_flNextMirrorLog = 0.0f;
+		if ( gpGlobals->curtime >= s_flNextMirrorLog )
+		{
+			s_flNextMirrorLog = gpGlobals->curtime + 1.0f;
+			C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
+			Msg( "[UH render] CReflectiveGlassView::Draw player=%p mirrorOnly=%d model=%s\n",
+				pPlayer, pPlayer ? pPlayer->IsMirrorOnly() : 0,
+				( pPlayer && pPlayer->GetModel() ) ? modelinfo->GetModelName( pPlayer->GetModel() ) : "<null>" );
+		}
+	}
+
 	// Working implementation from 1781e2a.
 	g_bRenderingReflectiveGlass = true;
 	BaseClass::Draw();

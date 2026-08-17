@@ -76,6 +76,16 @@ void CBaseClientRenderTargets::InitClientRenderTargets( IMaterialSystem* pMateri
 	m_CustomCameraTexture[1].Init( CreateCustomCameraTexture( pMaterialSystem, 2, 256 ) );
 	m_CustomCameraTexture[2].Init( CreateCustomCameraTexture( pMaterialSystem, 3, 512 ) );
 	m_CustomCameraTexture[3].Init( CreateCustomCameraTexture( pMaterialSystem, 4, 512 ) );
+
+	for ( int i = 0; i < 4; ++i )
+	{
+		ITexture *pTexture = m_CustomCameraTexture[i];
+		Msg( "[UH render] allocated custom camera %d ptr=%p name=%s size=%dx%d error=%d\n",
+			i + 1, pTexture, pTexture ? pTexture->GetName() : "<null>",
+			pTexture ? pTexture->GetActualWidth() : 0,
+			pTexture ? pTexture->GetActualHeight() : 0,
+			pTexture ? IsErrorTexture( pTexture ) : 1 );
+	}
 }
 
 //-----------------------------------------------------------------------------

@@ -47,6 +47,7 @@
 // Underhell: gate for mirror/monitor-only rendering (matches the original
 // client convar cl_player_render_mirror, FCVAR_CHEAT).
 ConVar cl_player_render_mirror( "cl_player_render_mirror", "1", FCVAR_CHEAT, "Enable or disable player mirror/monitor rendering" );
+ConVar cl_uh_render_debug( "cl_uh_render_debug", "0", 0, "Log Underhell mirror and monitor rendering" );
 
 
 #ifdef INTERPOLATEDVAR_PARANOID_MEASUREMENT

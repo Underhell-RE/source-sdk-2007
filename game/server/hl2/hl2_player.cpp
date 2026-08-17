@@ -1322,7 +1322,13 @@ void CHL2_Player::Spawn(void)
 
 #ifndef HL2MP
 #ifndef PORTAL
-	SetModel( "models/player.mdl" );
+	// Original player spawn function at 0x102E4B10 installs Jake's model
+	// directly. Chapter 1 map 11 does not send SetPlayerModel itself, so using
+	// the SDK placeholder models/player.mdl leaves mirrors and its webcam with
+	// no drawable player model.
+	PrecacheModel( "models/player/jake_casual.mdl" );
+	SetModel( "models/player/jake_casual.mdl" );
+	SetMirrorOnly( true );
 #endif
 #endif
 
