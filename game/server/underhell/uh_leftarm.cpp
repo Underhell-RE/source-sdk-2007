@@ -197,6 +197,8 @@ void CHL2_Player::UH_EquipFlare( void )
 	m_bHoldingFlare = true;
 	m_flFlareStartTime = gpGlobals->curtime;
 	UH_UpdateLeftArm();
+	CBaseViewModel *pDeployVM = GetViewModel( 1 );
+	if ( pDeployVM ) pDeployVM->SendViewModelMatchingSequence( 1 );
 
 	if ( m_hHeldFlareEffect ) UTIL_Remove( m_hHeldFlareEffect );
 	m_hHeldFlareEffect = NULL;
@@ -230,7 +232,11 @@ void CHL2_Player::UH_ThrowNade( void )
 	// A held flare is thrown instead of a grenade.
 	if ( m_bHoldingFlare )
 	{
-		UH_ThrowFlare();
+		CBaseViewModel *pFlareVM = GetViewModel( 1 );
+		if ( pFlareVM ) pFlareVM->SendViewModelMatchingSequence( 4 );
+		m_bFlareMarker = true;
+		float delay = pFlareVM ? max( 0.1f, pFlareVM->SequenceDuration() * 0.5f ) : 0.35f;
+		SetContextThink( &CHL2_Player::UH_LeftArmContextThink, gpGlobals->curtime + delay, "FlashLightContext" );
 		return;
 	}
 
@@ -251,10 +257,9 @@ void CHL2_Player::UH_ThrowNade( void )
 	m_bFlareMarker = true;
 	UH_SetLeftArmModel( UH_LEFTARM_GRENADE, 1, true );
 
-	// Throw gesture on the active weapon's viewmodel.
-	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
-	if ( pWeapon )
-		pWeapon->SendWeaponAnim( ACT_VM_THROW );
+	// Original sends authored sequence 1 on the left-arm grenade model.
+	CBaseViewModel *pGrenadeVM = GetViewModel( 1 );
+	if ( pGrenadeVM ) pGrenadeVM->SendViewModelMatchingSequence( 1 );
 
 	SetContextThink( &CHL2_Player::UH_LeftArmContextThink, gpGlobals->curtime + UH_THROW_STAGE_DELAY, "FlashLightContext" );
 }
@@ -266,6 +271,11 @@ void CHL2_Player::UH_ThrowNade( void )
 void CHL2_Player::UH_LeftArmContextThink( void )
 {
 	m_bFlareMarker = false;
+	if ( m_bHoldingFlare )
+	{
+		UH_ThrowFlare();
+		return;
+	}
 
 	// Actually throw the grenade: spawn the frag projectile and consume one
 	// grenade ammo. This replicates CWeaponFrag::ThrowGrenade + DecrementAmmo

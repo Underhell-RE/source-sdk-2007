@@ -232,9 +232,11 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
 - Bandage item use preserves the inventory slot and plays denial when no health/bleed effect is possible.
 - Radio/cracker activation was adjusted: delayed initial activation, stable track selection, radio sound insertion, no fake timed cracker explosion, pickup restrictions while active.
 - Failed active radio/cracker creation preserves inventory slot.
-- Glowstick visuals now use original even/odd `m_nSkin` pairs, hidden active props, `CPhysicsProp::CreateFlare(360)` fuse effects, and release the previous lit prop with physics when replaced/dropped.
-- Flare packs now create the original held viewmodel fuse effect; thrown flares use `CPhysicsProp::CreateFlare`, share the total 90-second burn from equip time, use `uh_flare_throw_scale 1200`, collision group 3 and angular velocity `(200,200,200)`.
-- Inventory world styling now writes `m_nSkin` at the decoded CBaseAnimating field instead of incorrectly changing bodygroups.
+- Glowstick visuals now use original even/odd `m_nSkin` pairs. Active sticks are non-material hidden props whose `env_flare` follows the player-owned effect; dropping/replacing releases a visible physics stick while preserving its 360-second flare effect.
+- Flare packs create the original `env_flare` on the left viewmodel `fuse`; sequence 1 deploys and sequence 4 stages the throw before release. Thrown flares use `CPhysicsProp::CreateFlare`, share the total 90-second burn from equip time, use `uh_flare_throw_scale 1200`, collision group 3 and angular velocity `(200,200,200)`, and can be picked back into inventory through `CPhysicsProp::Use`.
+- Inventory world styling writes `m_nSkin` at decoded CBaseAnimating+848 instead of changing unrelated bodygroups. Lit glowsticks release their tracked pickup-capable physics prop.
+- Grenade throws now play the authored throw sequence on viewmodel index 1 rather than incorrectly animating the active weapon.
+- Kick processing honors the door `kickable` key and runs the dedicated unlock/open path for prop and brush doors.
 - Added `item_gasmask_prison` due corpse gear drop requirements.
 - Heavy armor, apple, banana, soda and basic armor received partial value/skin fixes.
 

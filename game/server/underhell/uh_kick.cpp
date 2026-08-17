@@ -146,6 +146,19 @@ void CHL2_Player::UH_DoKickStrike( void )
 	RumbleEffect( 4, 0, 4 );
 	pHit->TakeDamage( info );
 
+	// Original sub_101E5A60 has a dedicated CBasePropDoor kick path gated by
+	// the FGD "kickable" key. Reproduce it for model and brush doors instead
+	// of relying on damage (stock doors ignore DMG_CLUB).
+	if ( pHit->IsUHKickableDoor() &&
+		( FClassnameIs( pHit, "prop_door_rotating" ) ||
+		  FClassnameIs( pHit, "func_door" ) || FClassnameIs( pHit, "func_door_rotating" ) ) )
+	{
+		variant_t empty;
+		pHit->AcceptInput( "Unlock", this, this, empty, USE_TOGGLE );
+		pHit->AcceptInput( FClassnameIs( pHit, "prop_door_rotating" ) ? "OpenAwayFrom" : "Open",
+			this, this, empty, USE_TOGGLE );
+	}
+
 	// Let the victim react (OnKicked output; the map uses e.g.
 	// "OnKicked" "door_KillingRoom,EnableMotion").
 	pHit->FireOnKicked( this );

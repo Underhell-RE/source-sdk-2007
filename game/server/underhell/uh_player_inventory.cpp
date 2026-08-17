@@ -133,6 +133,7 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 		CBaseEntity *pGlow = UH_IsLitGlowstick( iItem ) ? UH_GetActiveGlowStick() : NULL;
 		if ( pGlow )
 		{
+			pGlow->SetParent( NULL );
 			pGlow->RemoveEffects( EF_NODRAW | EF_NOSHADOW );
 			pGlow->RemoveSolidFlags( FSOLID_NOT_SOLID );
 			pGlow->SetSolid( SOLID_VPHYSICS );

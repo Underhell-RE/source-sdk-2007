@@ -366,6 +366,7 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	CBaseEntity *pOldGlow = pPlayer->UH_GetActiveGlowStick();
 	if ( pOldGlow )
 	{
+		pOldGlow->SetParent( NULL );
 		pOldGlow->RemoveEffects( EF_NODRAW | EF_NOSHADOW );
 		pOldGlow->RemoveSolidFlags( FSOLID_NOT_SOLID );
 		pOldGlow->SetSolid( SOLID_VPHYSICS );
@@ -397,6 +398,7 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	if ( pProp ) pProp->CreateFlare( 360.0f );
 	pGlow->GetBaseAnimating()->m_nSkin = pGlow->GetBaseAnimating()->m_nSkin + 1; // odd = lit
 	pGlow->SetOwnerEntity( pPlayer );
+	pGlow->SetParent( pPlayer );
 	pPlayer->UH_SetActiveGlowStick( pGlow );
 	pPlayer->EmitSound( "glowstick.crack" );
 	UTIL_Remove( this );

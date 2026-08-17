@@ -33,6 +33,10 @@
 #include "decals.h"
 #include "hierarchy.h"
 #include "shareddefs.h"
+#ifdef HL2_DLL
+#include "hl2/hl2_player.h"
+#include "underhell/uh_inventory.h"
+#endif
 #include "physobj.h"
 #include "physics_npc_solver.h"
 #include "SoundEmitterSystem/isoundemittersystembase.h"
@@ -2887,6 +2891,19 @@ void CPhysicsProp::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 	CBasePlayer *pPlayer = ToBasePlayer( pActivator );
 	if ( pPlayer )
 	{
+#ifdef HL2_DLL
+		const char *pszModel = STRING( GetModelName() );
+		if ( pszModel && !Q_stricmp( pszModel, "models/PG_props/pg_obj/pg_flare.mdl" ) )
+		{
+			CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+			if ( pHL2Player && pHL2Player->UH_FindFreeSlot() >= 0 )
+			{
+				pHL2Player->UH_GiveItem( UH_ITEM_FLARE_PACK );
+				UTIL_Remove( this );
+				return;
+			}
+		}
+#endif
 		if ( HasSpawnFlags( SF_PHYSPROP_ENABLE_PICKUP_OUTPUT ) )
 		{
 			m_OnPlayerUse.FireOutput( this, this );

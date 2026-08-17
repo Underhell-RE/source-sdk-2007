@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -1649,6 +1649,7 @@ public:
 
 	// Underhell: fire the "OnKicked" output (player kick hit this entity).
 	void	FireOnKicked( CBaseEntity *pActivator ) { m_OnKicked.FireOutput( pActivator, pActivator ); }
+	bool	IsUHKickableDoor( void ) const { return m_bUHKickableDoor; }
 private:
 
 	// User outputs. Fired when the "FireInputX" input is triggered.
@@ -1659,6 +1660,7 @@ private:
 
 	// Underhell: fired when the player kicks this entity (uh_jake_kick).
 	COutputEvent m_OnKicked;
+	bool m_bUHKickableDoor;
 
 	QAngle			m_angAbsRotation;
 

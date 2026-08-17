@@ -295,6 +295,7 @@ CBaseEntity::CBaseEntity( bool bServerOnly )
 
 	m_bAlternateSorting = false;
 	m_bIsMirrorOnly = false;
+	m_bUHKickableDoor = true;
 	m_CollisionGroup = COLLISION_GROUP_NONE;
 	m_iParentAttachment = 0;
 	CollisionProp()->Init( this );
@@ -1803,6 +1804,7 @@ BEGIN_DATADESC_NO_BASE( CBaseEntity )
 
 	// Underhell: fired when the player kicks this entity (uh_jake_kick).
 	DEFINE_OUTPUT( m_OnKicked, "OnKicked" ),
+	DEFINE_KEYFIELD( m_bUHKickableDoor, FIELD_BOOLEAN, "kickable" ),
 
 	// Function Pointers
 	DEFINE_FUNCTION( SUB_Remove ),
