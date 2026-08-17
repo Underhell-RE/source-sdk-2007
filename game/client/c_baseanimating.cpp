@@ -2792,9 +2792,11 @@ int C_BaseAnimating::DrawModel( int flags )
 			if ( gpGlobals->curtime >= s_flNextJakeTargetLog )
 			{
 				s_flNextJakeTargetLog = gpGlobals->curtime + 1.0f;
-				Msg( "[UH render] Jake target DrawModel ent=%d local=%d mirrorOnly=%d pass=%d model=%s origin=%.1f %.1f %.1f\n",
+				const QAngle &debugAngles = GetAbsAngles();
+				Msg( "[UH render] Jake target DrawModel ent=%d local=%d mirrorOnly=%d pass=%d model=%s origin=%.1f %.1f %.1f angles=%.1f %.1f %.1f renderMode=%d alpha=%d effects=0x%x\n",
 					entindex(), this == pLocalPlayer, IsMirrorOnly(), g_bRenderingReflectiveGlass,
-					pszDebugModel, GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z );
+					pszDebugModel, GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z,
+					debugAngles.x, debugAngles.y, debugAngles.z, GetRenderMode(), GetRenderColor().a, GetEffects() );
 			}
 		}
 	}

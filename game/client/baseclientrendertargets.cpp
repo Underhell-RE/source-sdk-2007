@@ -80,13 +80,26 @@ void CBaseClientRenderTargets::InitClientRenderTargets( IMaterialSystem* pMateri
 	m_CustomCameraTexture[2].Init( CreateCustomCameraTexture( pMaterialSystem, 3, 512 ) );
 	m_CustomCameraTexture[3].Init( CreateCustomCameraTexture( pMaterialSystem, 4, 512 ) );
 
+	ITexture *pStandardCamera = m_CameraTexture;
+	Msg( "[UH render] allocated standard camera ptr=%p name=%s size=%dx%d format=%d flags=0x%08x rt=%d error=%d\n",
+		pStandardCamera, pStandardCamera ? pStandardCamera->GetName() : "<null>",
+		pStandardCamera ? pStandardCamera->GetActualWidth() : 0,
+		pStandardCamera ? pStandardCamera->GetActualHeight() : 0,
+		pStandardCamera ? pStandardCamera->GetImageFormat() : -1,
+		pStandardCamera ? pStandardCamera->GetFlags() : 0,
+		pStandardCamera ? pStandardCamera->IsRenderTarget() : 0,
+		pStandardCamera ? IsErrorTexture( pStandardCamera ) : 1 );
+
 	for ( int i = 0; i < 4; ++i )
 	{
 		ITexture *pTexture = m_CustomCameraTexture[i];
-		Msg( "[UH render] allocated custom camera %d ptr=%p name=%s size=%dx%d error=%d\n",
+		Msg( "[UH render] allocated custom camera %d ptr=%p name=%s size=%dx%d format=%d flags=0x%08x rt=%d error=%d\n",
 			i + 1, pTexture, pTexture ? pTexture->GetName() : "<null>",
 			pTexture ? pTexture->GetActualWidth() : 0,
 			pTexture ? pTexture->GetActualHeight() : 0,
+			pTexture ? pTexture->GetImageFormat() : -1,
+			pTexture ? pTexture->GetFlags() : 0,
+			pTexture ? pTexture->IsRenderTarget() : 0,
 			pTexture ? IsErrorTexture( pTexture ) : 1 );
 	}
 }
