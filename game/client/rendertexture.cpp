@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 // Implements local hooks into named renderable textures.
@@ -80,23 +80,14 @@ ITexture *GetCameraTexture( void )
 	return s_pCameraTexture;
 }
 
-static CTextureReference s_pCustomCameraTexture[4];
+extern ITexture *GetAllocatedCustomCameraTexture( int index );
+
 ITexture *GetCustomCameraTexture( int index )
 {
-	if ( index < 1 || index > 4 )
-		return GetCameraTexture();
-
-	CTextureReference &texture = s_pCustomCameraTexture[index - 1];
-	if ( !texture )
-	{
-		char name[64];
-		Q_snprintf( name, sizeof( name ), "_rt_CustomCamera_%d", index );
-		texture.Init( materials->FindTexture( name, TEXTURE_GROUP_RENDER_TARGET ) );
-		if ( IsErrorTexture( texture ) )
-			return GetCameraTexture();
-		AddReleaseFunc();
-	}
-	return texture;
+	// Original sub_10129C10 returns the CTextureReference allocated by the
+	// client-render-target singleton directly. Looking it up again by name can
+	// bind the material-system error/placeholder texture during level loading.
+	return GetAllocatedCustomCameraTexture( index );
 }
 
 //=============================================================================
@@ -266,8 +257,6 @@ void ReleaseRenderTargets( void )
 {
 	s_pPowerOfTwoFrameBufferTexture.Shutdown();
 	s_pCameraTexture.Shutdown();
-	for ( int i = 0; i < 4; ++i )
-		s_pCustomCameraTexture[i].Shutdown();
 	s_pWaterReflectionTexture.Shutdown();
 	s_pWaterRefractionTexture.Shutdown();
 	s_pQuarterSizedFB0.Shutdown();

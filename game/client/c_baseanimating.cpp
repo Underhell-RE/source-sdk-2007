@@ -35,7 +35,6 @@
 #include "vphysics/constraints.h"
 #include "ragdoll_shared.h"
 #include "view.h"
-#include "viewrender.h"
 #include "c_ai_basenpc.h"
 #include "c_entitydissolve.h"
 #include "saverestoretypes.h"
@@ -2785,9 +2784,7 @@ int C_BaseAnimating::DrawModel( int flags )
 	// Mirror-only entities normally draw only in reflective passes. The local
 	// player is the exception while OTS/third-person is active: the same body
 	// must be visible to the main camera.
-	const bool bMirrorView = g_bRenderingReflectiveGlass || CurrentViewID() == VIEW_MONITOR ||
-		CurrentViewID() == VIEW_REFLECTION || CurrentViewID() == VIEW_REFRACTION;
-	if ( IsMirrorOnly() && ( !cl_player_render_mirror.GetBool() || !bMirrorView ) )
+	if ( IsMirrorOnly() && !g_bRenderingCameraView )
 	{
 		C_BasePlayer *pLocal = C_BasePlayer::GetLocalPlayer();
 		if ( this != pLocal || !pLocal->AllowOvertheShoulderView() )

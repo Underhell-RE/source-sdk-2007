@@ -12,7 +12,6 @@
 #include "dlight.h"
 #include "iviewrender.h"
 #include "view.h"
-#include "viewrender.h"
 #include "iefx.h"
 #include "c_team.h"
 #include "clientmode.h"
@@ -1927,15 +1926,6 @@ int C_BaseEntity::DrawBrushModel( bool bSort, bool bShadowDepth )
 int C_BaseEntity::DrawModel( int flags )
 {
 	if ( !m_bReadyToDraw )
-		return 0;
-
-	// Underhell: mirror/monitor-only entities stay visible (in the leaf system)
-	// but are only actually drawn during the reflective/refractive glass pass,
-	// gated by cl_player_render_mirror. This is what hides the player model /
-	// ghost apparitions from the normal first-person world view.
-	const bool bMirrorView = g_bRenderingReflectiveGlass || CurrentViewID() == VIEW_MONITOR ||
-		CurrentViewID() == VIEW_REFLECTION || CurrentViewID() == VIEW_REFRACTION;
-	if ( m_bIsMirrorOnly && ( !cl_player_render_mirror.GetBool() || !bMirrorView ) )
 		return 0;
 
 	int drawn = 0;

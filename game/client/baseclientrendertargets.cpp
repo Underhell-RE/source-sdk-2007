@@ -95,7 +95,20 @@ void CBaseClientRenderTargets::ShutdownClientRenderTargets()
 		m_CustomCameraTexture[i].Shutdown();
 }
 
+ITexture *CBaseClientRenderTargets::GetCustomCameraTextureByIndex( int index )
+{
+	if ( index < 1 || index > 4 )
+		return NULL;
+	return m_CustomCameraTexture[index - 1];
+}
+
 static CBaseClientRenderTargets g_BaseClientRenderTargets;
+
+ITexture *GetAllocatedCustomCameraTexture( int index )
+{
+	return g_BaseClientRenderTargets.GetCustomCameraTextureByIndex( index );
+}
+
 IClientRenderTargets *g_pClientRenderTargets = &g_BaseClientRenderTargets;
 EXPOSE_SINGLE_INTERFACE_GLOBALVAR( CBaseClientRenderTargets, IClientRenderTargets,
 	CLIENTRENDERTARGETS_INTERFACE_VERSION, g_BaseClientRenderTargets );

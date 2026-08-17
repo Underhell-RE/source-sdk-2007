@@ -38,6 +38,7 @@ public:
 	virtual void InitClientRenderTargets ( IMaterialSystem* pMaterialSystem, IMaterialSystemHardwareConfig* pHardwareConfig );
 	// Shutdown all custom render targets here.
 	virtual void ShutdownClientRenderTargets ( void );
+	ITexture *GetCustomCameraTextureByIndex( int index );
 
 protected:
 	

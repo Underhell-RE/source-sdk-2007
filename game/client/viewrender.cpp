@@ -2885,9 +2885,9 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 	if ( !pCameraEnt )
 		return;
 
-#ifdef _DEBUG
+	// Original byte_10407398: mirror-only entities are drawable for the whole
+	// monitor render pass in release builds as well as debug builds.
 	g_bRenderingCameraView = true;
-#endif
 
 	// FIXME: this should check for the ability to do a render target maybe instead.
 	// FIXME: shouldn't have to truck through all of the visible entities for this!!!!
@@ -2903,6 +2903,16 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 
 		ITexture *pThisTarget = pCameraEnt->UsesCustomRenderTarget()
 			? GetCustomCameraTexture( pCameraEnt->GetRenderTargetIndex() ) : pCameraTarget;
+		if ( !pThisTarget )
+		{
+			Warning( "NULL Texture in Monitor Drawing\n" );
+			continue;
+		}
+		if ( IsErrorTexture( pThisTarget ) )
+		{
+			Warning( "Error Texture in Monitor Drawing\n" );
+			continue;
+		}
 		int width = pThisTarget->GetActualWidth();
 		int height = pThisTarget->GetActualHeight();
 
@@ -2922,9 +2932,7 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 		pRenderContext->PopRenderTargetAndViewport();
 	}
 
-#ifdef _DEBUG
 	g_bRenderingCameraView = false;
-#endif
 
 #endif // USE_MONITORS
 }
@@ -5639,11 +5647,13 @@ void CReflectiveGlassView::Draw()
 	bool bVisOcclusion = r_visocclusion.GetInt();
 	r_visocclusion.SetValue( 0 );
 		   
-	// Underhell: mirror-only entities (player model, ghost apparitions) draw
-	// only during this reflective pass.
+	// Original CReflectiveGlassView::Draw toggles the same camera-pass byte
+	// used by DrawMonitors (byte_10407398 / g_bRenderingCameraView).
+	g_bRenderingCameraView = true;
 	g_bRenderingReflectiveGlass = true;
 	BaseClass::Draw();
 	g_bRenderingReflectiveGlass = false;
+	g_bRenderingCameraView = false;
 
 	r_visocclusion.SetValue( bVisOcclusion );
 
