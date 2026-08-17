@@ -153,7 +153,9 @@ public:
 	const char *GetHeadcrabModel( void ) { return "models/headcrabclassic.mdl"; }
 	const char *GetLegsModel( void ) { return "models/zombie/zombie_soldier_legs.mdl"; }
 	const char *GetTorsoModel( void ) { return "models/zombie/zombie_soldier_torso.mdl"; }
-	bool CanBecomeLiveTorso() { return m_bCanBecomeTorso; }
+	bool CanBecomeLiveTorso() { return false; }
+	bool ShouldBecomeTorso( const CTakeDamageInfo &, float ) { return false; }
+	HeadcrabRelease_t ShouldReleaseHeadcrab( const CTakeDamageInfo &, float ) { return RELEASE_NO; }
 	const char *GetMoanSound( int nSound );
 	void PainSound( const CTakeDamageInfo &info );
 	void DeathSound( const CTakeDamageInfo &info );
@@ -218,7 +220,6 @@ private:
 
 	// Runtime
 	int         m_iInfectedVariant; // 0..7
-	bool        m_bCanBecomeTorso;
 	bool        m_bCanCower;
 	float       m_flSprintTime;
 	float       m_flSprintRestTime;
@@ -249,7 +250,6 @@ BEGIN_DATADESC( CNPC_UH_Infected )
 	DEFINE_KEYFIELD( m_bDisableUrban, FIELD_BOOLEAN, "urban" ),
 
 	DEFINE_FIELD( m_iInfectedVariant, FIELD_INTEGER ),
-	DEFINE_FIELD( m_bCanBecomeTorso, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bCanCower, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flSprintTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flSprintRestTime, FIELD_TIME ),
@@ -373,7 +373,6 @@ CNPC_UH_Infected::CNPC_UH_Infected() : m_DurationDoorBash( 2.0f, 6.0f ), m_NextT
 	m_flDoorBashYaw = 0.0f;
 	m_flSpeedModifier = 0.0f;
 	m_iInfectedVariant = -1;
-	m_bCanBecomeTorso = true;
 	m_bCanCower = false;
 	m_flSprintTime = 0.0f;
 	m_flSprintRestTime = 0.0f;
@@ -507,7 +506,6 @@ void CNPC_UH_Infected::ApplyBodygroups( void )
 
 	int arms = FindBodygroupByName( "arms" );
 	if ( arms >= 0 ) SetBodygroup( arms, min( armState, GetBodygroupCount( arms ) - 1 ) );
-	m_bCanBecomeTorso = ( type == 1 || type == 2 || type == 6 ) ? ( armState != 3 ) : ( armState < 6 );
 
 	int head = FindBodygroupByName( "head" );
 	int body = FindBodygroupByName( "body" );
@@ -617,6 +615,16 @@ void CNPC_UH_Infected::Spawn( void )
 	CapabilitiesAdd( bits_CAP_MOVE_JUMP | bits_CAP_MOVE_CLIMB | bits_CAP_USE_WEAPONS );
 
 	BaseClass::Spawn();
+
+	// Infected weapon animations and arm-state checks are authored for melee
+	// equipment only. Reject a mapper-supplied firearm as well as world pickups.
+	CBaseCombatWeapon *pSpawnWeapon = GetActiveWeapon();
+	if ( pSpawnWeapon && !pSpawnWeapon->GetWpnData().m_bMeleeWeapon )
+	{
+		Weapon_Drop( pSpawnWeapon, NULL, NULL );
+		UTIL_Remove( pSpawnWeapon );
+	}
+
 	// The original overrides SequenceDuration as baseDuration / speed scale.
 	// SDK 2007's SequenceDuration is non-virtual, so playback rate is the
 	// source-level equivalent available to this reconstruction.
@@ -891,8 +899,9 @@ void CNPC_UH_Infected::BuildScheduleTestBits( void )
 	if ( IsCurSchedule( SCHED_NEW_WEAPON ) )
 	{
 		CBaseEntity *pEnemy = GetEnemy();
-		CBaseEntity *pWeapon = Weapon_FindUsable( Vector( 540, 540, 100 ) );
-		if ( pEnemy && pWeapon &&
+		CBaseCombatWeapon *pWeapon = dynamic_cast<CBaseCombatWeapon *>(
+			Weapon_FindUsable( Vector( 540, 540, 100 ) ) );
+		if ( pEnemy && pWeapon && pWeapon->GetWpnData().m_bMeleeWeapon &&
 			WorldSpaceCenter().DistTo( pEnemy->WorldSpaceCenter() ) <=
 			WorldSpaceCenter().DistTo( pWeapon->WorldSpaceCenter() ) )
 		{
@@ -929,12 +938,15 @@ int CNPC_UH_Infected::SelectSchedule( void )
 	{
 		CBaseCombatWeapon *pWeapon = dynamic_cast<CBaseCombatWeapon *>(
 			Weapon_FindUsable( Vector( 540, 540, 100 ) ) );
-		if ( pWeapon )
+		if ( pWeapon && pWeapon->GetWpnData().m_bMeleeWeapon )
 		{
 			pWeapon->Lock( 10.0f, this );
 			SetTarget( pWeapon );
 			return SCHED_NEW_WEAPON;
 		}
+
+		// Do not let BaseZombie's fallback schedule pick up firearms.
+		ClearCondition( COND_BETTER_WEAPON_AVAILABLE );
 	}
 
 	if ( HasCondition( COND_HEAR_FMRADIO ) && !HasCondition( COND_SEE_ENEMY ) )

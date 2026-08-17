@@ -3554,10 +3554,6 @@ BEGIN_DATADESC(CBasePropDoor)
 	DEFINE_FIELD(m_bLocked, FIELD_BOOLEAN),
 	//DEFINE_KEYFIELD(m_flBlockDamage, FIELD_FLOAT, "dmg"),
 	DEFINE_KEYFIELD( m_bForceClosed, FIELD_BOOLEAN, "forceclosed" ),
-	DEFINE_FIELD( m_bUHBreachPresentation, FIELD_BOOLEAN ),
-	DEFINE_FIELD( m_flUHSavedSpeed, FIELD_FLOAT ),
-	DEFINE_FIELD( m_iUHSavedSequence, FIELD_INTEGER ),
-	DEFINE_FIELD( m_iUHSavedSpawnFlags, FIELD_INTEGER ),
 	DEFINE_FIELD(m_eDoorState, FIELD_INTEGER),
 	DEFINE_FIELD( m_hMaster, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_hBlocker, FIELD_EHANDLE ),
@@ -3594,10 +3590,6 @@ END_SEND_TABLE()
 CBasePropDoor::CBasePropDoor( void )
 {
 	m_hMaster = NULL;
-	m_bUHBreachPresentation = false;
-	m_flUHSavedSpeed = 0.0f;
-	m_iUHSavedSequence = 0;
-	m_iUHSavedSpawnFlags = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -4572,17 +4564,6 @@ bool CBasePropDoor::NPCOpenDoor( CAI_BaseNPC *pNPC )
 void CBasePropDoor::UHBreachDoor( CBaseEntity *pActivator, CBaseEntity *pCaller,
 	bool bNPCBreach, const Vector &vecImpact )
 {
-	// A second kick restores presentation fields saved by an earlier breach
-	// before beginning the next transition.
-	if ( m_bUHBreachPresentation )
-	{
-		m_flSpeed = m_flUHSavedSpeed;
-		SetSequence( m_iUHSavedSequence );
-		ClearSpawnFlags();
-		AddSpawnFlags( m_iUHSavedSpawnFlags );
-		m_bUHBreachPresentation = false;
-	}
-
 	if ( IsDoorLocked() )
 		return;
 
@@ -4595,31 +4576,27 @@ void CBasePropDoor::UHBreachDoor( CBaseEntity *pActivator, CBaseEntity *pCaller,
 	}
 #endif
 
-	bool bForceOpen = bNPCBreach || ( !IsDoorOpening() && !IsDoorOpen() );
-	if ( !bForceOpen )
+	// Keep the door's authored opening/closing sequence intact. Only alter the
+	// movement speed and direction; forcing/resetting its current sequence here
+	// corrupts animation state on models with nonstandard door sequences.
+	m_bForceClosed = true;
+	m_flSpeed = uh_door_bash_speed.GetFloat();
+
+	if ( bNPCBreach || ( !IsDoorOpening() && !IsDoorOpen() ) )
+	{
+		DoorOpen( pCaller ? pCaller : pActivator );
+	}
+	else
 	{
 		Vector forward;
 		GetVectors( &forward, NULL, NULL );
 		Vector toImpact = vecImpact - GetAbsOrigin();
-		// Kicking from the opposite face reverses an already moving/open door.
-		bForceOpen = DotProduct( forward, toImpact ) >= 0.0f;
-		if ( !bForceOpen )
-		{
+		if ( DotProduct( forward, toImpact ) >= 0.0f )
+			DoorOpen( pCaller ? pCaller : pActivator );
+		else
 			DoorClose();
-			EmitSound( "Metal.Door_Breach" );
-			return;
-		}
 	}
 
-	m_flUHSavedSpeed = m_flSpeed;
-	m_iUHSavedSequence = GetSequence();
-	m_iUHSavedSpawnFlags = GetSpawnFlags();
-	m_bUHBreachPresentation = true;
-	m_bForceClosed = true;
-	m_flSpeed = uh_door_bash_speed.GetFloat();
-	ResetSequenceInfo();
-	AddSpawnFlags( SF_DOOR_SILENT );
-	DoorOpen( pCaller ? pCaller : pActivator );
 	EmitSound( "Metal.Door_Breach" );
 }
 

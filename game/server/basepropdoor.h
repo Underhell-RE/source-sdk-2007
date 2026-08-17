@@ -186,12 +186,6 @@ private:
 
 	bool m_bForceClosed;			// True if this door must close no matter what.
 
-	// Presentation state saved while an Underhell breach forces the authored door animation.
-	bool  m_bUHBreachPresentation;
-	float m_flUHSavedSpeed;
-	int   m_iUHSavedSequence;
-	int   m_iUHSavedSpawnFlags;
-
 	string_t m_SoundMoving;
 	string_t m_SoundOpen;
 	string_t m_SoundClose;
