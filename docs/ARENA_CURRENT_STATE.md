@@ -52,11 +52,11 @@ Several changes below improve a concrete discrepancy, but an improvement must no
   - update cadence: `0.25 s`;
   - decal only after >4 units of X/Y body motion;
   - stationary held bodies no longer continuously paint blood.
-- Carrying body weight state was added:
-  - player records `m_hCarryingRagdoll` and saved speed;
-  - bodies above mass 10 reduce speed to one third;
-  - state is restored when the pickup controller no longer holds the corpse.
-  - **Not complete:** client mouse/sensitivity damping from `uh_bodymousedamper` is still absent.
+- Corpse carry penalties now follow decoded `sub_102E1350`/pickup shutdown:
+  - player records `m_hCarryingRagdoll` and original `m_fSavedSensitivity`;
+  - a full body is identified by `ragdoll.listCount > 10` (the old code incorrectly tested root-object mass);
+  - speed is fixed to `hl2_normspeed / 3` and mouse sensitivity to `saved / uh_bodymousedamper`;
+  - release restores `hl2_normspeed` and the exact saved sensitivity.
 - Ragdoll hitgroup recovery walks ragdoll physics parent elements to map physics bones back to hitgroups.
 - Dismemberment tracks head/arm/leg accumulated damage, helmet damage, and prevents duplicate transitions through bodygroup state.
 - Corrected bodygroup lookup to tolerate `arms`/`Arms`, `legs`/`Legs`, etc.
@@ -232,7 +232,9 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
 - Bandage item use preserves the inventory slot and plays denial when no health/bleed effect is possible.
 - Radio/cracker activation was adjusted: delayed initial activation, stable track selection, radio sound insertion, no fake timed cracker explosion, pickup restrictions while active.
 - Failed active radio/cracker creation preserves inventory slot.
-- Glowstick skin/inventory color and active-prop lifetime were changed toward decoded behavior.
+- Glowstick visuals now use original even/odd `m_nSkin` pairs, hidden active props, `CPhysicsProp::CreateFlare(360)` fuse effects, and release the previous lit prop with physics when replaced/dropped.
+- Flare packs now create the original held viewmodel fuse effect; thrown flares use `CPhysicsProp::CreateFlare`, share the total 90-second burn from equip time, use `uh_flare_throw_scale 1200`, collision group 3 and angular velocity `(200,200,200)`.
+- Inventory world styling now writes `m_nSkin` at the decoded CBaseAnimating field instead of incorrectly changing bodygroups.
 - Added `item_gasmask_prison` due corpse gear drop requirements.
 - Heavy armor, apple, banana, soda and basic armor received partial value/skin fixes.
 

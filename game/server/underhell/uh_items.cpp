@@ -12,6 +12,7 @@
 #include "ammodef.h"
 #include "gamerules.h"
 #include "hl2_player.h"
+#include "props.h"
 #include "uh_items.h"
 #include "explode.h"
 #include "soundent.h"
@@ -349,8 +350,6 @@ bool CItemGlowStick::MyTouch( CBasePlayer *pPlayer )
 //-----------------------------------------------------------------------------
 void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
-	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
-	// path lights it.
 	if ( useType != USE_ON )
 	{
 		BaseClass::Use( pActivator, pCaller, useType, value );
@@ -358,56 +357,48 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	}
 
 	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
-	if ( !pPlayer )
-		return;
+	if ( !pPlayer ) return;
+	const int iItem = (int)value;
 
-	int iItem = (int)value;
-	Color glowColor = UH_GetGlowstickColor( iItem );
-
-	// Replace any existing lit glowstick with the new one.
+	// Activating another stick releases the previous hidden lit prop at the
+	// player's feet. sub_101742D0 restores draw/solid/physics before replacing
+	// m_hActiveGlowStick and clears the old lit inventory entry.
 	CBaseEntity *pOldGlow = pPlayer->UH_GetActiveGlowStick();
 	if ( pOldGlow )
 	{
-		UTIL_Remove( pOldGlow );
+		pOldGlow->RemoveEffects( EF_NODRAW | EF_NOSHADOW );
+		pOldGlow->RemoveSolidFlags( FSOLID_NOT_SOLID );
+		pOldGlow->SetSolid( SOLID_VPHYSICS );
+		if ( !pOldGlow->VPhysicsGetObject() )
+			pOldGlow->VPhysicsInitNormal( SOLID_VPHYSICS, 0, false );
+		pOldGlow->SetAbsOrigin( pPlayer->GetAbsOrigin() );
 		pPlayer->UH_SetActiveGlowStick( NULL );
+		for ( int id = UH_ITEM_LIT_GLOWSTICK_FIRST; id <= UH_ITEM_LIT_GLOWSTICK_LAST; ++id )
+		{
+			int slot = pPlayer->UH_FindInventoryItem( id );
+			if ( slot >= 0 ) { pPlayer->UH_RemoveInventoryItem( slot ); break; }
+		}
 	}
 
-	// The original uses a prop_physics (sub_101742D0) and lights it via
-	// EF_BRIGHTLIGHT (dlight tinted by m_clrRender) + EF_NOSHADOW + a glow
-	// render mode, then straps it to the player. Match that: prop_dynamic has
-	// no physics/dlight path and produced no visible light.
 	CBaseEntity *pGlow = CreateEntityByName( "prop_physics" );
-	if ( !pGlow )
-		return;
-
+	if ( !pGlow ) return;
 	pGlow->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
-	static_cast<CBaseAnimating *>( pGlow )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
-
+	pGlow->GetBaseAnimating()->m_nSkin = UH_GetGlowstickBodyGroup( iItem ); // 0/2/4/6/8 unlit skins
 	pGlow->SetAbsOrigin( pPlayer->GetAbsOrigin() + Vector( 0, 0, 36 ) );
 	pGlow->SetAbsAngles( pPlayer->GetAbsAngles() );
-
-	pGlow->Spawn();
-
-	// It rides on the player's waist and must not collide: drop the physics
-	// object prop_physics created and make it non-solid (keeps the dlight).
-	pGlow->SetSolid( SOLID_NONE );
+	pGlow->AddEffects( EF_NODRAW | EF_NOSHADOW );
 	pGlow->AddSolidFlags( FSOLID_NOT_SOLID );
-	pGlow->VPhysicsDestroyObject();
+	pGlow->SetSolid( SOLID_NONE );
+	DispatchSpawn( pGlow );
 
-	pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
-	pGlow->SetRenderMode( kRenderGlow );
-	pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
-
-	// The original creates the lit prop at player origin + 36 and records it
-	// as the active glowstick; it does not parent a visible model to the waist.
-	// Parenting was our reconstruction and is the reason a glowstick rendered
-	// permanently on the belt.
+	// CPhysicsProp::CreateFlare is the exact Source helper reached through
+	// sub_1020FA00: env_flare at "fuse", 360 s burn, owner cleanup at +5 s.
+	CBreakableProp *pProp = dynamic_cast<CBreakableProp *>( pGlow );
+	if ( pProp ) pProp->CreateFlare( 360.0f );
+	pGlow->GetBaseAnimating()->m_nSkin = pGlow->GetBaseAnimating()->m_nSkin + 1; // odd = lit
 	pGlow->SetOwnerEntity( pPlayer );
-	pGlow->SetContextThink( &CBaseEntity::SUB_Remove, gpGlobals->curtime + 360.0f, "GlowStickLifetime" );
-
 	pPlayer->UH_SetActiveGlowStick( pGlow );
 	pPlayer->EmitSound( "glowstick.crack" );
-
 	UTIL_Remove( this );
 }
 

@@ -47,7 +47,7 @@ static ConVar uh_maxseragdolls( "uh_maxseragdolls", "16", FCVAR_ARCHIVE,
 	"Max server-side ragdolls before the oldest becomes a client ragdoll." );
 static ConVar uh_ragdollcollisiontype( "uh_ragdollcollisiontype", "1", FCVAR_ARCHIVE,
 	"Collision group for server-side ragdolls (-1 = client-side, 0-19 = group)." );
-static ConVar uh_bodymousedamper( "uh_bodymousedamper", "4", FCVAR_ARCHIVE,
+ConVar uh_bodymousedamper( "uh_bodymousedamper", "4", FCVAR_ARCHIVE,
 	"Mouse sensitivity divider while dragging a ragdoll (weight illusion)." );
 static ConVar uh_maxitems( "uh_maxitems", "32", FCVAR_ARCHIVE,
 	"Limit on enemy-dropped items/objects." );

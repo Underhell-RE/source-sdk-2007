@@ -12,6 +12,7 @@
 
 #include "cbase.h"
 #include "hl2_player.h"
+#include "props.h"
 
 #include "underhell/uh_inventory.h"
 #include "underhell/uh_items.h"
@@ -125,27 +126,36 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 	Vector vecOrigin = EyePosition() + vecForward * 56.0f + Vector( 0, 0, 64.0f );
 	QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
 
-	// Glowsticks (unlit 14..18 AND lit 19..23) drop as a coloured lit prop.
-	// The lit ids have classname "nothing" (no world entity), so they must be
-	// spawned as a glowstick prop directly instead of going through
-	// CreateEntityByName("nothing"), which returns NULL and lost the item.
+	// Original drop switch uses the individual stick model and m_nSkin
+	// 0/2/4/6/8. Lit inventory ids release the tracked flare prop.
 	if ( UH_IsGlowstick( iItem ) || UH_IsLitGlowstick( iItem ) )
 	{
-		CBaseEntity *pGlow = CreateEntityByName( "prop_physics" );
-		if ( !pGlow )
+		CBaseEntity *pGlow = UH_IsLitGlowstick( iItem ) ? UH_GetActiveGlowStick() : NULL;
+		if ( pGlow )
+		{
+			pGlow->RemoveEffects( EF_NODRAW | EF_NOSHADOW );
+			pGlow->RemoveSolidFlags( FSOLID_NOT_SOLID );
+			pGlow->SetSolid( SOLID_VPHYSICS );
+			if ( !pGlow->VPhysicsGetObject() ) pGlow->VPhysicsInitNormal( SOLID_VPHYSICS, 0, false );
+			pGlow->SetAbsOrigin( vecOrigin );
+			pGlow->SetAbsAngles( angItem );
+			UH_SetActiveGlowStick( NULL );
 			return;
+		}
 
+		pGlow = CreateEntityByName( "prop_physics" );
+		if ( !pGlow ) return;
 		pGlow->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
-		static_cast<CBaseAnimating *>( pGlow )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
-
-		Color glowColor = UH_GetGlowstickColor( iItem );
-		pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
-		pGlow->SetRenderMode( kRenderGlow );
-		pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
-
 		pGlow->SetAbsOrigin( vecOrigin );
 		pGlow->SetAbsAngles( angItem );
-		pGlow->Spawn();
+		DispatchSpawn( pGlow );
+		pGlow->GetBaseAnimating()->m_nSkin = UH_GetGlowstickBodyGroup( iItem ) + ( UH_IsLitGlowstick( iItem ) ? 1 : 0 );
+		if ( UH_IsLitGlowstick( iItem ) )
+		{
+			CBreakableProp *pProp = dynamic_cast<CBreakableProp *>( pGlow );
+			if ( pProp ) pProp->CreateFlare( 360.0f );
+			pGlow->AddEffects( EF_NOSHADOW );
+		}
 		return;
 	}
 
@@ -169,13 +179,11 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 
 	default:
 		{
-			// TODO: original wrote the body group on a raw field (entity
-			// offset +212) — verify the exact member (m_nBody? m_nSkin?).
-			int iBodyGroup = UH_GetDropBodyGroup( iItem );
-			if ( iBodyGroup >= 0 )
-			{
-				static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, iBodyGroup );
-			}
+			// Original raw +212 (CBaseAnimating +848) is m_nSkin, not a
+			// bodygroup. Using SetBodygroup selected unrelated geometry.
+			int iSkin = UH_GetDropBodyGroup( iItem );
+			if ( iSkin >= 0 && pItem->GetBaseAnimating() )
+				pItem->GetBaseAnimating()->m_nSkin = iSkin;
 		}
 		break;
 	}

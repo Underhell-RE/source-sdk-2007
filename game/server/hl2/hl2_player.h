@@ -563,6 +563,8 @@ private:
 	// prediction); the rest is server-local (matches the original binary).
 	CNetworkVar( bool, m_bLeftArmDeployed );	// left arm raised
 	CNetworkVar( bool, m_bHoldingFlare );		// holding a flare (throws flare, not grenade)
+	float				m_flFlareStartTime;		// total 90 s burn starts when equipped
+	EHANDLE				m_hHeldFlareEffect;		// env_flare parented to viewmodel fuse
 	bool				m_bFlareMarker;			// grenade throw anim in progress
 	bool				m_bFlashlightHolstered;	// flashlight holstered in the left hand
 
@@ -576,7 +578,7 @@ private:
 	int					m_iEHealthCount;		// consecutive bleed-deaths (zeroes endurance at 10)
 	EHANDLE				m_hActiveGlowStick;		// lit glowstick prop parented to the player (original @2164)
 	EHANDLE				m_hCarryingRagdoll;		// original m_pCarryingRagdoll @2180
-	float				m_flCarryingRagdollSavedSpeed;
+	float				m_fSavedSensitivity;
 	Vector				m_vecUHFreeAimTarget;	// update_freeaim world target (original player floats @526..528)
 
 	// Underhell: block the "DropWeapon" command (set by the map via

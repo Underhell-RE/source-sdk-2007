@@ -329,7 +329,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_hCarryingRagdoll, FIELD_EHANDLE ),
-	DEFINE_FIELD( m_flCarryingRagdollSavedSpeed, FIELD_FLOAT ),
+	DEFINE_FIELD( m_fSavedSensitivity, FIELD_FLOAT ),
 	DEFINE_FIELD( m_vecUHFreeAimTarget, FIELD_VECTOR ),
 	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
@@ -346,6 +346,8 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_SOUNDPATCH( m_pGasMaskBreathLoop ),
 	DEFINE_FIELD( m_bLeftArmDeployed, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bHoldingFlare, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_flFlareStartTime, FIELD_TIME ),
+	DEFINE_FIELD( m_hHeldFlareEffect, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_bFlareMarker, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bFlashlightHolstered, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bDisableWeaponDrop, FIELD_BOOLEAN ),
@@ -475,10 +477,12 @@ CHL2_Player::CHL2_Player()
 	// Underhell second hand defaults.
 	m_bLeftArmDeployed = false;
 	m_bHoldingFlare = false;
+	m_flFlareStartTime = 0.0f;
+	m_hHeldFlareEffect = NULL;
 	m_bFlareMarker = false;
 	m_bFlashlightHolstered = false;
 	m_hCarryingRagdoll = NULL;
-	m_flCarryingRagdollSavedSpeed = 0.0f;
+	m_fSavedSensitivity = 0.0f;
 	m_vecUHFreeAimTarget = vec3_origin;
 
 	UH_InitializeInventory();

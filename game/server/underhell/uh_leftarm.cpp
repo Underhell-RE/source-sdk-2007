@@ -18,6 +18,7 @@
 
 #include "cbase.h"
 #include "hl2_player.h"
+#include "props.h"
 #include "baseviewmodel_shared.h"
 #include "ammodef.h"
 #include "grenade_frag.h"
@@ -31,7 +32,9 @@ static const char *UH_LEFTARM_FLARE      = "models/weapons/v_flare_pg.mdl";
 static const char *UH_FLARE_PROP         = "models/PG_props/pg_obj/pg_flare.mdl";
 
 #define UH_THROW_STAGE_DELAY  0.4f   // command -> grenade actually leaves the hand
-#define UH_FLARE_FUSE         90.0f  // seconds a thrown flare burns
+#define UH_FLARE_FUSE         90.0f  // total burn starts when equipped
+static ConVar uh_flare_throw_scale( "uh_flare_throw_scale", "1200", FCVAR_ARCHIVE );
+CBaseEntity *CreateFlare( Vector vOrigin, QAngle angles, CBaseEntity *pOwner, float flDuration );
 #define UH_GRENADE_TIMER      3.0f   // frag detonation fuse (vanilla GRENADE_TIMER)
 
 //-----------------------------------------------------------------------------
@@ -192,7 +195,22 @@ CBaseCombatWeapon *CHL2_Player::UH_FindOneHandedWeapon( void )
 void CHL2_Player::UH_EquipFlare( void )
 {
 	m_bHoldingFlare = true;
+	m_flFlareStartTime = gpGlobals->curtime;
 	UH_UpdateLeftArm();
+
+	if ( m_hHeldFlareEffect ) UTIL_Remove( m_hHeldFlareEffect );
+	m_hHeldFlareEffect = NULL;
+	CBaseViewModel *pVM = GetViewModel( 1 );
+	if ( pVM )
+	{
+		Vector org; QAngle ang;
+		int attachment = pVM->LookupAttachment( "fuse" );
+		if ( attachment > 0 && pVM->GetAttachment( attachment, org, ang ) )
+		{
+			m_hHeldFlareEffect = CreateFlare( org, ang, pVM, UH_FLARE_FUSE );
+			if ( m_hHeldFlareEffect ) m_hHeldFlareEffect->SetParent( pVM, attachment );
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -286,37 +304,36 @@ void CHL2_Player::UH_ThrowFlare( void )
 {
 	Vector vecForward;
 	EyeVectors( &vecForward );
+	VectorNormalize( vecForward );
+	Vector vecSrc = Weapon_ShootPosition();
 
-	Vector vecSrc = EyePosition() + vecForward * 16.0f;
+	if ( m_hHeldFlareEffect )
+	{
+		UTIL_Remove( m_hHeldFlareEffect );
+		m_hHeldFlareEffect = NULL;
+	}
 
 	CBaseEntity *pFlare = CreateEntityByName( "prop_physics" );
-	if ( !pFlare )
-		return;
-
+	if ( !pFlare ) return;
 	pFlare->SetModel( UH_FLARE_PROP );
 	pFlare->SetAbsOrigin( vecSrc );
 	pFlare->SetAbsAngles( GetAbsAngles() );
 	DispatchSpawn( pFlare );
+	pFlare->SetCollisionGroup( COLLISION_GROUP_INTERACTIVE_DEBRIS );
 
-	// Light the flare: glow render mode + a dlight tint so it actually emits
-	// light when thrown (matches the original's lit flare prop).
-	pFlare->SetRenderColor( 255, 200, 80 );
-	pFlare->SetRenderMode( kRenderGlow );
-	pFlare->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
+	const float flRemaining = max( 0.1f, m_flFlareStartTime + UH_FLARE_FUSE - gpGlobals->curtime );
+	CBreakableProp *pProp = dynamic_cast<CBreakableProp *>( pFlare );
+	if ( pProp ) pProp->CreateFlare( flRemaining );
 
-	// Throw velocity (original: view direction * 200).
 	IPhysicsObject *pPhys = pFlare->VPhysicsGetObject();
 	if ( pPhys )
 	{
-		Vector vecVel = vecForward * 200.0f + Vector( 0, 0, 40.0f );
-		AngularImpulse angImp( 0, 0, 0 );
+		Vector vecVel = vecForward * uh_flare_throw_scale.GetFloat();
+		AngularImpulse angImp( 200.0f, 200.0f, 200.0f );
 		pPhys->SetVelocity( &vecVel, &angImp );
 	}
 
-	// Burn out after the fuse.
-	pFlare->SetThink( &CBaseEntity::SUB_Remove );
-	pFlare->SetNextThink( gpGlobals->curtime + UH_FLARE_FUSE );
-
 	m_bHoldingFlare = false;
+	m_flFlareStartTime = 0.0f;
 	UH_UpdateLeftArm();
 }
