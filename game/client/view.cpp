@@ -1,4 +1,4 @@
-//===== Copyright © 1996-2005, Valve Corporation, All rights reserved. ======//
+//===== Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: 
 //
@@ -74,9 +74,8 @@ ConVar zoom_sensitivity_ratio( "zoom_sensitivity_ratio", "1.0", 0, "Additional m
 CViewRender g_DefaultViewRender;
 IViewRender *view = NULL;	// set in cldll_client_init.cpp if no mod creates their own
 
-#if _DEBUG
+// Underhell monitor/mirror render-pass state; required in release builds.
 bool g_bRenderingCameraView = false;
-#endif
 
 static Vector g_vecRenderOrigin(0,0,0);
 static QAngle g_vecRenderAngles(0,0,0);
