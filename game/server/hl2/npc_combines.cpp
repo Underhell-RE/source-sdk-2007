@@ -150,14 +150,14 @@ void CNPC_CombineS::PainSound( const CTakeDamageInfo &info )
 	const float flHealthRatio = (float)GetHealth() / (float)max( 1, GetMaxHealth() );
 	const char *pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_PAIN" : "COMBINE_PAIN";
 
-	if ( !HasMemory( bits_MEMORY_PAIN_LIGHT_SOUND ) && flHealthRatio > 0.9f )
+	if ( !HasMemory( bits_MEMORY_CUSTOM1 ) && flHealthRatio > 0.9f )
 	{
-		Remember( bits_MEMORY_PAIN_LIGHT_SOUND );
+		Remember( bits_MEMORY_CUSTOM1 );
 		pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_TAUNT" : "COMBINE_TAUNT";
 	}
-	else if ( !HasMemory( bits_MEMORY_PAIN_HEAVY_SOUND ) && flHealthRatio <= 0.5f )
+	else if ( !HasMemory( bits_MEMORY_CUSTOM2 ) && flHealthRatio <= 0.5f )
 	{
-		Remember( bits_MEMORY_PAIN_HEAVY_SOUND );
+		Remember( bits_MEMORY_CUSTOM2 );
 		pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_COVER" : "COMBINE_COVER";
 	}
 
