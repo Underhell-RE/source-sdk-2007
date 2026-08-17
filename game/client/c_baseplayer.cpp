@@ -7,6 +7,9 @@
 //===========================================================================//
 #include "cbase.h"
 #include "c_baseplayer.h"
+#ifdef HL2_CLIENT_DLL
+#include "c_basehlplayer.h"
+#endif
 #include "flashlighteffect.h"
 #include "weapon_selection.h"
 #include "history_resource.h"

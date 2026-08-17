@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: This is the soldier version of the combine, analogous to the HL1 grunt.
 //
@@ -57,6 +57,7 @@ extern Activity ACT_WALK_MARCH;
 void CNPC_CombineS::Spawn( void )
 {
 	Precache();
+	m_flNextUHPainSoundTime = 0.0f;
 	SetModel( STRING( GetModelName() ) );
 
 	if( IsElite() )
@@ -137,13 +138,54 @@ void CNPC_CombineS::Precache()
 }
 
 
+void CNPC_CombineS::PainSound( const CTakeDamageInfo &info )
+{
+	if ( ( GetFlags() & FL_DISSOLVING ) || gpGlobals->curtime <= m_flNextUHPainSoundTime )
+		return;
+
+	// sub_1033FA10. This signature is the CAI_BaseNPC virtual; the old
+	// parameterless CNPC_Combine::PainSound never overrode it, which made
+	// npc_combine_s silent when wounded.
+	const bool bPrisonGuard = V_stristr( STRING( GetModelName() ), "prisonguard" ) != NULL;
+	const float flHealthRatio = (float)GetHealth() / (float)max( 1, GetMaxHealth() );
+	const char *pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_PAIN" : "COMBINE_PAIN";
+
+	if ( !HasMemory( bits_MEMORY_PAIN_LIGHT_SOUND ) && flHealthRatio > 0.9f )
+	{
+		Remember( bits_MEMORY_PAIN_LIGHT_SOUND );
+		pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_TAUNT" : "COMBINE_TAUNT";
+	}
+	else if ( !HasMemory( bits_MEMORY_PAIN_HEAVY_SOUND ) && flHealthRatio <= 0.5f )
+	{
+		Remember( bits_MEMORY_PAIN_HEAVY_SOUND );
+		pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_COVER" : "COMBINE_COVER";
+	}
+
+	GetSentences()->Speak( pszSentence, SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
+	m_flNextUHPainSoundTime = gpGlobals->curtime + 1.0f;
+}
+
 void CNPC_CombineS::DeathSound( const CTakeDamageInfo &info )
 {
-	// NOTE: The response system deals with this at the moment
 	if ( GetFlags() & FL_DISSOLVING )
 		return;
 
-	GetSentences()->Speak( "COMBINE_DIE", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS ); 
+	// Original sub_10359D10 chooses a dedicated scream when a lethal hit has
+	// removed an arm or leg. Prison guards use their own sentence groups.
+	const bool bPrisonGuard = V_stristr( STRING( GetModelName() ), "prisonguard" ) != NULL;
+	const int nRoll = random->RandomInt( 0, 99 );
+	const bool bLostArm = ( m_nUHSeveredParts & ( ( 1u << 1 ) | ( 1u << 2 ) ) ) != 0;
+	const bool bLostLeg = ( m_nUHSeveredParts & ( ( 1u << 3 ) | ( 1u << 4 ) ) ) != 0;
+
+	const char *pszSentence;
+	if ( bLostArm && nRoll <= 35 )
+		pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_LOSTARM" : "COMBINE_LOSTARM";
+	else if ( bLostLeg && nRoll >= 36 && nRoll <= 69 )
+		pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_LOSTLEG" : "COMBINE_LOSTLEG";
+	else
+		pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_DIE" : "COMBINE_DIE";
+
+	GetSentences()->Speak( pszSentence, SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
 }
 
 
@@ -442,6 +484,7 @@ Activity CNPC_CombineS::NPC_TranslateActivity( Activity eNewActivity )
 //---------------------------------------------------------
 BEGIN_DATADESC( CNPC_CombineS )
 
+	DEFINE_FIELD( m_flNextUHPainSoundTime, FIELD_TIME ),
 	DEFINE_KEYFIELD( m_iUseMarch, FIELD_INTEGER, "usemarch" ),
 
 END_DATADESC()
