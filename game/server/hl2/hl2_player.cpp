@@ -335,6 +335,8 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flLastBleedTickBase, FIELD_TIME ),
 	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_hUHLookGlowTarget, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_flNextUHLookGlowTime, FIELD_TIME ),
 	DEFINE_FIELD( m_hCarryingRagdoll, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_fSavedSensitivity, FIELD_FLOAT ),
 	DEFINE_FIELD( m_vecUHFreeAimTarget, FIELD_VECTOR ),
@@ -500,6 +502,8 @@ CHL2_Player::CHL2_Player()
 	m_hCarryingRagdoll = NULL;
 	m_fSavedSensitivity = 0.0f;
 	m_vecUHFreeAimTarget = vec3_origin;
+	m_hUHLookGlowTarget = NULL;
+	m_flNextUHLookGlowTime = 0.0f;
 	m_bBulletTimeDisabled = true;
 
 	UH_InitializeInventory();
@@ -903,6 +907,8 @@ void CHL2_Player::PreThink(void)
 	CheckSuitZoom();
 	VPROF_SCOPE_END();
 
+	UH_UpdateLookGlow();
+
 	if (m_lifeState >= LIFE_DYING)
 	{
 		PlayerDeathThink();
@@ -913,7 +919,7 @@ void CHL2_Player::PreThink(void)
 	CheckFlashlight();
 #endif	// HL2_EPISODIC
 
-	// Underhell: drain the flashlight battery while the light is on.
+	// Underhell flashlight battery.
 	UH_UpdateFlashlightBattery();
 
 	// So the correct flags get sent to client asap.

@@ -1,4 +1,4 @@
-//===== Copyright © 1996-2005, Valve Corporation, All rights reserved. ======//
+//===== Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: 
 //
@@ -477,8 +477,10 @@ BEGIN_RECV_TABLE_NOBASE(C_BaseEntity, DT_BaseEntity)
 	RecvPropInt		( RECVINFO( m_bSimulatedEveryTick ), 0, RecvProxy_InterpolationAmountChanged ),
 	RecvPropInt		( RECVINFO( m_bAnimatedEveryTick ), 0, RecvProxy_InterpolationAmountChanged ),
 	RecvPropBool	( RECVINFO( m_bAlternateSorting ) ),
-	// Underhell: mirror/monitor-only rendering flag.
+	// Underhell: mirror/monitor-only and L4D-style outline state.
 	RecvPropBool	( RECVINFO( m_bIsMirrorOnly ) ),
+	RecvPropBool	( RECVINFO( m_bGlow ) ),
+	RecvPropInt	( RECVINFO( m_GlowColor ), 0, RecvProxy_IntToColor32 ),
 
 END_RECV_TABLE()
 
@@ -904,6 +906,11 @@ C_BaseEntity::C_BaseEntity() :
 	m_bSimulatedEveryTick = false;
 	m_bAnimatedEveryTick = false;
 	m_bIsMirrorOnly = false;
+	m_bGlow = false;
+	m_GlowColor.r = 230;
+	m_GlowColor.g = 230;
+	m_GlowColor.b = 100;
+	m_GlowColor.a = 100;
 	m_pPhysicsObject = NULL;
 
 #ifdef _DEBUG

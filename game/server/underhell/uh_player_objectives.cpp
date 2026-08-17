@@ -225,3 +225,42 @@ void CHL2_Player::InputSetStatusVisibility( inputdata_t &inputdata )
 		m_Local.m_iHideHUD |= ( 1 | 8 | 0x100 | 0x4000 );
 	}
 }
+
+//-----------------------------------------------------------------------------
+// Temporary interaction outline (original sub_102E16B0). Every 0.15 seconds
+// trace 600 units through the camera center; usable items within 96 units glow
+// unless a mapper-owned hard glow is already controlling the entity.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_UpdateLookGlow( void )
+{
+	if ( gpGlobals->curtime < m_flNextUHLookGlowTime )
+		return;
+	m_flNextUHLookGlowTime = gpGlobals->curtime + 0.15f;
+
+	CBaseEntity *oldTarget = m_hUHLookGlowTarget.Get();
+	if ( oldTarget )
+		oldTarget->SetUHAutomaticGlow( false );
+	m_hUHLookGlowTarget = NULL;
+	if ( !IsAlive() )
+		return;
+
+	Vector forward;
+	EyeVectors( &forward );
+	trace_t tr;
+	UTIL_TraceLine( EyePosition(), EyePosition() + forward * 600.0f,
+		0x46004003, this, COLLISION_GROUP_NONE, &tr );
+
+	CBaseEntity *target = tr.m_pEnt;
+	if ( !target || tr.DidHitWorld() || target == this || EyePosition().DistTo( tr.endpos ) > 96.0f )
+		return;
+
+	const char *classname = target->GetClassname();
+	const bool itemClass = classname &&
+		( !Q_strnicmp( classname, "item_", 5 ) || !Q_strnicmp( classname, "weapon_", 7 ) ||
+		  !Q_strnicmp( classname, "prop_physics", 12 ) || !Q_strnicmp( classname, "prop_dynamic", 12 ) );
+	if ( !itemClass || !( target->ObjectCaps() & FCAP_IMPULSE_USE ) )
+		return;
+
+	target->SetUHAutomaticGlow( true );
+	m_hUHLookGlowTarget = target;
+}

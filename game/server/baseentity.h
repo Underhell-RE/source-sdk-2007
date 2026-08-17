@@ -1652,6 +1652,8 @@ public:
 	// Underhell: fire the "OnKicked" output (player kick hit this entity).
 	void	FireOnKicked( CBaseEntity *pActivator ) { m_OnKicked.FireOutput( pActivator, pActivator ); }
 	bool	IsUHKickableDoor( void ) const { return m_bUHKickableDoor; }
+	bool	IsUHHardGlow( void ) const { return m_bHardGlow; }
+	void	SetUHAutomaticGlow( bool enabled ) { if ( !m_bHardGlow ) m_bGlow = enabled; }
 private:
 
 	// User outputs. Fired when the "FireInputX" input is triggered.
@@ -1663,9 +1665,9 @@ private:
 	// Underhell: fired when the player kicks this entity (uh_jake_kick).
 	COutputEvent m_OnKicked;
 	bool m_bUHKickableDoor;
-	bool m_bUHGlow;
-	color32 m_UHGlowColor;
-	color32 m_UHGlowOriginalColor;
+	CNetworkVar( bool, m_bGlow );
+	bool m_bHardGlow;
+	CNetworkColor32( m_GlowColor );
 
 	QAngle			m_angAbsRotation;
 

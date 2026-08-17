@@ -1,4 +1,4 @@
-//===== Copyright © 1996-2005, Valve Corporation, All rights reserved. ======//
+//===== Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: A base class for the client-side representation of entities.
 //
@@ -1581,12 +1581,15 @@ private:
 	CNetworkVar( bool, m_bSimulatedEveryTick );
 	CNetworkVar( bool, m_bAnimatedEveryTick );
 	CNetworkVar( bool, m_bAlternateSorting );
-	// Underhell: render this entity ONLY in mirror/monitor render targets.
+	// Underhell: mirror-only and L4D-style outline state.
 	CNetworkVar( bool, m_bIsMirrorOnly );
+	bool	m_bGlow;
+	color32	m_GlowColor;
 
 public:
-	// Underhell: query the mirror-only rendering flag.
 	bool	IsMirrorOnly( void ) const { return m_bIsMirrorOnly; }
+	bool	IsGlowEnabled( void ) const { return m_bGlow; }
+	const color32 &GetGlowColor( void ) const { return m_GlowColor; }
 private:
 
 	//Adrian

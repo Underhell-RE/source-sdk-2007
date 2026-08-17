@@ -470,6 +470,7 @@ public:
 	void				InputRemoveEndurance( inputdata_t &inputdata );
 	void				InputRemoveLitGlowstick( inputdata_t &inputdata );
 	void				InputSetStatusVisibility( inputdata_t &inputdata );
+	void				UH_UpdateLookGlow( void );
 
 	// Underhell "give" inputs (fired at !player from the maps). "Give" mirrors
 	// the vanilla "give" ConCommand (item_suit is special-cased); "GiveInv"
@@ -586,6 +587,8 @@ private:
 	float				m_flLastBleedTickBase;	// curtime of the previous think (dt accumulator base)
 	int					m_iEHealthCount;		// consecutive bleed-deaths (zeroes endurance at 10)
 	EHANDLE				m_hActiveGlowStick;		// lit glowstick prop parented to the player (original @2164)
+	EHANDLE				m_hUHLookGlowTarget;		// temporary center-camera outline target
+	float				m_flNextUHLookGlowTime;
 	EHANDLE				m_hCarryingRagdoll;		// original m_pCarryingRagdoll @2180
 	float				m_fSavedSensitivity;
 	Vector				m_vecUHFreeAimTarget;	// update_freeaim world target (original player floats @526..528)
