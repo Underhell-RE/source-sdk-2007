@@ -49,15 +49,17 @@ ITexture* CBaseClientRenderTargets::CreateCustomCameraTexture( IMaterialSystem* 
 {
 	char name[64];
 	Q_snprintf( name, sizeof( name ), "_rt_CustomCamera_%d", index );
-	// sub_101299B0 calls IMaterialSystem vtable slot 84 (Ex2) with size mode
-	// 5 (RT_SIZE_OFFSCREEN). Its recovered call supplies only name, dimensions,
-	// mode and format; the remaining arguments are defaults, including RT flags
-	// 0. Marking these camera textures HDR produced the solid brown/grey sample.
-	return pMaterialSystem->CreateNamedRenderTargetTextureEx2(
-		name, size, size, RT_SIZE_OFFSCREEN,
-		pMaterialSystem->GetBackBufferFormat(), MATERIAL_RT_DEPTH_SHARED,
-		TEXTUREFLAGS_CLAMPS | TEXTUREFLAGS_CLAMPT,
-		0 );
+	// The original 2007 client calls material-system vtable slot 84 with only
+	// these five explicit arguments (see Cliento.dll 0x10129A32..0x10129A53).
+	// Calling the newer eight-argument declaration changed the RT allocation
+	// contract and produced a valid-but-solid-colour texture.
+	typedef ITexture *(__thiscall *CreateOriginalCameraRTFn)( IMaterialSystem *,
+		const char *, int, int, RenderTargetSizeMode_t, ImageFormat );
+	void **pMaterialSystemVTable = *(void ***)pMaterialSystem;
+	CreateOriginalCameraRTFn pCreateOriginalCameraRT =
+		(CreateOriginalCameraRTFn)pMaterialSystemVTable[84];
+	return pCreateOriginalCameraRT( pMaterialSystem, name, size, size,
+		RT_SIZE_OFFSCREEN, pMaterialSystem->GetBackBufferFormat() );
 }
 
 //-----------------------------------------------------------------------------
