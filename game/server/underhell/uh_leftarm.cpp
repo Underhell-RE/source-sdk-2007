@@ -198,7 +198,7 @@ void CHL2_Player::UH_EquipFlare( void )
 	m_flFlareStartTime = gpGlobals->curtime;
 	UH_UpdateLeftArm();
 	CBaseViewModel *pDeployVM = GetViewModel( 1 );
-	if ( pDeployVM ) pDeployVM->SendViewModelMatchingSequence( 1 );
+	if ( pDeployVM ) { pDeployVM->SetCycle( 0.0f ); pDeployVM->SetPlaybackRate( 1.0f ); pDeployVM->SendViewModelMatchingSequence( 1 ); }
 
 	if ( m_hHeldFlareEffect ) UTIL_Remove( m_hHeldFlareEffect );
 	m_hHeldFlareEffect = NULL;
@@ -233,7 +233,7 @@ void CHL2_Player::UH_ThrowNade( void )
 	if ( m_bHoldingFlare )
 	{
 		CBaseViewModel *pFlareVM = GetViewModel( 1 );
-		if ( pFlareVM ) pFlareVM->SendViewModelMatchingSequence( 4 );
+		if ( pFlareVM ) { pFlareVM->SetCycle( 0.0f ); pFlareVM->SetPlaybackRate( 1.0f ); pFlareVM->SendViewModelMatchingSequence( 4 ); }
 		m_bFlareMarker = true;
 		float delay = pFlareVM ? max( 0.1f, pFlareVM->SequenceDuration() * 0.5f ) : 0.35f;
 		SetContextThink( &CHL2_Player::UH_LeftArmContextThink, gpGlobals->curtime + delay, "FlashLightContext" );
@@ -259,7 +259,7 @@ void CHL2_Player::UH_ThrowNade( void )
 
 	// Original sends authored sequence 1 on the left-arm grenade model.
 	CBaseViewModel *pGrenadeVM = GetViewModel( 1 );
-	if ( pGrenadeVM ) pGrenadeVM->SendViewModelMatchingSequence( 1 );
+	if ( pGrenadeVM ) { pGrenadeVM->SetCycle( 0.0f ); pGrenadeVM->SetPlaybackRate( 1.0f ); pGrenadeVM->SendViewModelMatchingSequence( 1 ); }
 
 	SetContextThink( &CHL2_Player::UH_LeftArmContextThink, gpGlobals->curtime + UH_THROW_STAGE_DELAY, "FlashLightContext" );
 }

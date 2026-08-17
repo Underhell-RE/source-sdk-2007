@@ -13,6 +13,7 @@
 #include "gamerules.h"
 #include "hl2_player.h"
 #include "props.h"
+#include "hl2/weapon_flaregun.h"
 #include "uh_items.h"
 #include "explode.h"
 #include "soundent.h"
@@ -392,10 +393,19 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	pGlow->SetSolid( SOLID_NONE );
 	DispatchSpawn( pGlow );
 
-	// CPhysicsProp::CreateFlare is the exact Source helper reached through
-	// sub_1020FA00: env_flare at "fuse", 360 s burn, owner cleanup at +5 s.
-	CBreakableProp *pProp = dynamic_cast<CBreakableProp *>( pGlow );
-	if ( pProp ) pProp->CreateFlare( 360.0f );
+	// Underhell extends CFlare with glowstick mode: coloured dlight only, no
+	// flare sprite, smoke, burn damage or crackling flare presentation.
+	CBaseAnimating *pGlowAnim = pGlow->GetBaseAnimating();
+	int attachment = pGlowAnim ? pGlowAnim->LookupAttachment( "fuse" ) : 0;
+	Vector lightOrigin = pGlow->GetAbsOrigin(); QAngle lightAngles = pGlow->GetAbsAngles();
+	if ( attachment > 0 ) pGlowAnim->GetAttachment( attachment, lightOrigin, lightAngles );
+	CFlare *pLight = CFlare::Create( lightOrigin, lightAngles, pGlow, 360.0f );
+	if ( pLight )
+	{
+		pLight->SetGlowStickMode( UH_GetGlowstickBodyGroup( iItem ) );
+		pLight->m_bPropFlare = true;
+		pLight->SetParent( pGlow, attachment );
+	}
 	pGlow->GetBaseAnimating()->m_nSkin = pGlow->GetBaseAnimating()->m_nSkin + 1; // odd = lit
 	pGlow->SetOwnerEntity( pPlayer );
 	pGlow->SetParent( pPlayer );

@@ -13,6 +13,7 @@
 #include "cbase.h"
 #include "hl2_player.h"
 #include "props.h"
+#include "hl2/weapon_flaregun.h"
 
 #include "underhell/uh_inventory.h"
 #include "underhell/uh_items.h"
@@ -153,8 +154,12 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 		pGlow->GetBaseAnimating()->m_nSkin = UH_GetGlowstickBodyGroup( iItem ) + ( UH_IsLitGlowstick( iItem ) ? 1 : 0 );
 		if ( UH_IsLitGlowstick( iItem ) )
 		{
-			CBreakableProp *pProp = dynamic_cast<CBreakableProp *>( pGlow );
-			if ( pProp ) pProp->CreateFlare( 360.0f );
+			CBaseAnimating *pGlowAnim = pGlow->GetBaseAnimating();
+	int attachment = pGlowAnim ? pGlowAnim->LookupAttachment( "fuse" ) : 0;
+			Vector org = pGlow->GetAbsOrigin(); QAngle ang = pGlow->GetAbsAngles();
+			if ( attachment > 0 ) pGlowAnim->GetAttachment( attachment, org, ang );
+			CFlare *pLight = CFlare::Create( org, ang, pGlow, 360.0f );
+			if ( pLight ) { pLight->SetGlowStickMode( UH_GetGlowstickBodyGroup( iItem ) ); pLight->m_bPropFlare = true; pLight->SetParent( pGlow, attachment ); }
 			pGlow->AddEffects( EF_NOSHADOW );
 		}
 		return;
