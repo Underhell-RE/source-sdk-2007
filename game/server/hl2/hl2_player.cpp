@@ -2961,8 +2961,31 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 		return true;
 	}
 
-	// sub_100D02C0 only replaces a bucket in optional single-primary mode.
-	// Normal Underhell keeps BFG weapons alongside other weapons in the slot.
+	// BFG is an exceptional carried category in Underhell. Taking a weapon from
+	// another script slot throws the owned BFG into the world before the normal
+	// pickup path runs. A weapon in the same slot does not trigger this rule.
+	const bool bPickingBFG = FClassnameIs( pWeapon, "weapon_bfg_mgl" ) ||
+		FClassnameIs( pWeapon, "weapon_bfg_minigun" );
+	if ( !bPickingBFG )
+	{
+		for ( int i = 0; i < MAX_WEAPONS; ++i )
+		{
+			CBaseCombatWeapon *pOwned = GetWeapon( i );
+			if ( !pOwned || pOwned->GetSlot() == pWeapon->GetSlot() )
+				continue;
+
+			if ( FClassnameIs( pOwned, "weapon_bfg_mgl" ) ||
+				 FClassnameIs( pOwned, "weapon_bfg_minigun" ) )
+			{
+				Vector vecForward;
+				EyeVectors( &vecForward );
+				Vector vecVelocity = vecForward * 300.0f;
+				Weapon_Drop( pOwned, NULL, &vecVelocity );
+				break;
+			}
+		}
+	}
+
 	return BaseClass::BumpWeapon( pWeapon );
 }
 
@@ -3149,6 +3172,26 @@ void CHL2_Player::PlayerUse ( void )
 	}
 
 	CBaseEntity *pUseEntity = FindUseEntity();
+
+	// Carryable world things are selected by the crosshair trace, not by the
+	// tangent/radius fallbacks in FindUseEntity. Doors, buttons and friendly
+	// NPCs retain the stock forgiving selection behavior.
+	const char *pszUseClass = pUseEntity ? pUseEntity->GetClassname() : NULL;
+	const bool bCrosshairThing = pszUseClass &&
+		( !Q_strnicmp( pszUseClass, "prop_physics", 12 ) ||
+		  !Q_strnicmp( pszUseClass, "item_", 5 ) ||
+		  !Q_strnicmp( pszUseClass, "weapon_", 7 ) );
+	if ( bCrosshairThing )
+	{
+		Vector vecForward;
+		EyeVectors( &vecForward );
+		trace_t useTrace;
+		UTIL_TraceLine( EyePosition(), EyePosition() + vecForward * PLAYER_USE_RADIUS,
+			MASK_SOLID | CONTENTS_DEBRIS | CONTENTS_PLAYERCLIP,
+			this, COLLISION_GROUP_NONE, &useTrace );
+		if ( useTrace.m_pEnt != pUseEntity )
+			pUseEntity = NULL;
+	}
 
 	bool usedSomething = false;
 

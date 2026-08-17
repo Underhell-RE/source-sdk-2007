@@ -88,8 +88,7 @@ void CBaseClientRenderTargets::InitClientRenderTargets( IMaterialSystem* pMateri
 		Q_snprintf( textureName, sizeof( textureName ), "_rt_CustomCamera_%d", i + 1 );
 		KeyValues *vmt = new KeyValues( "UnlitGeneric" );
 		vmt->SetString( "$basetexture", textureName );
-		vmt->SetInt( "$vertexcolor", 1 );
-		vmt->SetInt( "$vertexalpha", 1 );
+		vmt->SetString( "%tooltexture", ( i < 2 ) ? "dev/dev_monitor" : "dev/dev_monitor_512" );
 		vmt->SetString( "$surfaceprop", "glass" );
 		m_pCustomCameraMaterial[i] = pMaterialSystem->CreateMaterial( materialNames[i], vmt );
 	}

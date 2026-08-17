@@ -255,16 +255,13 @@ void CHL2_Player::UH_UpdateLookGlow( void )
 		return;
 
 	const char *classname = target->GetClassname();
-	const bool physicsProp = classname && !Q_strnicmp( classname, "prop_physics", 12 );
 	const bool itemClass = classname &&
 		( !Q_strnicmp( classname, "item_", 5 ) || !Q_strnicmp( classname, "weapon_", 7 ) ||
-		  physicsProp || !Q_strnicmp( classname, "prop_dynamic", 12 ) );
+		  !Q_strnicmp( classname, "prop_physics", 12 ) || !Q_strnicmp( classname, "prop_dynamic", 12 ) );
 
-	// CPhysicsProp::ObjectCaps intentionally withholds FCAP_IMPULSE_USE from
-	// props above the phys-pickup mass limit. The original look trace does not
-	// use that limit as its glow gate: a physics prop in the crosshair still
-	// receives the outline even when it is too heavy to carry.
-	if ( !itemClass || ( !physicsProp && !( target->ObjectCaps() & FCAP_IMPULSE_USE ) ) )
+	// Only entities which can actually be +used receive the automatic outline.
+	// Heavy/fixed physics props intentionally remain unoutlined.
+	if ( !itemClass || !( target->ObjectCaps() & FCAP_IMPULSE_USE ) )
 		return;
 
 	target->SetUHAutomaticGlow( true );
