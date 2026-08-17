@@ -200,7 +200,7 @@ void CUHGunWeapon::PrimaryAttack( void )
 
 	// Underhell shotguns are pump-action. The old thin gun base used their
 	// 0.8 s refire time but never sent the intervening pump sequence.
-	if ( m_iShotsPerFire > 1 )
+	if ( m_iShotsPerFire > 1 && !FClassnameIs( this, "weapon_shotgun_xm1014" ) )
 	{
 		m_bNeedPump = true;
 		m_flPumpTime = gpGlobals->curtime + 0.4f;
@@ -217,8 +217,8 @@ void CUHGunWeapon::PrimaryAttack( void )
 	// Accumulate an accuracy penalty so spamming a gun spreads it out (the
 	// vanilla pistol's model; the Underhell scripts carry the accuracy
 	// multipliers, not the penalty curve).
-	m_flAccuracyPenalty += 0.1f;
-	m_flAccuracyPenalty = clamp( m_flAccuracyPenalty, 0.0f, 1.0f );
+	m_flAccuracyPenalty += ( m_iWeaponType == 1 ) ? 0.2f : 0.1f;
+	m_flAccuracyPenalty = clamp( m_flAccuracyPenalty, 0.0f, 1.5f );
 }
 
 //-----------------------------------------------------------------------------
@@ -262,6 +262,12 @@ void CUHGunWeapon::SecondaryAttack( void )
 //-----------------------------------------------------------------------------
 void CUHGunWeapon::UH_ToggleFireMode( void )
 {
+	// Only weapons authored with UH_Weapon_Special/FireMode expose select fire.
+	// In the shipped scripts this is the G36K; pistol scripts omit the key and
+	// retain their dedicated semi-auto trigger latch.
+	if ( GetWpnData().m_iFireMode == 0 )
+		return;
+
 	if ( m_iFireMode == FIREMODE_FULLAUTO )
 	{
 		m_iFireMode = FIREMODE_SEMI;
@@ -293,6 +299,16 @@ void CUHGunWeapon::WeaponIdle( void )
 
 void CUHGunWeapon::ItemPostFrame( void )
 {
+	CBasePlayer *pPenaltyOwner = ToBasePlayer( GetOwner() );
+	if ( m_iWeaponType == 1 && pPenaltyOwner &&
+		 !( pPenaltyOwner->m_nButtons & IN_ATTACK ) &&
+		 gpGlobals->curtime > m_flNextPrimaryAttack )
+	{
+		// Original CWeaponPistol::UpdatePenaltyTime, sub_10279CB0.
+		m_flAccuracyPenalty = clamp( m_flAccuracyPenalty - gpGlobals->frametime,
+			0.0f, 1.5f );
+	}
+
 	// sub_1027F4E0's pump sits between the fire event and the 0.8 s refire
 	// window. Run it from ItemPostFrame so it also happens while IN_ATTACK is
 	// held; WeaponIdle alone is skipped during sustained fire.
@@ -432,7 +448,7 @@ const Vector &CUHGunWeapon::GetBulletSpread( void )
 	else
 	{
 		// Spam penalty ramps the cone from ~1 to ~6 degrees.
-		float ramp = RemapValClamped( m_flAccuracyPenalty, 0.0f, 1.0f, 0.0f, 1.0f );
+		float ramp = RemapValClamped( m_flAccuracyPenalty, 0.0f, 1.5f, 0.0f, 1.0f );
 		VectorLerp( VECTOR_CONE_1DEGREES, VECTOR_CONE_6DEGREES, ramp, cone );
 	}
 
@@ -525,7 +541,9 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 // Registers one weapon class under its entity name and its send table.
 // Damage comes from the sk_plr_dmg_<weapon> convar. Fire rates extracted from
 // serveror.dll:
-//   - pistols: 0.2 s (shared fire routine sub_1027AEC0)
+//   - Glock/Beretta/Dualies/SOCOM: semi-auto latch, next attack +0.1 s
+//     (sub_10279600/sub_1027A920/sub_1027AC00 and shared pistol path)
+//   - Python: +0.75 s in sub_1027B490
 //   - SMGs + BFG minigun: 0.075 s (GetFireRate vtable slot 277 -> sub_102801F0)
 //   - G36K: 0.1 s (select-fire GetFireRate sub_103F5150)
 // Shotgun / sniper / BFG MGL use custom pump/delay fire paths (not GetFireRate);
@@ -620,7 +638,7 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bFireModeInitialized = false; m_bNeedPump = false; m_flPumpTime = 0.0f; m_hLaserDot = NULL; m_bSocomLaserOn = false; }
+	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = ( _weaponType == 1 ) ? FIREMODE_SEMI : FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bFireModeInitialized = false; m_bNeedPump = false; m_flPumpTime = 0.0f; m_hLaserDot = NULL; m_bSocomLaserOn = false; }
 
 #define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
 	acttable_t _className::m_acttable[] = \
@@ -644,14 +662,15 @@ UH_IMPLEMENT_MELEE( CWeaponWrench,		weapon_melee_wrench,	WeaponWrench,	sk_plr_dm
 UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	sk_plr_dmg_cleaver )
 
 //-----------------------------------------------------------------------------
-// Pistols — semi-auto, shared fire routine (0.2 s).
+// Pistols — semi-auto. Service pistols use a 0.1 s mechanical cooldown but
+// require a fresh trigger edge; Python uses its authored 0.75 s delay.
 // Weapon type 1 = pistol (silencer-gated on m_bHavePistolSilencer).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1, UH_ACTTABLE_PISTOL, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1, UH_ACTTABLE_PISTOL, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1, UH_ACTTABLE_PISTOL, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1, UH_ACTTABLE_PISTOL, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.1f, sk_plr_dmg_pistol_glock, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.1f, sk_plr_dmg_pistol_beretta, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.1f, sk_plr_dmg_pistol_socom, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.75f, sk_plr_dmg_pistol_python, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.1f, sk_plr_dmg_pistol_dualberetta, 1, UH_ACTTABLE_PISTOL, 1 )
 
 //-----------------------------------------------------------------------------
 // SMGs — full auto, 0.075 s (exact, GetFireRate).
@@ -661,13 +680,13 @@ UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.0
 UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0, UH_ACTTABLE_SMG1, 1 )
 
 //-----------------------------------------------------------------------------
-// Shotguns — pump-action. All four share one fire/pump routine (sub_1027E0A0 +
-// sub_1027F4E0); the pump cycle constant in the DLL is 0.8 s (0x10487878).
+// Shotguns — 12 pellets from the shipped sk_plr_num_shotgun_pellets setting.
+// M3/M5/SPAS use the pump path; XM1014 is self-loading and skips it.
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0, UH_ACTTABLE_SHOTGUN, 7 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0, UH_ACTTABLE_SHOTGUN, 7 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0, UH_ACTTABLE_SHOTGUN, 7 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0, UH_ACTTABLE_SHOTGUN, 7 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0, UH_ACTTABLE_SHOTGUN, 12 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0, UH_ACTTABLE_SHOTGUN, 12 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0, UH_ACTTABLE_SHOTGUN, 12 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0, UH_ACTTABLE_SHOTGUN, 12 )
 
 //-----------------------------------------------------------------------------
 // Rifles — G36K is select-fire (0.1 s full-auto). Weapon type 4 = rifle.
