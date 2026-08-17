@@ -385,7 +385,16 @@ public:
 	// batteries (m_iUHBatteryCount) rather than suit power.
 	//-----------------------------------------------------------------------------
 	int					UH_GetBatteryCount( void ) const { return m_iUHBatteryCount; }
-	void				UH_AddBattery( int iCount ) { m_iUHBatteryCount = clamp( m_iUHBatteryCount + iCount, 0, 20 ); }
+	void				UH_AddBattery( int iCount )
+	{
+		const bool bWasEmpty = ( m_iUHBatteryCount <= 0 );
+		m_iUHBatteryCount = clamp( m_iUHBatteryCount + iCount, 0, 20 );
+		if ( bWasEmpty && m_iUHBatteryCount > 0 )
+		{
+			m_HL2Local.m_flFlashBattery = 100.0f;
+			m_flUHBatteryCharge = 100.0f;
+		}
+	}
 	void				UH_UpdateFlashlightBattery( void );	// drain a battery while the flashlight is on
 
 	// Underhell gear ownership accessors (the fields themselves are private;
@@ -426,6 +435,8 @@ public:
 	void				UH_LeftArmContextThink( void );	// the delayed grenade throw
 	void				UH_FlashlightViewModelThink( void );	// finish flashlight holster anim
 	void				UH_ThrowFlare( void );		// throw the held flare
+	void				UH_StartFlareStrike( void );	// primary attack with held flare
+	void				UH_FlareHitContextThink( void );
 	void				UH_UpdateLeftArm( void );	// sync left-arm viewmodel with weapon + flashlight
 	void				UH_EquipFlare( void );		// put a flare in the left hand (flare pack use)
 	void				UH_HolsterLeftArm( void );	// put the left arm away (weapon switch / drop)
@@ -576,6 +587,8 @@ private:
 	float				m_flFlareStartTime;		// total 90 s burn starts when equipped
 	EHANDLE				m_hHeldFlareEffect;		// env_flare parented to viewmodel fuse
 	bool				m_bFlareMarker;			// grenade throw anim in progress
+	bool				m_bFlareStrikePending;	// delayed melee impact
+	float				m_flNextFlareStrike;
 	bool				m_bFlashlightHolstered;	// flashlight holstered in the left hand
 
 	// Server-only runtime accumulators (mirror the original binary's members;

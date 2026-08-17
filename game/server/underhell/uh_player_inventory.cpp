@@ -154,12 +154,8 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 		pGlow->GetBaseAnimating()->m_nSkin = UH_GetGlowstickBodyGroup( iItem ) + ( UH_IsLitGlowstick( iItem ) ? 1 : 0 );
 		if ( UH_IsLitGlowstick( iItem ) )
 		{
-			CBaseAnimating *pGlowAnim = pGlow->GetBaseAnimating();
-	int attachment = pGlowAnim ? pGlowAnim->LookupAttachment( "fuse" ) : 0;
-			Vector org = pGlow->GetAbsOrigin(); QAngle ang = pGlow->GetAbsAngles();
-			if ( attachment > 0 ) pGlowAnim->GetAttachment( attachment, org, ang );
-			CFlare *pLight = CFlare::Create( org, ang, pGlow, 360.0f );
-			if ( pLight ) { pLight->SetGlowStickMode( UH_GetGlowstickBodyGroup( iItem ) ); pLight->m_bPropFlare = true; pLight->SetParent( pGlow, attachment ); }
+			// The original dropped object is the lit-skin physics prop itself;
+			// it is not an env_flare with a second physics/effect lifetime.
 			pGlow->AddEffects( EF_NOSHADOW );
 		}
 		return;

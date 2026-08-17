@@ -360,6 +360,8 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flFlareStartTime, FIELD_TIME ),
 	DEFINE_FIELD( m_hHeldFlareEffect, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_bFlareMarker, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bFlareStrikePending, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_flNextFlareStrike, FIELD_TIME ),
 	DEFINE_FIELD( m_bFlashlightHolstered, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bDisableWeaponDrop, FIELD_BOOLEAN ),
 
@@ -498,6 +500,8 @@ CHL2_Player::CHL2_Player()
 	m_flFlareStartTime = 0.0f;
 	m_hHeldFlareEffect = NULL;
 	m_bFlareMarker = false;
+	m_bFlareStrikePending = false;
+	m_flNextFlareStrike = 0.0f;
 	m_bFlashlightHolstered = false;
 	m_hCarryingRagdoll = NULL;
 	m_fSavedSensitivity = 0.0f;
@@ -1240,6 +1244,14 @@ bool CHL2_Player::HandleInteraction(int interactionType, void *data, CBaseCombat
 
 void CHL2_Player::PlayerRunCommand(CUserCmd *ucmd, IMoveHelper *moveHelper)
 {
+	// A held flare owns primary attack; intercept it before ItemPostFrame.
+	if ( m_bHoldingFlare && ( ucmd->buttons & IN_ATTACK ) )
+	{
+		if ( !( m_nButtons & IN_ATTACK ) )
+			UH_StartFlareStrike();
+		ucmd->buttons &= ~IN_ATTACK;
+	}
+
 	// Handle FL_FROZEN.
 	if ( m_afPhysicsFlags & PFLAG_ONBARNACLE )
 	{
@@ -2277,14 +2289,7 @@ void CHL2_Player::FlashlightTurnOn( void )
 		}
 	}
 
-	// Underhell: the flashlight runs on batteries (m_iUHBatteryCount), not on
-	// suit power like vanilla HL2.
-	if ( UH_GetBatteryCount() <= 0 )
-	{
-		EmitSound( "HL2Player.UseDeny" );
-		return;
-	}
-
+	// A depleted flashlight still switches on; the client renders its weak flicker.
 	AddEffects( EF_DIMLIGHT );
 	m_bFlashlightOn = true;
 	EmitSound( "HL2Player.FlashLightOn" );
@@ -2294,13 +2299,13 @@ void CHL2_Player::FlashlightTurnOn( void )
 
 	// Start draining the current battery.
 #ifdef HL2_EPISODIC
-	if ( m_HL2Local.m_flFlashBattery <= 0.0f )
+	if ( m_iUHBatteryCount > 0 && m_HL2Local.m_flFlashBattery <= 0.0f )
 	{
 		m_HL2Local.m_flFlashBattery = 100.0f;
 		m_flUHBatteryCharge = 100.0f;
 	}
 #else
-	if ( m_flUHBatteryCharge <= 0.0f ) m_flUHBatteryCharge = 100.0f;
+	if ( m_iUHBatteryCount > 0 && m_flUHBatteryCharge <= 0.0f ) m_flUHBatteryCharge = 100.0f;
 #endif
 
 	variant_t flashlighton;
@@ -2956,35 +2961,8 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 		return true;
 	}
 
-	// Underhell: one weapon per bucket. Picking up a weapon whose bucket is
-	// already occupied throws the current weapon in that bucket forward
-	// (decode sub_100D02C0: Weapon_Drop with forward * 300) before equipping the
-	// new one. During impulse 101 the old weapon is silently removed instead.
-	if ( !Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
-	{
-		int slot = pWeapon->GetSlot();
-		CBaseCombatWeapon *pOld = Weapon_GetSlot( slot );
-		if ( pOld != NULL )
-		{
-			if ( gEvilImpulse101 )
-			{
-				for ( int i = 0; i < MAX_WEAPONS; i++ )
-				{
-					CBaseCombatWeapon *pW = GetWeapon( i );
-					if ( pW && pW->GetSlot() == slot )
-						UTIL_Remove( pW );
-				}
-			}
-			else
-			{
-				Vector vecForward;
-				AngleVectors( EyeAngles(), &vecForward );
-				Vector vecVel = vecForward * 300.0f;
-				Weapon_Drop( pOld, NULL, &vecVel );
-			}
-		}
-	}
-
+	// sub_100D02C0 only replaces a bucket in optional single-primary mode.
+	// Normal Underhell keeps BFG weapons alongside other weapons in the slot.
 	return BaseClass::BumpWeapon( pWeapon );
 }
 

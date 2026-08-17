@@ -1063,6 +1063,22 @@ void C_BasePlayer::UpdateFlashlight()
 			}
 			lightDistance = 0;
 		}
+#ifdef HL2_CLIENT_DLL
+		else
+		{
+			// sub_10045E20: the ordinary flashlight originates at the authored
+			// "Flashlight" attachment on left-hand viewmodel 1. The shoulder
+			// flashlight deliberately remains at EyePosition/EyeAngles.
+			C_BaseHLPlayer *pHLPlayer = dynamic_cast<C_BaseHLPlayer *>( this );
+			if ( pHLPlayer && !pHLPlayer->m_bShoulderFlashlight )
+			{
+				C_BaseViewModel *pFlashlightVM = GetViewModel( 1 );
+				int attachment = pFlashlightVM ? pFlashlightVM->LookupAttachment( "Flashlight" ) : 0;
+				if ( attachment > 0 )
+					pFlashlightVM->GetAttachment( attachment, lightOrigin, lightAngles );
+			}
+		}
+#endif
 
 		Vector vecForward, vecRight, vecUp;
 		AngleVectors( lightAngles, &vecForward, &vecRight, &vecUp );
@@ -1228,6 +1244,17 @@ bool C_BasePlayer::ShouldInterpolate()
 	return BaseClass::ShouldInterpolate();
 }
 
+
+ShadowType_t C_BasePlayer::ShadowCastType()
+{
+	// The local model remains registered in first person for mirror rendering,
+	// but it must not project a player shadow into the main first-person view.
+	// OTS still gets the authored dynamic player shadow.
+	if ( IsLocalPlayer() && !AllowOvertheShoulderView() )
+		return SHADOWS_NONE;
+
+	return SHADOWS_RENDER_TO_TEXTURE_DYNAMIC;
+}
 
 bool C_BasePlayer::ShouldDraw()
 {

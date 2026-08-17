@@ -195,7 +195,10 @@ void CHL2_Player::UH_UpdateFlashlightBattery( void )
 		m_iUHBatteryCount = 0;
 		m_HL2Local.m_flFlashBattery = 0.0f;
 		m_flUHBatteryCharge = 0.0f;
-		if ( FlashlightIsOn() ) FlashlightTurnOff();
+
+		// Do not switch the flashlight off at zero. The original projected
+		// flashlight has a depleted mode: a very weak, unstable beam. Keeping
+		// EF_DIMLIGHT active lets the client reproduce that flicker.
 		if ( m_bNightVisionOn ) UH_ToggleNightVision();
 		return;
 	}

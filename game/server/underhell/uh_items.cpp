@@ -242,6 +242,7 @@ bool CItemApple::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
 
@@ -286,6 +287,7 @@ bool CItemUHSoda::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
 
@@ -331,6 +333,7 @@ bool CItemGlowStick::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
 
@@ -391,19 +394,11 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	pGlow->SetSolid( SOLID_NONE );
 	DispatchSpawn( pGlow );
 
-	// Underhell extends CFlare with glowstick mode: coloured dlight only, no
-	// flare sprite, smoke, burn damage or crackling flare presentation.
-	CBaseAnimating *pGlowAnim = pGlow->GetBaseAnimating();
-	int attachment = pGlowAnim ? pGlowAnim->LookupAttachment( "fuse" ) : 0;
-	Vector lightOrigin = pGlow->GetAbsOrigin(); QAngle lightAngles = pGlow->GetAbsAngles();
-	if ( attachment > 0 ) pGlowAnim->GetAttachment( attachment, lightOrigin, lightAngles );
-	CFlare *pLight = CFlare::Create( lightOrigin, lightAngles, pGlow, 360.0f );
-	if ( pLight )
-	{
-		pLight->SetGlowStickMode( UH_GetGlowstickBodyGroup( iItem ) );
-		pLight->m_bPropFlare = true;
-		pLight->SetParent( pGlow, attachment );
-	}
+	// sub_101742D0 creates exactly one hidden prop_physics and follows it to
+	// the player. It does not create an env_flare child. The previous child
+	// flare kept thinking/colliding after the prop was released, producing an
+	// ever-growing physics/effect workload when a glowstick came to rest.
+	// Odd skins are the authored lit glowstick variants.
 	pGlow->GetBaseAnimating()->m_nSkin = pGlow->GetBaseAnimating()->m_nSkin + 1; // odd = lit
 	pGlow->SetOwnerEntity( pPlayer );
 	pGlow->SetParent( pPlayer );
@@ -544,6 +539,7 @@ bool CItemHeavyArmor::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->ArmorValue() >= 200 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
 	SetOwnerEntity( pHL2Player );
 
@@ -661,6 +657,25 @@ UH_DEFINE_ARMOR_ITEM( CItemHelmetPrison,	item_helmet_prison,	"models/items/helme
 UH_DEFINE_ARMOR_ITEM( CItemHelmetPMC,		item_helmet_pmc,	"models/items/pmc_helmet.mdl" )
 UH_DEFINE_ARMOR_ITEM( CItemHelmetWorker,	item_helmet_worker,	"models/items/worker_helmet.mdl" )
 UH_DEFINE_ITEM( CItemFlarePack,		item_flarepack,		"models/pg_props/pg_obj/pg_flare_pack.mdl" )
+
+bool CItemFlarePack::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player || pHL2Player->UH_FindFreeSlot() < 0 )
+		return false;
+
+	// sub_10172CB0 calls the inventory-give virtual three times with item 13:
+	// one flare pack pickup therefore supplies three individual flares.
+	FirePlayerPickupOutput( pHL2Player );
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	SetOwnerEntity( pHL2Player );
+	pHL2Player->UH_GiveItem( UH_ITEM_FLARE_PACK );
+	pHL2Player->UH_GiveItem( UH_ITEM_FLARE_PACK );
+	pHL2Player->UH_GiveItem( UH_ITEM_FLARE_PACK );
+	UTIL_Remove( this );
+	return true;
+}
+
 UH_DEFINE_ITEM( CItemFMRadio,		item_fmradio,		"models/items/fmradio.mdl" )
 UH_DEFINE_ITEM( CItemRadioCracker,	item_radiocracker,	"models/items/fmradio.mdl" )
 
@@ -696,6 +711,7 @@ bool CItemArmor::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->ArmorValue() >= 100 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
 	SetOwnerEntity( pHL2Player );
 
@@ -782,6 +798,7 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 	// merely because every slot is occupied. UH_GiveItem owns the full-inventory
 	// fallback and recreates the world item when required, matching the original
 	// item's pickup route.
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupBandages" );
 	SetOwnerEntity( pHL2Player );
 	pHL2Player->UH_GiveItem( UH_ITEM_BANDAGES );

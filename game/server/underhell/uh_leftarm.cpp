@@ -371,3 +371,55 @@ void CHL2_Player::UH_ThrowFlare( void )
 	m_flFlareStartTime = 0.0f;
 	UH_UpdateLeftArm();
 }
+
+//-----------------------------------------------------------------------------
+// Purpose: Melee strike with the lit flare. The original starts sequence 4,
+// then executes its bludgeon swing from FlareHitContext after half of the
+// animation (sub_101E97E0 / sub_101F2A20).
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_StartFlareStrike( void )
+{
+	if ( !m_bHoldingFlare || m_bFlareStrikePending || gpGlobals->curtime < m_flNextFlareStrike )
+		return;
+
+	CBaseViewModel *pVM = GetViewModel( 1 );
+	if ( !pVM )
+		return;
+
+	pVM->SetCycle( 0.0f );
+	pVM->SetPlaybackRate( 1.0f );
+	pVM->SendViewModelMatchingSequence( 4 );
+	m_bFlareStrikePending = true;
+
+	const float flDuration = max( 0.2f, pVM->SequenceDuration() );
+	SetContextThink( &CHL2_Player::UH_FlareHitContextThink,
+		gpGlobals->curtime + flDuration * 0.5f, "FlareHitContext" );
+}
+
+void CHL2_Player::UH_FlareHitContextThink( void )
+{
+	if ( !m_bFlareStrikePending )
+		return;
+
+	m_bFlareStrikePending = false;
+	m_flNextFlareStrike = gpGlobals->curtime + 0.15f;
+
+	if ( !m_bHoldingFlare || !IsAlive() )
+		return;
+
+	CBaseEntity *pHit = CheckTraceHullAttack( 64.0f, Vector( -16, -16, -16 ),
+		Vector( 16, 16, 16 ), 10, DMG_CLUB | DMG_BURN, 1.0f );
+	if ( pHit )
+	{
+		ViewPunch( QAngle( -1.0f, 0.0f, 0.0f ) );
+		EmitSound( "Weapon_Crowbar.Melee_Hit" );
+	}
+	else
+	{
+		EmitSound( "Weapon_Crowbar.Single" );
+	}
+
+	CBaseViewModel *pVM = GetViewModel( 1 );
+	if ( pVM )
+		pVM->SendViewModelMatchingSequence( 1 );
+}

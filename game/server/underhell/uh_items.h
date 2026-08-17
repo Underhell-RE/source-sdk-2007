@@ -239,7 +239,15 @@ UH_DECLARE_ARMOR_ITEM( CItemRespiratorGuard )
 UH_DECLARE_ARMOR_ITEM( CItemGasmaskGuard )
 UH_DECLARE_ARMOR_ITEM( CItemGasmaskPrison )
 
-UH_DECLARE_ITEM( CItemFlarePack,		UH_ITEM_FLARE_PACK )
+class CItemFlarePack : public CUHItem
+{
+public:
+	DECLARE_CLASS( CItemFlarePack, CUHItem );
+	virtual void Spawn( void );
+	virtual void Precache( void );
+	virtual bool MyTouch( CBasePlayer *pPlayer );
+	virtual int GetInventoryItemType() const { return UH_ITEM_FLARE_PACK; }
+};
 UH_DECLARE_ITEM( CItemFMRadio,			UH_ITEM_FM_RADIO )
 UH_DECLARE_ITEM( CItemRadioCracker,		UH_ITEM_RADIO_CRACKER )
 
