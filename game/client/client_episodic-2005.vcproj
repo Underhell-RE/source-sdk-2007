@@ -5214,6 +5214,14 @@
 				>
 			</File>
 		</Filter>
+		<Filter
+			Name="Underhell Shader Editor Bridge"
+			>
+			<File RelativePath=".\underhell\shadereditor\uh_shadereditor_system.cpp"></File>
+			<File RelativePath=".\underhell\shadereditor\uh_shadereditor_system.h"></File>
+			<File RelativePath=".\underhell\shadereditor\ivshadereditor.h"></File>
+			<File RelativePath=".\underhell\shadereditor\README.md"></File>
+		</Filter>
 	</Files>
 	<Globals>
 	</Globals>
