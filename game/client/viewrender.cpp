@@ -148,7 +148,7 @@ static ConVar r_screenfademaxsize( "r_screenfademaxsize", "0" );
 
 static ConVar cl_drawmonitors( "cl_drawmonitors", "1" );
 static ConVar r_eyewaterepsilon( "r_eyewaterepsilon", "7.0f", FCVAR_CHEAT );
-static ConVar cl_uh_monitor_copy_workaround( "cl_uh_monitor_copy_workaround", "0", 0,
+static ConVar cl_uh_monitor_copy_workaround( "cl_uh_monitor_copy_workaround", "1", 0,
 	"Render custom monitor cameras through the known-good _rt_Camera surface, then copy to their custom target" );
 
 extern ConVar cl_leveloverview;
