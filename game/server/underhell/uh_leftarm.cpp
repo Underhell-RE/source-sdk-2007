@@ -22,6 +22,8 @@
 #include "baseviewmodel_shared.h"
 #include "ammodef.h"
 #include "grenade_frag.h"
+#include "hl2/weapon_flaregun.h"
+#include "hl2/info_darknessmode_lightsource.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -209,8 +211,28 @@ void CHL2_Player::UH_EquipFlare( void )
 		int attachment = pVM->LookupAttachment( "fuse" );
 		if ( attachment > 0 && pVM->GetAttachment( attachment, org, ang ) )
 		{
-			m_hHeldFlareEffect = CreateFlare( org, ang, pVM, UH_FLARE_FUSE );
-			if ( m_hHeldFlareEffect ) m_hHeldFlareEffect->SetParent( pVM, attachment );
+			CFlare *pFlare = CFlare::Create( org, ang, this, UH_FLARE_FUSE );
+			if ( pFlare )
+			{
+				// sub_10172E80 performs this setup after creating the flare:
+				// stop its fly-gravity movement, make it non-interactive, freeze
+				// gravity, preserve the fuse's world transform, then attach it to
+				// viewmodel 1.  Parenting a live MOVETYPE_FLYGRAVITY flare (our old
+				// code) leaves the networked effect in an invalid/moving state, so
+				// the client never keeps its glow at the flare in the player's hand.
+				pFlare->m_bPropFlare = true;
+				pFlare->SetMoveType( MOVETYPE_NONE );
+				pFlare->SetCollisionGroup( COLLISION_GROUP_INTERACTIVE );
+				pFlare->SetGravity( 0.0f );
+				pFlare->SetAbsOrigin( org );
+				pFlare->SetParent( pVM, attachment );
+
+				// Also matches the final AddEntityToDarknessCheck call in the
+				// original.  This is the server-side illumination registration;
+				// C_Flare supplies the visible client dlight/elight and sprites.
+				AddEntityToDarknessCheck( pFlare, 307.20001f );
+				m_hHeldFlareEffect = pFlare;
+			}
 		}
 	}
 }
