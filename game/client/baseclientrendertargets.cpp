@@ -8,6 +8,7 @@
 
 #include "cbase.h"
 #include "baseclientrendertargets.h"						// header	
+#include "materialsystem/ITexture.h"
 #include "materialsystem/imaterialsystemhardwareconfig.h"	// Hardware config checks
 
 ITexture* CBaseClientRenderTargets::CreateWaterReflectionTexture( IMaterialSystem* pMaterialSystem, int iSize )
