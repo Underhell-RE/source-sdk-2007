@@ -180,6 +180,11 @@ void CHL2_Player::InputBleedPlayer( inputdata_t &inputdata )
 
 void CHL2_Player::InputRemoveLitGlowstick( inputdata_t &inputdata )
 {
+	CBaseEntity *pGlowLight = UH_GetActiveGlowStickLight();
+	if ( pGlowLight )
+		UTIL_Remove( pGlowLight );
+	UH_SetActiveGlowStickLight( NULL );
+
 	CBaseEntity *pGlow = UH_GetActiveGlowStick();
 	if ( pGlow )
 		UTIL_Remove( pGlow );
@@ -256,11 +261,11 @@ void CHL2_Player::UH_UpdateLookGlow( void )
 
 	const char *classname = target->GetClassname();
 	const bool itemClass = classname &&
-		( !Q_strnicmp( classname, "item_", 5 ) || !Q_strnicmp( classname, "weapon_", 7 ) ||
-		  !Q_strnicmp( classname, "prop_physics", 12 ) || !Q_strnicmp( classname, "prop_dynamic", 12 ) );
+		( !Q_strnicmp( classname, "item_", 5 ) || !Q_strnicmp( classname, "weapon_", 7 ) );
 
-	// Only entities which can actually be +used receive the automatic outline.
-	// Heavy/fixed physics props intentionally remain unoutlined.
+	// Automatic crosshair glow is only for real item/weapon entities. Quest
+	// props, doors, vehicles and NPCs are controlled by the mapper's Glow input;
+	// m_bHardGlow keeps that state independent of this temporary target.
 	if ( !itemClass || !( target->ObjectCaps() & FCAP_IMPULSE_USE ) )
 		return;
 

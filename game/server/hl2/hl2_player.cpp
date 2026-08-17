@@ -62,6 +62,9 @@ extern ConVar weapon_showproficiency;
 extern ConVar autoaim_max_dist;
 extern ConVar uh_flashlight_battery_time;
 
+// Original sub_100D02C0 weapon-category gate.
+ConVar uh_weapon_category( "uh_weapon_category", "1", FCVAR_CHEAT );
+
 // Do not touch with without seeing me, please! (sjb)
 // For consistency's sake, enemy gunfire is traced against a scaled down
 // version of the player's hull, not the hitboxes for the player's model
@@ -335,6 +338,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flLastBleedTickBase, FIELD_TIME ),
 	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_hActiveGlowStickLight, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_hUHLookGlowTarget, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_flNextUHLookGlowTime, FIELD_TIME ),
 	DEFINE_FIELD( m_hCarryingRagdoll, FIELD_EHANDLE ),
@@ -1244,12 +1248,12 @@ bool CHL2_Player::HandleInteraction(int interactionType, void *data, CBaseCombat
 
 void CHL2_Player::PlayerRunCommand(CUserCmd *ucmd, IMoveHelper *moveHelper)
 {
-	// A held flare owns primary attack; intercept it before ItemPostFrame.
-	if ( m_bHoldingFlare && ( ucmd->buttons & IN_ATTACK ) )
+	// sub_101E96F0: the held flare strike is secondary fire (+attack2).
+	if ( m_bHoldingFlare && ( ucmd->buttons & IN_ATTACK2 ) )
 	{
-		if ( !( m_nButtons & IN_ATTACK ) )
+		if ( !( m_nButtons & IN_ATTACK2 ) )
 			UH_StartFlareStrike();
-		ucmd->buttons &= ~IN_ATTACK;
+		ucmd->buttons &= ~IN_ATTACK2;
 	}
 
 	// Handle FL_FROZEN.
@@ -2961,28 +2965,19 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 		return true;
 	}
 
-	// BFG is an exceptional carried category in Underhell. Taking a weapon from
-	// another script slot throws the owned BFG into the world before the normal
-	// pickup path runs. A weapon in the same slot does not trigger this rule.
-	const bool bPickingBFG = FClassnameIs( pWeapon, "weapon_bfg_mgl" ) ||
-		FClassnameIs( pWeapon, "weapon_bfg_minigun" );
-	if ( !bPickingBFG )
+	// sub_100D02C0: when uh_weapon_category is enabled, only the weapon already
+	// occupying the incoming weapon's script slot/category is thrown. Weapons
+	// in every other slot remain untouched.
+	if ( uh_weapon_category.GetBool() &&
+		 !Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
 	{
-		for ( int i = 0; i < MAX_WEAPONS; ++i )
+		CBaseCombatWeapon *pOld = Weapon_GetSlot( pWeapon->GetSlot() );
+		if ( pOld )
 		{
-			CBaseCombatWeapon *pOwned = GetWeapon( i );
-			if ( !pOwned || pOwned->GetSlot() == pWeapon->GetSlot() )
-				continue;
-
-			if ( FClassnameIs( pOwned, "weapon_bfg_mgl" ) ||
-				 FClassnameIs( pOwned, "weapon_bfg_minigun" ) )
-			{
-				Vector vecForward;
-				EyeVectors( &vecForward );
-				Vector vecVelocity = vecForward * 300.0f;
-				Weapon_Drop( pOwned, NULL, &vecVelocity );
-				break;
-			}
+			Vector vecForward;
+			EyeVectors( &vecForward );
+			Vector vecVelocity = vecForward * 300.0f;
+			Weapon_Drop( pOld, NULL, &vecVelocity );
 		}
 	}
 

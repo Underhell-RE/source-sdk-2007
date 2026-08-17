@@ -376,6 +376,7 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 			pOldGlow->VPhysicsInitNormal( SOLID_VPHYSICS, 0, false );
 		pOldGlow->SetAbsOrigin( pPlayer->GetAbsOrigin() );
 		pPlayer->UH_SetActiveGlowStick( NULL );
+		pPlayer->UH_SetActiveGlowStickLight( NULL );
 		for ( int id = UH_ITEM_LIT_GLOWSTICK_FIRST; id <= UH_ITEM_LIT_GLOWSTICK_LAST; ++id )
 		{
 			int slot = pPlayer->UH_FindInventoryItem( id );
@@ -394,15 +395,30 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	pGlow->SetSolid( SOLID_NONE );
 	DispatchSpawn( pGlow );
 
-	// sub_101742D0 creates exactly one hidden prop_physics and follows it to
-	// the player. It does not create an env_flare child. The previous child
-	// flare kept thinking/colliding after the prop was released, producing an
-	// ever-growing physics/effect workload when a glowstick came to rest.
-	// Odd skins are the authored lit glowstick variants.
+	// The hidden physics prop stores the authored lit skin. CFlare supplies the
+	// coloured dynamic light, but is frozen before parenting: a live
+	// MOVETYPE_FLYGRAVITY flare under a moving/physics parent caused repeated
+	// collision updates and the reported long-term slowdown.
+	CBaseAnimating *pGlowAnim = pGlow->GetBaseAnimating();
+	int attachment = pGlowAnim ? pGlowAnim->LookupAttachment( "fuse" ) : 0;
+	Vector lightOrigin = pGlow->GetAbsOrigin(); QAngle lightAngles = pGlow->GetAbsAngles();
+	if ( attachment > 0 ) pGlowAnim->GetAttachment( attachment, lightOrigin, lightAngles );
+	CFlare *pLight = CFlare::Create( lightOrigin, lightAngles, pGlow, 360.0f );
+	if ( pLight )
+	{
+		pLight->SetGlowStickMode( UH_GetGlowstickBodyGroup( iItem ) );
+		pLight->m_bPropFlare = true;
+		pLight->SetMoveType( MOVETYPE_NONE );
+		pLight->SetSolid( SOLID_NONE );
+		pLight->AddSolidFlags( FSOLID_NOT_SOLID );
+		pLight->SetGravity( 0.0f );
+		pLight->SetParent( pGlow, attachment );
+	}
 	pGlow->GetBaseAnimating()->m_nSkin = pGlow->GetBaseAnimating()->m_nSkin + 1; // odd = lit
 	pGlow->SetOwnerEntity( pPlayer );
 	pGlow->SetParent( pPlayer );
 	pPlayer->UH_SetActiveGlowStick( pGlow );
+	pPlayer->UH_SetActiveGlowStickLight( pLight );
 	pPlayer->EmitSound( "glowstick.crack" );
 	UTIL_Remove( this );
 }

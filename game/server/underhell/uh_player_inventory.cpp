@@ -107,6 +107,7 @@ void CHL2_Player::UH_InitializeInventory( void )
 	m_bFlashlightOn = false;
 	m_bInventoryEnabled = true;
 	m_hActiveGlowStick = NULL;
+	m_hActiveGlowStickLight = NULL;
 	m_bIronSighted = false;
 	m_fIronsightedTime = 0.0f;
 }
@@ -142,6 +143,7 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 			pGlow->SetAbsOrigin( vecOrigin );
 			pGlow->SetAbsAngles( angItem );
 			UH_SetActiveGlowStick( NULL );
+			UH_SetActiveGlowStickLight( NULL );
 			return;
 		}
 
@@ -154,8 +156,21 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 		pGlow->GetBaseAnimating()->m_nSkin = UH_GetGlowstickBodyGroup( iItem ) + ( UH_IsLitGlowstick( iItem ) ? 1 : 0 );
 		if ( UH_IsLitGlowstick( iItem ) )
 		{
-			// The original dropped object is the lit-skin physics prop itself;
-			// it is not an env_flare with a second physics/effect lifetime.
+			CBaseAnimating *pGlowAnim = pGlow->GetBaseAnimating();
+			int attachment = pGlowAnim ? pGlowAnim->LookupAttachment( "fuse" ) : 0;
+			Vector org = pGlow->GetAbsOrigin(); QAngle ang = pGlow->GetAbsAngles();
+			if ( attachment > 0 ) pGlowAnim->GetAttachment( attachment, org, ang );
+			CFlare *pLight = CFlare::Create( org, ang, pGlow, 360.0f );
+			if ( pLight )
+			{
+				pLight->SetGlowStickMode( UH_GetGlowstickBodyGroup( iItem ) );
+				pLight->m_bPropFlare = true;
+				pLight->SetMoveType( MOVETYPE_NONE );
+				pLight->SetSolid( SOLID_NONE );
+				pLight->AddSolidFlags( FSOLID_NOT_SOLID );
+				pLight->SetGravity( 0.0f );
+				pLight->SetParent( pGlow, attachment );
+			}
 			pGlow->AddEffects( EF_NOSHADOW );
 		}
 		return;
@@ -364,6 +379,9 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 			UH_RemoveInventoryItem( iSlot );
 
 			CBaseEntity *pGlow = UH_GetActiveGlowStick();
+			CBaseEntity *pGlowLight = UH_GetActiveGlowStickLight();
+			if ( pGlowLight ) UTIL_Remove( pGlowLight );
+			UH_SetActiveGlowStickLight( NULL );
 			if ( pGlow )
 			{
 				UTIL_Remove( pGlow );

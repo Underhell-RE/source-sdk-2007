@@ -388,12 +388,14 @@ void CHL2_Player::UH_StartFlareStrike( void )
 
 	pVM->SetCycle( 0.0f );
 	pVM->SetPlaybackRate( 1.0f );
-	pVM->SendViewModelMatchingSequence( 4 );
+	// sub_101E96F0 randomly selects one of the three authored hit animations.
+	pVM->SendViewModelMatchingSequence( random->RandomInt( 5, 7 ) );
+	ViewPunch( QAngle( -1.0f, 0.0f, 0.0f ) );
+	SuitPower_Drain( 5.0f );
 	m_bFlareStrikePending = true;
 
-	const float flDuration = max( 0.2f, pVM->SequenceDuration() );
 	SetContextThink( &CHL2_Player::UH_FlareHitContextThink,
-		gpGlobals->curtime + flDuration * 0.5f, "FlareHitContext" );
+		gpGlobals->curtime + 0.35f, "FlareHitContext" );
 }
 
 void CHL2_Player::UH_FlareHitContextThink( void )
@@ -411,7 +413,6 @@ void CHL2_Player::UH_FlareHitContextThink( void )
 		Vector( 16, 16, 16 ), 10, DMG_CLUB | DMG_BURN, 1.0f );
 	if ( pHit )
 	{
-		ViewPunch( QAngle( -1.0f, 0.0f, 0.0f ) );
 		EmitSound( "Weapon_Crowbar.Melee_Hit" );
 	}
 	else

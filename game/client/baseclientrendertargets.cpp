@@ -9,8 +9,6 @@
 #include "cbase.h"
 #include "baseclientrendertargets.h"						// header	
 #include "materialsystem/imaterialsystemhardwareconfig.h"	// Hardware config checks
-#include "materialsystem/imaterial.h"
-#include "tier1/keyvalues.h"
 
 ITexture* CBaseClientRenderTargets::CreateWaterReflectionTexture( IMaterialSystem* pMaterialSystem, int iSize )
 {
@@ -50,11 +48,14 @@ ITexture* CBaseClientRenderTargets::CreateCustomCameraTexture( IMaterialSystem* 
 {
 	char name[64];
 	Q_snprintf( name, sizeof( name ), "_rt_CustomCamera_%d", index );
-	return pMaterialSystem->CreateNamedRenderTargetTextureEx2(
-		name, size, size, RT_SIZE_DEFAULT,
+	// Original sub_101299B0 uses the off-screen size mode and the legacy
+	// CreateNamedRenderTargetTexture call. RT_SIZE_DEFAULT allowed the target
+	// to be regenerated/clamped like a framebuffer target, leaving it at the
+	// clear colour on this Orange Box material system.
+	return pMaterialSystem->CreateNamedRenderTargetTexture(
+		name, size, size, RT_SIZE_OFFSCREEN,
 		pMaterialSystem->GetBackBufferFormat(), MATERIAL_RT_DEPTH_SHARED,
-		TEXTUREFLAGS_CLAMPS | TEXTUREFLAGS_CLAMPT,
-		CREATERENDERTARGETFLAGS_HDR );
+		true, false );
 }
 
 //-----------------------------------------------------------------------------
@@ -76,22 +77,6 @@ void CBaseClientRenderTargets::InitClientRenderTargets( IMaterialSystem* pMateri
 	m_CustomCameraTexture[1].Init( CreateCustomCameraTexture( pMaterialSystem, 2, 256 ) );
 	m_CustomCameraTexture[2].Init( CreateCustomCameraTexture( pMaterialSystem, 3, 512 ) );
 	m_CustomCameraTexture[3].Init( CreateCustomCameraTexture( pMaterialSystem, 4, 512 ) );
-
-	static const char *materialNames[4] =
-	{
-		"dev/dev_monitor_256a", "dev/dev_monitor_256b",
-		"dev/dev_monitor_512a", "dev/dev_monitor_512b"
-	};
-	for ( int i = 0; i < 4; ++i )
-	{
-		char textureName[64];
-		Q_snprintf( textureName, sizeof( textureName ), "_rt_CustomCamera_%d", i + 1 );
-		KeyValues *vmt = new KeyValues( "UnlitGeneric" );
-		vmt->SetString( "$basetexture", textureName );
-		vmt->SetString( "%tooltexture", ( i < 2 ) ? "dev/dev_monitor" : "dev/dev_monitor_512" );
-		vmt->SetString( "$surfaceprop", "glass" );
-		m_pCustomCameraMaterial[i] = pMaterialSystem->CreateMaterial( materialNames[i], vmt );
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -108,14 +93,7 @@ void CBaseClientRenderTargets::ShutdownClientRenderTargets()
 	// Monitors
 	m_CameraTexture.Shutdown();
 	for ( int i = 0; i < 4; ++i )
-	{
 		m_CustomCameraTexture[i].Shutdown();
-		if ( m_pCustomCameraMaterial[i] )
-		{
-			m_pCustomCameraMaterial[i]->DecrementReferenceCount();
-			m_pCustomCameraMaterial[i] = NULL;
-		}
-	}
 }
 
 static CBaseClientRenderTargets g_BaseClientRenderTargets;

@@ -509,6 +509,8 @@ public:
 	//-----------------------------------------------------------------------------
 	CBaseEntity			*UH_GetActiveGlowStick( void ) const { return m_hActiveGlowStick.Get(); }
 	void				UH_SetActiveGlowStick( CBaseEntity *pGlowStick ) { m_hActiveGlowStick.Set( pGlowStick ); }
+	CBaseEntity			*UH_GetActiveGlowStickLight( void ) const { return m_hActiveGlowStickLight.Get(); }
+	void				UH_SetActiveGlowStickLight( CBaseEntity *pLight ) { m_hActiveGlowStickLight.Set( pLight ); }
 
 	//-----------------------------------------------------------------------------
 	// Underhell objectives / map signaling (implementation in
@@ -600,6 +602,7 @@ private:
 	float				m_flLastBleedTickBase;	// curtime of the previous think (dt accumulator base)
 	int					m_iEHealthCount;		// consecutive bleed-deaths (zeroes endurance at 10)
 	EHANDLE				m_hActiveGlowStick;		// lit glowstick prop parented to the player (original @2164)
+	EHANDLE				m_hActiveGlowStickLight;	// stable coloured env_flare child
 	EHANDLE				m_hUHLookGlowTarget;		// temporary center-camera outline target
 	float				m_flNextUHLookGlowTime;
 	EHANDLE				m_hCarryingRagdoll;		// original m_pCarryingRagdoll @2180

@@ -28,7 +28,6 @@
 // Externs
 class IMaterialSystem;
 class IMaterialSystemHardwareConfig;
-class IMaterial;
 
 class CBaseClientRenderTargets : public IClientRenderTargets
 {
@@ -52,7 +51,6 @@ protected:
 	// Used for monitors
 	CTextureReference		m_CameraTexture;
 	CTextureReference		m_CustomCameraTexture[4];
-	IMaterial				*m_pCustomCameraMaterial[4];
 
 	// Init functions for the common render targets
 	ITexture* CreateWaterReflectionTexture( IMaterialSystem* pMaterialSystem, int iSize = 1024 );
