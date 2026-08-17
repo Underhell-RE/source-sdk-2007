@@ -148,6 +148,8 @@ static ConVar r_screenfademaxsize( "r_screenfademaxsize", "0" );
 
 static ConVar cl_drawmonitors( "cl_drawmonitors", "1" );
 static ConVar r_eyewaterepsilon( "r_eyewaterepsilon", "7.0f", FCVAR_CHEAT );
+static ConVar cl_uh_monitor_copy_workaround( "cl_uh_monitor_copy_workaround", "1", 0,
+	"Render custom monitor cameras through the known-good _rt_Camera surface, then copy to their custom target" );
 
 extern ConVar cl_leveloverview;
 
@@ -2904,9 +2906,10 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 		{
 			s_flNextMonitorLog = gpGlobals->curtime + 1.0f;
 			bLogMonitorPass = true;
-			Msg( "[UH render] DrawMonitors begin player=%p mirrorOnly=%d model=%s\n",
+			Msg( "[UH render] DrawMonitors begin player=%p mirrorOnly=%d model=%s copyWorkaround=%d\n",
 				player, player ? player->IsMirrorOnly() : 0,
-				( player && player->GetModel() ) ? modelinfo->GetModelName( player->GetModel() ) : "<null>" );
+				( player && player->GetModel() ) ? modelinfo->GetModelName( player->GetModel() ) : "<null>",
+				cl_uh_monitor_copy_workaround.GetBool() );
 		}
 	}
 	
@@ -2956,10 +2959,48 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 		int width = pThisTarget->GetActualWidth();
 		int height = pThisTarget->GetActualHeight();
 
+		if ( pCameraEnt->UsesCustomRenderTarget() && cl_uh_monitor_copy_workaround.GetBool() &&
+			 pThisTarget->GetActualWidth() == pCameraTarget->GetActualWidth() &&
+			 pThisTarget->GetActualHeight() == pCameraTarget->GetActualHeight() )
+		{
+			// _rt_Camera is known to render correctly on this Orange Box build.
+			// Use it as a scratch render surface, then explicitly copy the result
+			// into the VMT-bound custom texture. Standard cameras are redrawn in a
+			// second pass below so their final _rt_Camera image is preserved.
+			const int scratchWidth = pCameraTarget->GetActualWidth();
+			const int scratchHeight = pCameraTarget->GetActualHeight();
+			if ( !DrawOneMonitor( pCameraTarget, cameraNum, pCameraEnt, cameraView,
+				player, 0, 0, scratchWidth, scratchHeight ) )
+				continue;
+
+			CMatRenderContextPtr pCopyContext( materials );
+			pCopyContext->PushRenderTargetAndViewport( pCameraTarget );
+			pCopyContext->CopyRenderTargetToTextureEx( pThisTarget, 0, NULL, NULL );
+			pCopyContext->PopRenderTargetAndViewport();
+			++cameraNum;
+			continue;
+		}
+
 		if ( !DrawOneMonitor( pThisTarget, cameraNum, pCameraEnt, cameraView, player, 0, 0, width, height ) )
 			continue;
 
 		++cameraNum;
+	}
+
+	if ( cl_uh_monitor_copy_workaround.GetBool() )
+	{
+		// A custom camera may have used _rt_Camera as scratch after the normal
+		// camera was drawn. Restore the standard monitor's final image.
+		for ( C_PointCamera *pStandardCamera = GetPointCameraList();
+			pStandardCamera != NULL; pStandardCamera = pStandardCamera->m_pNext )
+		{
+			if ( !pStandardCamera->IsActive() || pStandardCamera->IsDormant() ||
+				 pStandardCamera->UsesCustomRenderTarget() )
+				continue;
+
+			DrawOneMonitor( pCameraTarget, cameraNum, pStandardCamera, cameraView, player,
+				0, 0, pCameraTarget->GetActualWidth(), pCameraTarget->GetActualHeight() );
+		}
 	}
 
 	if ( IsX360() && cameraNum > 0 )
