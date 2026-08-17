@@ -144,6 +144,10 @@ void CHL2_Player::UH_DoKickStrike( void )
 
 	// The impact path adds its own, lighter rumble pulse after a real hit.
 	RumbleEffect( 4, 0, 4 );
+	// Fire this before applying damage force. The VMF's breakaway doors use
+	// OnKicked -> EnableMotion; applying force while motion is still disabled
+	// discards the impulse and leaves the door standing in place.
+	pHit->FireOnKicked( this );
 	pHit->TakeDamage( info );
 
 	// Original sub_101E5A60 has a dedicated CBasePropDoor kick path gated by
@@ -159,9 +163,6 @@ void CHL2_Player::UH_DoKickStrike( void )
 			this, this, empty, USE_TOGGLE );
 	}
 
-	// Let the victim react (OnKicked output; the map uses e.g.
-	// "OnKicked" "door_KillingRoom,EnableMotion").
-	pHit->FireOnKicked( this );
 }
 
 //-----------------------------------------------------------------------------
