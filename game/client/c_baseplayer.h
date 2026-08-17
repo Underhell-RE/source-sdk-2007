@@ -187,7 +187,7 @@ public:
 	float						MaxSpeed() const		{ return m_flMaxspeed; }
 
 	// Should this object cast shadows?
-	virtual ShadowType_t		ShadowCastType() { return SHADOWS_NONE; }
+	virtual ShadowType_t		ShadowCastType() { return SHADOWS_RENDER_TO_TEXTURE_DYNAMIC; }
 
 	virtual bool				ShouldReceiveProjectedTextures( int flags )
 	{
@@ -196,6 +196,7 @@ public:
 
 
 	bool						IsLocalPlayer( void ) const;
+	virtual bool				AllowOvertheShoulderView( void );
 
 	// Global/static methods
 	virtual void				ThirdPersonSwitch( bool bThirdperson );

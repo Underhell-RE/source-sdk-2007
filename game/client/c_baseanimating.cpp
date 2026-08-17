@@ -1,10 +1,11 @@
-//===== Copy	right © 1996-2005, Valve Corporation, All rights reserved. ==//
+//===== Copy	right ï¿½ 1996-2005, Valve Corporation, All rights reserved. ==//
 //
 // Purpose: 
 //
 // $NoKeywords: $
 //===========================================================================//
 #include "cbase.h"
+#include "c_baseplayer.h"
 #include "c_baseanimating.h"
 #include "c_Sprite.h"
 #include "model_types.h"
@@ -2780,10 +2781,15 @@ int C_BaseAnimating::DrawModel( int flags )
 	if ( !m_bReadyToDraw )
 		return 0;
 
-	// Underhell: mirror/monitor-only studio models (player model, ghost actors)
-	// draw only during the reflective/refractive glass pass.
+	// Mirror-only entities normally draw only in reflective passes. The local
+	// player is the exception while OTS/third-person is active: the same body
+	// must be visible to the main camera.
 	if ( IsMirrorOnly() && ( !cl_player_render_mirror.GetBool() || !g_bRenderingReflectiveGlass ) )
-		return 0;
+	{
+		C_BasePlayer *pLocal = C_BasePlayer::GetLocalPlayer();
+		if ( this != pLocal || !pLocal->AllowOvertheShoulderView() )
+			return 0;
+	}
 
 	int drawn = 0;
 

@@ -1,4 +1,4 @@
-//====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =====//
+//====== Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. =====//
 //
 // Purpose: Client-side CBasePlayer.
 //
@@ -1042,11 +1042,30 @@ void C_BasePlayer::UpdateFlashlight()
 			m_pFlashlight->TurnOn();
 		}
 
-		Vector vecForward, vecRight, vecUp;
-		EyeVectors( &vecForward, &vecRight, &vecUp );
+		Vector lightOrigin = EyePosition();
+		QAngle lightAngles = EyeAngles();
+		int lightDistance = FLASHLIGHT_DISTANCE;
 
-		// Update the light with the new position and direction.		
-		m_pFlashlight->UpdateLight( EyePosition(), vecForward, vecRight, vecUp, FLASHLIGHT_DISTANCE );
+		// OTS cannot use the hidden first-person eye origin. Anchor the beam to
+		// the world weapon when it provides the authored muzzle attachment.
+		C_BaseCombatWeapon *pWeapon = GetActiveWeapon();
+		if ( pWeapon && AllowOvertheShoulderView() )
+		{
+			int attachment = pWeapon->LookupAttachment( "muzzle_flash" );
+			if ( attachment > 0 )
+				pWeapon->GetAttachment( attachment, lightOrigin, lightAngles );
+			else
+			{
+				Vector aimForward;
+				AngleVectors( lightAngles, &aimForward );
+				lightOrigin += aimForward * VEC_HULL_MAX.Length2D();
+			}
+			lightDistance = 0;
+		}
+
+		Vector vecForward, vecRight, vecUp;
+		AngleVectors( lightAngles, &vecForward, &vecRight, &vecUp );
+		m_pFlashlight->UpdateLight( lightOrigin, vecForward, vecRight, vecUp, lightDistance );
 	}
 	else if (m_pFlashlight)
 	{
@@ -1626,6 +1645,11 @@ bool C_BasePlayer::ShouldDrawLocalPlayer()
 bool C_BasePlayer::IsLocalPlayer( void ) const
 {
 	return ( GetLocalPlayer() == this );
+}
+
+bool C_BasePlayer::AllowOvertheShoulderView( void )
+{
+	return IsAlive() && !IsObserver() && !IsInAVehicle() && ::input->CAM_IsThirdPerson();
 }
 
 int	C_BasePlayer::GetUserID( void )

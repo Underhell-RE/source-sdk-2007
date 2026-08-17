@@ -11,6 +11,8 @@
 #include "c_ai_basenpc.h"
 #include "in_buttons.h"
 #include "collisionutils.h"
+#include "view.h"
+#include "iinput.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -663,6 +665,30 @@ void C_BaseHLPlayer::PerformClientSideNPCSpeedModifiers( float flFrameTime, CUse
 bool C_BaseHLPlayer::CreateMove( float flInputSampleTime, CUserCmd *pCmd )
 {
 	bool bResult = BaseClass::CreateMove( flInputSampleTime, pCmd );
+
+	// OTS aims the player from his eye position at the camera-center trace and
+	// rotates movement into the new yaw basis. This prevents shoulder offset
+	// from making bullets pass parallel to (rather than through) the reticle.
+	if ( ::input->CAM_IsThirdPerson() && AllowOvertheShoulderView() )
+	{
+		trace_t tr;
+		UTIL_TraceLine( MainViewOrigin(), MainViewOrigin() + MainViewForward() * MAX_TRACE_LENGTH,
+			MASK_SHOT, this, COLLISION_GROUP_NONE, &tr );
+		Vector target = tr.endpos;
+		Vector aim = target - EyePosition();
+		if ( aim.LengthSqr() > 1.0f )
+		{
+			QAngle oldAngles = pCmd->viewangles;
+			QAngle aimAngles;
+			VectorAngles( aim, aimAngles );
+			float delta = DEG2RAD( AngleNormalize( aimAngles.y - oldAngles.y ) );
+			float oldForward = pCmd->forwardmove;
+			float oldSide = pCmd->sidemove;
+			pCmd->forwardmove = cos( delta ) * oldForward + sin( delta ) * oldSide;
+			pCmd->sidemove = -sin( delta ) * oldForward + cos( delta ) * oldSide;
+			pCmd->viewangles = aimAngles;
+		}
+	}
 
 	// Original client stamps player+3456 every generated command while +use is
 	// held. The reticle reads this timestamp directly during Paint.

@@ -55,8 +55,6 @@ static ConVar c_orthoheight( "c_orthoheight",   "100", FCVAR_ARCHIVE );
 static kbutton_t cam_pitchup, cam_pitchdown, cam_yawleft, cam_yawright;
 static kbutton_t cam_in, cam_out; // -- "cam_move" is unused
 
-extern const ConVar *sv_cheats;
-
 // API Wrappers
 
 /*
@@ -260,18 +258,6 @@ void CInput::CAM_Think( void )
 	
 	if( !m_fCameraInThirdPerson )
 		return;
-
-	if ( !sv_cheats )
-	{
-		sv_cheats = cvar->FindVar( "sv_cheats" );
-	}
-
-	// If cheats have been disabled, pull us back out of third-person view.
-	if ( sv_cheats && !sv_cheats->GetBool() )
-	{
-		CAM_ToFirstPerson();
-		return;
-	}
 
 	// In Maya-mode
 	if ( Is_CAM_ThirdPerson_MayaMode() )
@@ -949,7 +935,7 @@ static ConCommand startcamin( "+camin", CAM_InDown );
 static ConCommand endcamin( "-camin", CAM_InUp );
 static ConCommand startcamout( "+camout", CAM_OutDown );
 static ConCommand camout( "-camout", CAM_OutUp );
-static ConCommand thirdperson( "thirdperson", ::CAM_ToThirdPerson, "Switch to thirdperson camera.", FCVAR_CHEAT );
+static ConCommand thirdperson( "thirdperson", ::CAM_ToThirdPerson, "Switch to thirdperson camera." );
 static ConCommand thirdperson_mayamode( "thirdperson_mayamode", ::CAM_ToThirdPerson_MayaMode, "Switch to thirdperson Maya-like camera controls.", FCVAR_CHEAT );
 static ConCommand firstperson( "firstperson", ::CAM_ToFirstPerson, "Switch to firstperson camera." );
 static ConCommand camortho( "camortho", ::CAM_ToOrthographic, "Switch to orthographic camera.", FCVAR_CHEAT );
