@@ -395,23 +395,24 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	pGlow->SetSolid( SOLID_NONE );
 	DispatchSpawn( pGlow );
 
-	// The hidden physics prop stores the authored lit skin. CFlare supplies the
-	// coloured dynamic light, but is frozen before parenting: a live
-	// MOVETYPE_FLYGRAVITY flare under a moving/physics parent caused repeated
-	// collision updates and the reported long-term slowdown.
+	// A glowstick needs light only. env_flare cannot be used here: Create()
+	// starts its burn sound, sprite emitter and spark think before callers can
+	// modify it. A light_dynamic has no visible flare, smoke, sparks or sound.
 	CBaseAnimating *pGlowAnim = pGlow->GetBaseAnimating();
 	int attachment = pGlowAnim ? pGlowAnim->LookupAttachment( "fuse" ) : 0;
 	Vector lightOrigin = pGlow->GetAbsOrigin(); QAngle lightAngles = pGlow->GetAbsAngles();
 	if ( attachment > 0 ) pGlowAnim->GetAttachment( attachment, lightOrigin, lightAngles );
-	CFlare *pLight = CFlare::Create( lightOrigin, lightAngles, pGlow, 360.0f );
+	CBaseEntity *pLight = CreateEntityByName( "light_dynamic" );
 	if ( pLight )
 	{
-		pLight->SetGlowStickMode( UH_GetGlowstickBodyGroup( iItem ) );
-		pLight->m_bPropFlare = true;
-		pLight->SetMoveType( MOVETYPE_NONE );
-		pLight->SetSolid( SOLID_NONE );
-		pLight->AddSolidFlags( FSOLID_NOT_SOLID );
-		pLight->SetGravity( 0.0f );
+		Color color = UH_GetGlowstickColor( iItem );
+		pLight->KeyValue( "_light", UTIL_VarArgs( "%d %d %d 255", color.r(), color.g(), color.b() ) );
+		pLight->KeyValue( "distance", "256" );
+		pLight->KeyValue( "brightness", "2" );
+		pLight->SetAbsOrigin( lightOrigin );
+		pLight->SetAbsAngles( lightAngles );
+		DispatchSpawn( pLight );
+		pLight->SetOwnerEntity( pGlow );
 		pLight->SetParent( pGlow, attachment );
 	}
 	pGlow->GetBaseAnimating()->m_nSkin = pGlow->GetBaseAnimating()->m_nSkin + 1; // odd = lit

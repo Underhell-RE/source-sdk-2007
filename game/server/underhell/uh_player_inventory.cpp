@@ -135,16 +135,15 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 		CBaseEntity *pGlow = UH_IsLitGlowstick( iItem ) ? UH_GetActiveGlowStick() : NULL;
 		if ( pGlow )
 		{
-			pGlow->SetParent( NULL );
-			pGlow->RemoveEffects( EF_NODRAW | EF_NOSHADOW );
-			pGlow->RemoveSolidFlags( FSOLID_NOT_SOLID );
-			pGlow->SetSolid( SOLID_VPHYSICS );
-			if ( !pGlow->VPhysicsGetObject() ) pGlow->VPhysicsInitNormal( SOLID_VPHYSICS, 0, false );
-			pGlow->SetAbsOrigin( vecOrigin );
-			pGlow->SetAbsAngles( angItem );
+			// The carried prop was spawned hidden/non-solid. Rebuilding the
+			// dropped prop is safer than attempting to turn that entity back into
+			// VPhysics after it has been parented to the player.
+			CBaseEntity *pLight = UH_GetActiveGlowStickLight();
+			if ( pLight ) UTIL_Remove( pLight );
+			UTIL_Remove( pGlow );
 			UH_SetActiveGlowStick( NULL );
 			UH_SetActiveGlowStickLight( NULL );
-			return;
+			pGlow = NULL;
 		}
 
 		pGlow = CreateEntityByName( "prop_physics" );
@@ -160,15 +159,17 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 			int attachment = pGlowAnim ? pGlowAnim->LookupAttachment( "fuse" ) : 0;
 			Vector org = pGlow->GetAbsOrigin(); QAngle ang = pGlow->GetAbsAngles();
 			if ( attachment > 0 ) pGlowAnim->GetAttachment( attachment, org, ang );
-			CFlare *pLight = CFlare::Create( org, ang, pGlow, 360.0f );
+			CBaseEntity *pLight = CreateEntityByName( "light_dynamic" );
 			if ( pLight )
 			{
-				pLight->SetGlowStickMode( UH_GetGlowstickBodyGroup( iItem ) );
-				pLight->m_bPropFlare = true;
-				pLight->SetMoveType( MOVETYPE_NONE );
-				pLight->SetSolid( SOLID_NONE );
-				pLight->AddSolidFlags( FSOLID_NOT_SOLID );
-				pLight->SetGravity( 0.0f );
+				Color color = UH_GetGlowstickColor( iItem );
+				pLight->KeyValue( "_light", UTIL_VarArgs( "%d %d %d 255", color.r(), color.g(), color.b() ) );
+				pLight->KeyValue( "distance", "256" );
+				pLight->KeyValue( "brightness", "2" );
+				pLight->SetAbsOrigin( org );
+				pLight->SetAbsAngles( ang );
+				DispatchSpawn( pLight );
+				pLight->SetOwnerEntity( pGlow );
 				pLight->SetParent( pGlow, attachment );
 			}
 			pGlow->AddEffects( EF_NOSHADOW );

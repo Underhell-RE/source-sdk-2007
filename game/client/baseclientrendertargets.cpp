@@ -48,14 +48,13 @@ ITexture* CBaseClientRenderTargets::CreateCustomCameraTexture( IMaterialSystem* 
 {
 	char name[64];
 	Q_snprintf( name, sizeof( name ), "_rt_CustomCamera_%d", index );
-	// Original sub_101299B0 uses the off-screen size mode and the legacy
-	// CreateNamedRenderTargetTexture call. RT_SIZE_DEFAULT allowed the target
-	// to be regenerated/clamped like a framebuffer target, leaving it at the
-	// clear colour on this Orange Box material system.
-	return pMaterialSystem->CreateNamedRenderTargetTexture(
+	// sub_101299B0 calls IMaterialSystem vtable slot 84, which is Ex2 in this
+	// Orange Box interface, with size mode 5 (RT_SIZE_OFFSCREEN).
+	return pMaterialSystem->CreateNamedRenderTargetTextureEx2(
 		name, size, size, RT_SIZE_OFFSCREEN,
 		pMaterialSystem->GetBackBufferFormat(), MATERIAL_RT_DEPTH_SHARED,
-		true, false );
+		TEXTUREFLAGS_CLAMPS | TEXTUREFLAGS_CLAMPT,
+		CREATERENDERTARGETFLAGS_HDR );
 }
 
 //-----------------------------------------------------------------------------
