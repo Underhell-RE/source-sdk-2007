@@ -331,6 +331,8 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_hCarryingRagdoll, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_fSavedSensitivity, FIELD_FLOAT ),
 	DEFINE_FIELD( m_vecUHFreeAimTarget, FIELD_VECTOR ),
+	DEFINE_FIELD( m_bBulletTimeDisabled, FIELD_BOOLEAN ),
+	DEFINE_THINKFUNC( UH_EndBulletTimeThink ),
 	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
@@ -484,6 +486,7 @@ CHL2_Player::CHL2_Player()
 	m_hCarryingRagdoll = NULL;
 	m_fSavedSensitivity = 0.0f;
 	m_vecUHFreeAimTarget = vec3_origin;
+	m_bBulletTimeDisabled = true;
 
 	UH_InitializeInventory();
 	UH_InitializeEndurance();
@@ -1929,7 +1932,7 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 
 	case 110:
 	{
-		UH_SetBulletTime( !UH_BulletTimeActive() );
+		if ( !m_bBulletTimeDisabled ) UH_ToggleBulletTime( this );
 		break;
 	}
 

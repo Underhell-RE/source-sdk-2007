@@ -111,8 +111,8 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
   - `bt_playerbulletspeed` default `2000`;
   - `bt_plr_speed` default `250`.
 - `bt_enabled` callback changes `host_timescale`, player max speed, overlay and start/end sound playback.
-- `impulse 110` toggles BT.
-- `EnableBt`/`DisableBt` player map inputs were added.
+- `impulse 110` toggles BT only while the player's original BT gate allows it.
+- `EnableBT` only clears that gate; `DisableBT` sets it and schedules the actual shutdown one game-second later. This matches Chapter1_16, where EnableBT occurs at t=3, alias `bt` starts BT at t=4, and DisableBT at t=9 ends it at t=10 (about 20 real seconds at timescale 0.3).
 - BT sound scripts are precached (`Player.bullettimestart`, loop/end).
 - Visible bullet model selection follows decompiled ammo IDs:
   - IDs 3/4: `bt_9mm`;
@@ -287,10 +287,12 @@ Commit `7200b4b` incorrectly made `+use` strip a helmet from a corpse. It was ex
 
 - Corrected original internal variant order and FGD-key mapping:
   - inmate 0, worker 1, doctor 2, uniform 3, urban 4, rural 5, guard 6, office 7.
-- Corrected some bodygroup branches.
-- Removed an incorrect fabricated head-hit call in `OnTakeDamage_Alive`; base `TraceAttack` now remains responsible for actual hitgroup routing.
+- Rebuilt per-family skin/head/arm/glove/helmet/respirator randomization from `sub_101A6620`, including the distinct 0/1/2/3 versus 0..7 arm-state families.
+- Corrected original defaults (`uh_infected_door_dist 37`, efficiency 1), SpeedModifier semantics, Zombine sound set, duplicate NPCInit, efficiency/cower handling and short door probe.
+- Existing custom schedules cover climb unstick, door bash, radio investigation/destruction, sprint slots and melee; shared dismemberment now transfers infected part state into corpses.
+- Removed an incorrect fabricated head-hit call in `OnTakeDamage_Alive`; base `TraceAttack` remains responsible for actual hitgroup routing.
 
-**Not complete:** schedules, climb, sprint, door/radio interaction, limp behavior, melee, corpse/gib state transfer and original custom conditions/tasks are incomplete.
+**Still runtime-sensitive:** exact animation availability, radio navigation edge cases, equipment choice and door-break timing require in-game comparison across all eight models.
 
 ### Ace
 

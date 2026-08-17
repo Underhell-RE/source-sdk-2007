@@ -33,6 +33,25 @@ END_DATADESC()
 bool UH_BulletTimeActive() { return bt_enabled.GetBool(); }
 void UH_SetBulletTime( bool bEnabled ) { bt_enabled.SetValue( bEnabled ? 1 : 0 ); }
 
+void UH_ToggleBulletTime( CBasePlayer *pPlayer )
+{
+	const bool bEnable = !bt_enabled.GetBool();
+	if ( pPlayer )
+	{
+		if ( bEnable )
+		{
+			pPlayer->EmitSound( "Player.bullettimestart" );
+			pPlayer->EmitSound( "Player.bullettimeloop" );
+		}
+		else
+		{
+			pPlayer->StopSound( "Player.bullettimeloop" );
+			pPlayer->EmitSound( "Player.bullettimeend" );
+		}
+	}
+	bt_enabled.SetValue( bEnable ? 1 : 0 );
+}
+
 static const char *UH_BulletModel( int ammoType )
 {
 	switch ( ammoType )
@@ -144,7 +163,6 @@ static void UH_BulletTimeChanged( IConVar *pVar, const char *pOldValue, float fl
 		CHL2_Player *pPlayer = dynamic_cast< CHL2_Player * >( UTIL_PlayerByIndex( i ) );
 		if ( !pPlayer ) continue;
 		pPlayer->SetMaxSpeed( bt_enabled.GetBool() ? bt_plr_speed.GetFloat() : ( pNormalSpeed ? pNormalSpeed->GetFloat() : 150.0f ) );
-		pPlayer->EmitSound( bt_enabled.GetBool() ? "Player.bullettimestart" : "Player.bullettimeend" );
 		engine->ClientCommand( pPlayer->edict(), bt_enabled.GetBool() ? "r_screenoverlay dev/bullettime" : "r_screenoverlay off" );
 	}
 }
@@ -154,5 +172,25 @@ void UH_BulletTimePlayerDied( CBasePlayer *pPlayer )
 	if ( bt_enabled.GetBool() ) bt_enabled.SetValue( 0 );
 }
 
-void CHL2_Player::InputEnableBt( inputdata_t &inputdata ) { UH_SetBulletTime( true ); }
-void CHL2_Player::InputDisableBt( inputdata_t &inputdata ) { UH_SetBulletTime( false ); }
+void CHL2_Player::InputEnableBt( inputdata_t &inputdata )
+{
+	// Original EnableBT only clears the per-player gate. The map starts BT one
+	// second later with alias "bt" -> impulse 110.
+	m_bBulletTimeDisabled = false;
+}
+
+void CHL2_Player::InputDisableBt( inputdata_t &inputdata )
+{
+	m_bBulletTimeDisabled = true;
+	if ( UH_BulletTimeActive() )
+	{
+		StopSound( "Player.bullettimeloop" );
+		EmitSound( "Player.bullettimeend" );
+		SetContextThink( &CHL2_Player::UH_EndBulletTimeThink, gpGlobals->curtime + 1.0f, "BulletTimeEndContext" );
+	}
+}
+
+void CHL2_Player::UH_EndBulletTimeThink( void )
+{
+	if ( UH_BulletTimeActive() ) UH_SetBulletTime( false );
+}

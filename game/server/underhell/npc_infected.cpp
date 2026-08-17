@@ -55,8 +55,8 @@ extern ConVar sk_plr_dmg_smg1_grenade;
 // ConVars from original binaries (strings extracted from serveror.dll)
 // ---------------------------------------------------------------------------
 static ConVar uh_infected_health( "uh_infected_health", "50", FCVAR_ARCHIVE, "Infected health" );
-static ConVar uh_infected_door_dist( "uh_infected_door_dist", "96", FCVAR_ARCHIVE, "Door bash distance" );
-static ConVar uh_infected_efficiency( "uh_infected_efficiency", "0", FCVAR_ARCHIVE, "Efficiency" );
+static ConVar uh_infected_door_dist( "uh_infected_door_dist", "37", FCVAR_ARCHIVE, "Door bash distance" );
+static ConVar uh_infected_efficiency( "uh_infected_efficiency", "1", FCVAR_ARCHIVE, "Efficiency" );
 static ConVar uh_infected_randspeedenabled( "uh_infected_randspeedenabled", "1", FCVAR_ARCHIVE, "Random speed enabled" );
 static ConVar uh_infectedcower( "uh_infectedcower", "0", FCVAR_ARCHIVE, "Cower?" );
 
@@ -378,7 +378,7 @@ AI_END_CUSTOM_NPC()
 // ---------------------------------------------------------------------------
 CNPC_UH_Infected::CNPC_UH_Infected() : m_DurationDoorBash( 2.0f, 6.0f )
 {
-	m_flSpeedModifier = -1.0f; // blank -> random
+	m_flSpeedModifier = 0.0f; // zero = constructor random/default; nonzero overrides
 	m_iInfectedVariant = -1;
 	m_bInfectedFlag = false;
 	m_bIsLimping = false;
@@ -444,6 +444,12 @@ void CNPC_UH_Infected::Precache( void )
 	PrecacheScriptSound( "Zombie.AttackMiss" );
 	PrecacheScriptSound( "Zombine.Die" );
 	PrecacheScriptSound( "Zombine.Pain" );
+	PrecacheScriptSound( "Zombine.Alert" );
+	PrecacheScriptSound( "Zombine.Idle" );
+	PrecacheScriptSound( "Zombine.ReadyGrenade" );
+	PrecacheScriptSound( "Zombine.Charge" );
+	PrecacheScriptSound( "Metal.Door_Breach" );
+	PrecacheScriptSound( "ATV_engine_null" );
 	PrecacheScriptSound( "NPC_FastZombie.LeapAttack" );
 	PrecacheScriptSound( "NPC_FastZombie.Attack" );
 }
@@ -480,21 +486,14 @@ void CNPC_UH_Infected::PickBodyVariant( void )
 // ---------------------------------------------------------------------------
 void CNPC_UH_Infected::ApplySpeedModifier( void )
 {
-	// If blank (-1), random 0.4..1.0 (per FGD). Else clamp 0..1
-	if ( m_flSpeedModifier < -0.5f )
-	{
-		if ( uh_infected_randspeedenabled.GetBool() )
-			m_flSpeedModifier = random->RandomFloat( 0.4f, 1.0f );
-		else
-			m_flSpeedModifier = 1.0f;
-	}
-	m_flSpeedModifier = clamp( m_flSpeedModifier, 0.0f, 1.0f );
-
-	// Scale derived from original: 0.8 + rand*0.5 + SpeedModifier*0.2
-	// Original at 0x106B93?? used formula: rand*0.000030518509*0.5+0.8
-	float flRandBase = random->RandomFloat( 0.8f, 1.3f );
-	m_flSpeedScale = flRandBase * (0.7f + m_flSpeedModifier * 0.6f);
-	m_flSpeedScale = clamp( m_flSpeedScale, 0.4f, 1.8f );
+	// Constructor sub_101A7B70 chooses 0.8..1.3 when random speed is enabled.
+	// Spawn then replaces it verbatim when the SpeedModifier key is nonzero.
+	if ( m_flSpeedModifier != 0.0f )
+		m_flSpeedScale = m_flSpeedModifier;
+	else if ( uh_infected_randspeedenabled.GetBool() )
+		m_flSpeedScale = random->RandomFloat( 0.8f, 1.3f );
+	else
+		m_flSpeedScale = 1.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -502,67 +501,60 @@ void CNPC_UH_Infected::ApplySpeedModifier( void )
 // ---------------------------------------------------------------------------
 void CNPC_UH_Infected::ApplyBodygroups( void )
 {
-	// All infected have skin randomization
-	int iSkin = random->RandomInt( 0, 5 );
-	m_nSkin = iSkin;
+	const int type = m_iInfectedVariant;
+	m_nSkin = random->RandomInt( 0, ( type == 0 || type == 6 || type == 7 ) ? 2 :
+		( type == 1 || type == 2 ) ? 5 : 8 );
 
-	// Per-variant randomization (helmets, respirator, gloves, arms)
-	int iVariant = m_iInfectedVariant;
-
-	if ( iVariant == 1 ) // worker
+	int armState;
+	const int roll = random->RandomInt( 0, 99 );
+	if ( type == 1 || type == 2 || type == 6 )
 	{
-		// worker: 0..5 skin already, plus head 0..8 random
-		int iHead = random->RandomInt( 0, 8 );
-		SetBodygroup( FindBodygroupByName( "head" ), iHead );
-
-		// Gloves
-		if ( FindBodygroupByName( "Glove_L" ) >= 0 )
-			SetBodygroup( FindBodygroupByName( "Glove_L" ), random->RandomInt( 0, 1 ) );
-		if ( FindBodygroupByName( "Glove_R" ) >= 0 )
-			SetBodygroup( FindBodygroupByName( "Glove_R" ), random->RandomInt( 0, 1 ) );
-
-		// Arms – will be overridden if limp
-	}
-	else if ( iVariant == 2 ) // doctor
-	{
-		int iHead = random->RandomInt( 0, 8 );
-		if ( FindBodygroupByName( "head" ) >= 0 )
-			SetBodygroup( FindBodygroupByName( "head" ), iHead );
-	}
-	else if ( iVariant == 6 ) // guard
-	{
-		int iHelmet = random->RandomInt( 0, 3 );
-		int iHead = random->RandomInt( 0, 9 );
-		int iRespirator = random->RandomInt( 0, 1 );
-
-		if ( FindBodygroupByName( "helmet" ) >= 0 )
-			SetBodygroup( FindBodygroupByName( "helmet" ), iHelmet );
-		if ( FindBodygroupByName( "head" ) >= 0 )
-			SetBodygroup( FindBodygroupByName( "head" ), iHead );
-		if ( FindBodygroupByName( "respirator" ) >= 0 )
-			SetBodygroup( FindBodygroupByName( "respirator" ), iRespirator );
-
-		if ( iHelmet == 3 )
-		{
-			// Visor down (original calls SetSequence? We set bodygroup)
-			// Find and set VisorDown via animation event is complex, ignore
-		}
+		if ( roll > 29 ) armState = 0;
+		else if ( roll >= 5 ) armState = random->RandomInt( 1, 2 );
+		else armState = 3;
 	}
 	else
 	{
-		int iHead = random->RandomInt( 0, 2 );
-		int iBody = random->RandomInt( 0, 1 );
-		if ( FindBodygroupByName( "head" ) >= 0 )
-			SetBodygroup( FindBodygroupByName( "head" ), iHead );
-		if ( FindBodygroupByName( "body" ) >= 0 )
-			SetBodygroup( FindBodygroupByName( "body" ), iBody );
+		if ( roll > 29 ) armState = roll % 2;
+		else if ( roll >= 5 ) armState = roll % 2 + ( random->RandomInt( 0, 1 ) ? 2 : 4 );
+		else armState = 6 + random->RandomInt( 0, 1 );
 	}
 
-	// Limp handling – random limb loss
-	if ( m_bInfectedFlag )
+	int arms = FindBodygroupByName( "arms" );
+	if ( arms >= 0 ) SetBodygroup( arms, min( armState, GetBodygroupCount( arms ) - 1 ) );
+	m_bInfectedFlag = armState != 0;
+	m_bIsLimping = false; // arm loss changes capabilities, not locomotion speed
+
+	int head = FindBodygroupByName( "head" );
+	int body = FindBodygroupByName( "body" );
+	if ( type == 6 )
 	{
-		BecomeLimp();
+		int helmetValue = random->RandomInt( 0, 3 );
+		int helmet = FindBodygroupByName( "helmet" );
+		int respirator = FindBodygroupByName( "respirator" );
+		if ( helmet >= 0 ) SetBodygroup( helmet, helmetValue );
+		if ( head >= 0 ) SetBodygroup( head, min( random->RandomInt( 0, 19 ), 9 ) );
+		if ( respirator >= 0 ) SetBodygroup( respirator, helmetValue == 3 ? 0 : random->RandomInt( 0, 1 ) );
+		if ( helmetValue == 3 ) SetSequenceByName( (char *)"VisorDown" );
 	}
+	else
+	{
+		if ( head >= 0 ) SetBodygroup( head, random->RandomInt( 0, 8 ) );
+		if ( body >= 0 && type != 1 && type != 2 ) SetBodygroup( body, armState % 2 );
+	}
+
+	if ( type == 1 )
+	{
+		int helmet = FindBodygroupByName( "helmet" );
+		if ( helmet >= 0 ) SetBodygroup( helmet, random->RandomInt( 0, 3 ) == 0 );
+		int gl = FindBodygroupByName( "Glove_L" );
+		int gr = FindBodygroupByName( "Glove_R" );
+		if ( gl >= 0 && ( armState == 0 || armState == 2 ) ) SetBodygroup( gl, random->RandomInt( 0, 1 ) );
+		if ( gr >= 0 && ( armState == 0 || armState == 1 ) ) SetBodygroup( gr, random->RandomInt( 0, 1 ) );
+	}
+
+	// Original capability state follows authored arm loss.
+	if ( armState > 0 ) CapabilitiesRemove( bits_CAP_MOVE_SHOOT );
 }
 
 void CNPC_UH_Infected::BecomeLimp( void )
@@ -667,9 +659,6 @@ void CNPC_UH_Infected::Spawn( void )
 	// Pick variant before base spawn because SetZombieModel needs it
 	PickBodyVariant();
 
-	// Random limp flag – original 25% chance (0..3 ==0)
-	m_bInfectedFlag = ( random->RandomInt( 0, 3 ) == 0 );
-
 	ApplySpeedModifier();
 
 	SetSolid( SOLID_BBOX );
@@ -700,14 +689,13 @@ void CNPC_UH_Infected::Spawn( void )
 	GiveAdditionalEquipment();
 
 	BaseClass::Spawn();
+	SetEfficiency( (AI_Efficiency_t)clamp( uh_infected_efficiency.GetInt(), (int)AIE_NORMAL, (int)AIE_SUPER_EFFICIENT ) );
 
 	// Touch for climbing (original set touch to ClimbTouch)
 	SetTouch( &CNPC_UH_Infected::ClimbTouch );
 
-	// Set playback rate affected by speed
+	// BaseZombie::Spawn already called NPCInit once.
 	SetPlaybackRate( m_flSpeedScale );
-
-	NPCInit();
 
 	// Random moan time
 	m_flNextMoanTime = gpGlobals->curtime + random->RandomFloat( 0.5f, 2.0f );
@@ -718,7 +706,7 @@ void CNPC_UH_Infected::Spawn( void )
 // ---------------------------------------------------------------------------
 const char *CNPC_UH_Infected::GetMoanSound( int nSound )
 {
-	return "NPC_FastZombie.Moan1";
+	return "Zombine.Idle";
 }
 
 void CNPC_UH_Infected::PainSound( const CTakeDamageInfo &info )
@@ -733,7 +721,7 @@ void CNPC_UH_Infected::DeathSound( const CTakeDamageInfo &info )
 
 void CNPC_UH_Infected::AlertSound( void )
 {
-	EmitSound( "NPC_Infected.Attack" );
+	EmitSound( "Zombine.Alert" );
 }
 
 void CNPC_UH_Infected::IdleSound( void )
@@ -741,13 +729,13 @@ void CNPC_UH_Infected::IdleSound( void )
 	if ( gpGlobals->curtime < m_flNextMoanTime )
 		return;
 
-	EmitSound( "NPC_FastZombie.Moan1" );
+	EmitSound( "Zombine.Idle" );
 	m_flNextMoanTime = gpGlobals->curtime + random->RandomFloat( 2.0f, 5.0f );
 }
 
 void CNPC_UH_Infected::AttackSound( void )
 {
-	EmitSound( "NPC_FastZombie.Attack" );
+	EmitSound( "Zombie.Attack" );
 }
 
 void CNPC_UH_Infected::AttackHitSound( void )
@@ -844,6 +832,25 @@ void CNPC_UH_Infected::GatherConditions( void )
 		ClearCondition( COND_ENEMY_UNREACHABLE );
 	}
 
+	// Original infected checks a short 37-unit door probe before selecting its
+	// bash-door schedule.
+	Vector forward; AngleVectors( GetAbsAngles(), &forward );
+	trace_t doorTrace;
+	UTIL_TraceHull( WorldSpaceCenter(), WorldSpaceCenter() + forward * uh_infected_door_dist.GetFloat(),
+		WorldAlignMins(), WorldAlignMaxs(), MASK_NPCSOLID, this, COLLISION_GROUP_NPC, &doorTrace );
+	if ( doorTrace.m_pEnt &&
+		( dynamic_cast<CBasePropDoor *>( doorTrace.m_pEnt ) || dynamic_cast<CBaseDoor *>( doorTrace.m_pEnt ) ) )
+	{
+		m_hBlockingDoor = doorTrace.m_pEnt;
+		m_flDoorBashYaw = GetAbsAngles().y;
+		SetCondition( COND_BLOCKED_BY_DOOR );
+	}
+	else if ( m_hBlockingDoor && !m_hBlockingDoor->IsAlive() )
+	{
+		m_hBlockingDoor = NULL;
+		ClearCondition( COND_BLOCKED_BY_DOOR );
+	}
+
 	// Random run condition
 	if ( random->RandomInt( 0, 100 ) < 5 )
 	{
@@ -930,6 +937,9 @@ int CNPC_UH_Infected::SelectSchedule( void )
 		// Investigate radio (original also listened for COND_HEAR_FMRADIO = 60)
 		return SCHED_UH_INFECTED_INVESTIGATE_RADIO;
 	}
+
+	if ( uh_infectedcower.GetBool() && HasCondition( COND_SEE_ENEMY ) )
+		return SCHED_RUN_FROM_ENEMY;
 
 	if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
 	{
@@ -1090,7 +1100,7 @@ void CNPC_UH_Infected::StartTask( const Task_t *pTask )
 				CBaseEntity *pTarget = GetTarget();
 				if ( pTarget && ( FClassnameIs( pTarget, "item_fmradio" ) || FClassnameIs( pTarget, "item_radiocracker" ) || FClassnameIs( pTarget, "uh_radio" ) ) )
 				{
-					EmitSound( "NPC_FastZombie.Attack" );
+					EmitSound( "Zombie.Attack" );
 
 					// If it's a radio cracker (either classname item_radiocracker or uh_radio with cracker flag), explode
 					bool bIsCracker = false;
@@ -1286,4 +1296,5 @@ void CNPC_UH_Infected::InputSetSpeedModifier( inputdata_t &inputdata )
 {
 	m_flSpeedModifier = inputdata.value.Float();
 	ApplySpeedModifier();
+	SetPlaybackRate( m_flSpeedScale );
 }

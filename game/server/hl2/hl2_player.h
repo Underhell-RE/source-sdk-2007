@@ -479,6 +479,7 @@ public:
 	void				InputEnableKick( inputdata_t &inputdata );
 	void				InputEnableBt( inputdata_t &inputdata );
 	void				InputDisableBt( inputdata_t &inputdata );
+	void				UH_EndBulletTimeThink( void );
 	void				UH_SetKickViewModel( const char *pszModel );	// set + precache viewmodel 2
 
 	//-----------------------------------------------------------------------------
@@ -580,6 +581,7 @@ private:
 	EHANDLE				m_hCarryingRagdoll;		// original m_pCarryingRagdoll @2180
 	float				m_fSavedSensitivity;
 	Vector				m_vecUHFreeAimTarget;	// update_freeaim world target (original player floats @526..528)
+	bool				m_bBulletTimeDisabled;	// original player+2120; inputs gate impulse 110
 
 	// Underhell: block the "DropWeapon" command (set by the map via
 	// InputDisableDropWeapon / InputEnableDropWeapon; original m_bDisableWeaponDrop @2136).
