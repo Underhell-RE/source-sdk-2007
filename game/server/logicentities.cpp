@@ -2353,7 +2353,7 @@ BEGIN_DATADESC( CLogicAutosave )
 	DEFINE_KEYFIELD( m_minHitPointsToCommit, FIELD_INTEGER, "MinHitPointsToCommit" ),
 	// Inputs
 	DEFINE_INPUTFUNC( FIELD_VOID, "Save", InputSave ),
-	DEFINE_INPUTFUNC( FIELD_VOID, "HardSave", InputHardSave ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "HardSave", InputHardSave ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "SaveDangerous", InputSaveDangerous ),
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetMinHitpointsThreshold", InputSetMinHitpointsThreshold ),
 END_DATADESC()
@@ -2376,8 +2376,21 @@ void CLogicAutosave::InputSave( inputdata_t &inputdata )
 //-----------------------------------------------------------------------------
 void CLogicAutosave::InputHardSave( inputdata_t &inputdata )
 {
-	if ( g_iSkillLevel == SKILL_HARD )
+	const char *pszName = inputdata.value.String();
+	if ( !pszName || !pszName[0] )
+	{
 		InputSave( inputdata );
+		return;
+	}
+
+	// Some shipped outputs pass "save name", while House passes only the
+	// filename. Normalize both forms and reject command separators.
+	if ( !Q_strnicmp( pszName, "save ", 5 ) ) pszName += 5;
+	while ( *pszName == ' ' || *pszName == '\t' ) ++pszName;
+	if ( !pszName[0] || V_stristr( pszName, ";" ) || V_stristr( pszName, "\n" ) || V_stristr( pszName, "\r" ) )
+		return;
+
+	engine->ServerCommand( UTIL_VarArgs( "save %s\n", pszName ) );
 }
 
 void CLogicAutosave::InputSaveDangerous( inputdata_t &inputdata )

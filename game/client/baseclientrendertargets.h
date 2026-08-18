@@ -39,6 +39,7 @@ public:
 	// Shutdown all custom render targets here.
 	virtual void ShutdownClientRenderTargets ( void );
 	ITexture *GetCustomCameraTextureByIndex( int index );
+	ITexture *GetScopeTexture() { return m_ScopeTexture; }
 
 protected:
 	
@@ -52,12 +53,14 @@ protected:
 	// Used for monitors
 	CTextureReference		m_CameraTexture;
 	CTextureReference		m_CustomCameraTexture[4];
+	CTextureReference		m_ScopeTexture;
 
 	// Init functions for the common render targets
 	ITexture* CreateWaterReflectionTexture( IMaterialSystem* pMaterialSystem, int iSize = 1024 );
 	ITexture* CreateWaterRefractionTexture( IMaterialSystem* pMaterialSystem, int iSize = 1024 );
 	ITexture* CreateCameraTexture( IMaterialSystem* pMaterialSystem, int iSize = 256 );
 	ITexture* CreateCustomCameraTexture( IMaterialSystem* pMaterialSystem, int index, int size );
+	ITexture* CreateScopeTexture( IMaterialSystem* pMaterialSystem );
 
 };
 

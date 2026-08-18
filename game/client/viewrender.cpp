@@ -58,6 +58,8 @@
 #define USE_MONITORS
 #endif
 #include "rendertexture.h"
+#include "hl2/c_basehlplayer.h"
+#include "baseviewmodel_shared.h"
 #include "viewpostprocess.h"
 #include "viewdebug.h"
 
@@ -1869,6 +1871,9 @@ void CViewRender::RenderView( const CViewSetup &view, int nClearFlags, int whatT
 
 		g_pClientShadowMgr->AdvanceFrame();
 
+		if ( ( whatToDraw & RENDERVIEW_SUPPRESSMONITORRENDERING ) == 0 )
+			DrawScope( view );
+
 	#ifdef USE_MONITORS
 		if ( cl_drawmonitors.GetBool() && 
 			( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() >= 70 ) &&
@@ -2870,6 +2875,52 @@ bool CViewRender::DrawOneMonitor( ITexture *pRenderTarget, int cameraNum, C_Poin
 	}
 #endif // USE_MONITORS
 	return true;
+}
+
+static ConVar r_scope_fov( "r_scope_fov", "10", 0 );
+
+void CViewRender::DrawScope( const CViewSetup &cameraView )
+{
+	C_BaseHLPlayer *pPlayer = dynamic_cast<C_BaseHLPlayer *>( C_BasePlayer::GetLocalPlayer() );
+	if ( !pPlayer )
+		return;
+	C_BaseViewModel *pViewModel = pPlayer->GetViewModel( 0 );
+	if ( !pViewModel || !pPlayer->GetActiveWeapon() )
+		return;
+
+	int iScopeAttachment = pViewModel->LookupAttachment( "Scope" );
+	if ( iScopeAttachment <= 0 )
+		return;
+
+	ITexture *pScopeTarget = GetScopeTexture();
+	if ( !pScopeTarget || IsErrorTexture( pScopeTarget ) )
+		return;
+
+	CViewSetup scopeView = cameraView;
+	if ( !pPlayer->m_bIronSighted )
+	{
+		Vector vecOrigin;
+		QAngle vecAngles;
+		if ( pViewModel->GetAttachment( iScopeAttachment, vecOrigin, vecAngles ) )
+		{
+			scopeView.origin = vecOrigin;
+			scopeView.angles = vecAngles;
+		}
+	}
+	scopeView.x = scopeView.y = 0;
+	scopeView.width = pScopeTarget->GetActualWidth();
+	scopeView.height = pScopeTarget->GetActualHeight();
+	scopeView.fov = r_scope_fov.GetFloat();
+	scopeView.m_bOrtho = false;
+
+	CMatRenderContextPtr pRenderContext( materials );
+	pRenderContext->PushRenderTargetAndViewport( pScopeTarget );
+	pRenderContext.SafeRelease();
+	RenderView( scopeView, VIEW_CLEAR_DEPTH | VIEW_CLEAR_COLOR,
+		RENDERVIEW_SUPPRESSMONITORRENDERING );
+	pRenderContext.GetFrom( materials );
+	pRenderContext->PopRenderTargetAndViewport();
+	m_CurrentView = cameraView;
 }
 
 void CViewRender::DrawMonitors( const CViewSetup &cameraView )

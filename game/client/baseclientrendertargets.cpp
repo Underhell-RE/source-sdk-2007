@@ -45,6 +45,16 @@ ITexture* CBaseClientRenderTargets::CreateCameraTexture( IMaterialSystem* pMater
 		CREATERENDERTARGETFLAGS_HDR );
 }
 
+ITexture* CBaseClientRenderTargets::CreateScopeTexture( IMaterialSystem* pMaterialSystem )
+{
+	// Cliento sub_10129AC0: dev/_rt_Scope, 1024x1024, size mode 5,
+	// back-buffer format. Use the current SDK's typed ABI, as with camera MRTs.
+	return pMaterialSystem->CreateNamedRenderTargetTextureEx2(
+		"dev/_rt_Scope", 1024, 1024, RT_SIZE_DEFAULT,
+		pMaterialSystem->GetBackBufferFormat(), MATERIAL_RT_DEPTH_SHARED,
+		0, CREATERENDERTARGETFLAGS_HDR );
+}
+
 ITexture* CBaseClientRenderTargets::CreateCustomCameraTexture( IMaterialSystem* pMaterialSystem, int index, int size )
 {
 	char name[64];
@@ -71,7 +81,8 @@ void CBaseClientRenderTargets::InitClientRenderTargets( IMaterialSystem* pMateri
 	m_WaterReflectionTexture.Init( CreateWaterReflectionTexture( pMaterialSystem, 1024 ) );
 	m_WaterRefractionTexture.Init( CreateWaterRefractionTexture( pMaterialSystem, 1024 ) );
 
-	// Monitors
+	// Scope + monitors
+	m_ScopeTexture.Init( CreateScopeTexture( pMaterialSystem ) );
 	m_CameraTexture.Init( CreateCameraTexture( pMaterialSystem, 256 ) );
 	m_CustomCameraTexture[0].Init( CreateCustomCameraTexture( pMaterialSystem, 1, 256 ) );
 	m_CustomCameraTexture[1].Init( CreateCustomCameraTexture( pMaterialSystem, 2, 256 ) );
@@ -113,7 +124,8 @@ void CBaseClientRenderTargets::ShutdownClientRenderTargets()
 	m_WaterReflectionTexture.Shutdown();
 	m_WaterRefractionTexture.Shutdown();
 
-	// Monitors
+	// Scope + monitors
+	m_ScopeTexture.Shutdown();
 	m_CameraTexture.Shutdown();
 	for ( int i = 0; i < 4; ++i )
 		m_CustomCameraTexture[i].Shutdown();
@@ -131,6 +143,11 @@ static CBaseClientRenderTargets g_BaseClientRenderTargets;
 ITexture *GetAllocatedCustomCameraTexture( int index )
 {
 	return g_BaseClientRenderTargets.GetCustomCameraTextureByIndex( index );
+}
+
+ITexture *GetAllocatedScopeTexture()
+{
+	return g_BaseClientRenderTargets.GetScopeTexture();
 }
 
 IClientRenderTargets *g_pClientRenderTargets = &g_BaseClientRenderTargets;

@@ -81,6 +81,7 @@ ITexture *GetCameraTexture( void )
 }
 
 extern ITexture *GetAllocatedCustomCameraTexture( int index );
+extern ITexture *GetAllocatedScopeTexture();
 
 ITexture *GetCustomCameraTexture( int index )
 {
@@ -88,6 +89,11 @@ ITexture *GetCustomCameraTexture( int index )
 	// client-render-target singleton directly. Looking it up again by name can
 	// bind the material-system error/placeholder texture during level loading.
 	return GetAllocatedCustomCameraTexture( index );
+}
+
+ITexture *GetScopeTexture( void )
+{
+	return GetAllocatedScopeTexture();
 }
 
 //=============================================================================

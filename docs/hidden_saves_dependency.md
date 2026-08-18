@@ -98,18 +98,11 @@ Source save не является стабильным форматом данн
 
 Поэтому копирование оригинальных `.hiddensave` в порт — принципиально ненадёжное решение. Даже если конкретная версия сейчас загрузится, следующий datamap change снова её сломает.
 
-## Дополнительная проблема текущего порта
+## Исправленная проблема порта
 
-Сейчас восстановленный `CLogicAutosave::InputHardSave` не соответствует тому, чего ожидают House VMF:
+До введения compatibility layer восстановленный `CLogicAutosave::InputHardSave` не соответствовал House VMF: был `FIELD_VOID`, игнорировал имя, зависел от Hard difficulty и запускал только `autosave`.
 
-- input зарегистрирован как `FIELD_VOID`;
-- строковый параметр (`house.hiddensave`, `house1.hiddensave`) игнорируется;
-- сохранение вызывается только на Hard difficulty;
-- выполняется обычный `autosave`, а не именованный `save`.
-
-Следовательно, оригинальная схема перезаписи House snapshots в текущем коде не воспроизводится корректно даже при наличии начальных файлов.
-
-Это следует исправить как временный compatibility layer, но не использовать как окончательную архитектуру.
+Теперь input принимает строку, поддерживает `name` и `save name` и создаёт именованный save. Это нужно для совместимости, но не делает shipped binary snapshots хорошей окончательной архитектурой.
 
 ## Нормальное решение
 
@@ -261,6 +254,35 @@ changelevel Uh_House_0
 - versioned persistent prop support;
 - временное исправление `CLogicAutosave::InputHardSave`;
 - тесты map spawn/return/new game/migration.
+
+## Реализованный временный proxy
+
+В коде добавлены:
+
+```text
+uh_hidden_save_proxy 0
+uh_load_hidden_save <name.hiddensave>
+```
+
+По умолчанию proxy выключен и `uh_load_hidden_save` выполняет обычный `load`.
+При `uh_hidden_save_proxy 1` известные snapshots перенаправляются:
+
+```text
+house0.restart.hiddensave -> changelevel Uh_House_0
+house0.hiddensave         -> changelevel Uh_House_0
+house.hiddensave          -> changelevel Uh_House_0
+house1.hiddensave         -> changelevel Uh_House_1
+```
+
+`point_servercommand` также перехватывает соответствующие `load` из VMF, когда cvar включён. Прямую engine-команду `load` из старого `chapter1.cfg` перехватить безопасно нельзя, поэтому для proxy-теста cfg должен вызывать:
+
+```cfg
+uh_load_hidden_save house0.restart.hiddensave
+```
+
+Это намеренно экспериментальная прослойка: fresh map пока не применяет полноценный versioned campaign state.
+
+Также исправлен `logic_autosave.HardSave`: input принимает строку, нормализует как `name` так и `save name`, и выполняет именованный save независимо от difficulty.
 
 ## Минимальный набор тестов
 
