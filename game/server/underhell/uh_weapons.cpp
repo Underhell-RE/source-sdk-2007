@@ -19,6 +19,7 @@
 #include "rumble_shared.h"
 #include "ai_basenpc.h"
 #include "hl2_player.h"
+#include "hl2/npc_metropolice.h"
 #include "baseviewmodel_shared.h"
 #include "sprite.h"
 #include "uh_weapons.h"
@@ -118,14 +119,69 @@ void CUHMeleeWeapon::HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCh
 		}
 	}
 
+	// The baton has the original stunstick-derived NPC strike: 32 units and a
+	// hull stretched downward. Other Underhell melee weapons use the crowbar
+	// strike dimensions.
+	const bool bBaton = FClassnameIs( this, "weapon_melee_baton" );
 	Vector vecEnd;
-	VectorMA( pOperator->Weapon_ShootPosition(), 50, vecDirection, vecEnd );
+	VectorMA( pOperator->Weapon_ShootPosition(), bBaton ? 32.0f : 50.0f, vecDirection, vecEnd );
 	CBaseEntity *pHurt = pOperator->CheckTraceHullAttack( pOperator->Weapon_ShootPosition(), vecEnd,
-		Vector(-16,-16,-16), Vector(36,36,36), GetDamage(), DMG_CLUB, 0.75 );
+		bBaton ? Vector(-16,-16,-40) : Vector(-16,-16,-16),
+		bBaton ? Vector(16,16,16) : Vector(36,36,36),
+		(int)GetDamage(), DMG_CLUB, bBaton ? 0.5f : 0.75f );
 
 	if ( pHurt )
 	{
 		WeaponSound( MELEE_HIT );
+
+		// CWeaponBaton::Operator_HandleAnimEvent in the original is the
+		// stunstick handler, not the generic crowbar handler. In particular,
+		// StunnedTarget fires npc_metropolice.OnStunnedPlayer. Chapter 03's
+		// shower guards count that output to end the punishment sequence; if it
+		// is omitted they can beat the player forever even though attacks animate.
+		if ( bBaton )
+		{
+			CBasePlayer *pPlayer = ToBasePlayer( pHurt );
+			CNPC_MetroPolice *pCop = dynamic_cast<CNPC_MetroPolice *>( pOperator );
+			bool bKnockedOut = false;
+
+			if ( pCop && pPlayer )
+			{
+				if ( pCop->ShouldKnockOutTarget( pHurt ) )
+				{
+					pPlayer->ViewPunch( QAngle( -16, random->RandomFloat( -48, -24 ), 2 ) );
+					color32 white = { 255, 255, 255, 255 };
+					UTIL_ScreenFade( pPlayer, white, 0.2f, 1.0f, FFADE_OUT|FFADE_PURGE|FFADE_STAYOUT );
+					pCop->KnockOutTarget( pHurt );
+					bKnockedOut = true;
+				}
+				else
+				{
+					pCop->StunnedTarget( pHurt );
+				}
+			}
+
+			if ( pPlayer && !bKnockedOut && !( pPlayer->GetFlags() & FL_GODMODE ) )
+			{
+				pPlayer->ViewPunch( QAngle( -16, random->RandomFloat( -48, -24 ), 2 ) );
+
+				Vector vecImpulse = pHurt->GetAbsOrigin() - GetAbsOrigin();
+				if ( pPlayer->GetGroundEntity() == pOperator )
+				{
+					vecImpulse = vecDirection;
+					vecImpulse.z = 0;
+				}
+				VectorNormalize( vecImpulse );
+				vecImpulse *= 500.0f;
+				if ( !( pPlayer->GetFlags() & FL_ONGROUND ) )
+					vecImpulse.z = 0.0f;
+				pHurt->ApplyAbsVelocityImpulse( vecImpulse );
+
+				color32 red = { 128, 0, 0, 128 };
+				UTIL_ScreenFade( pPlayer, red, 0.5f, 0.1f, FFADE_IN );
+				pPlayer->ForceDropOfCarriedPhysObjects();
+			}
+		}
 
 		trace_t traceHit;
 		UTIL_TraceLine( pOperator->Weapon_ShootPosition(), pHurt->GetAbsOrigin(), MASK_SHOT_HULL, pOperator, COLLISION_GROUP_NONE, &traceHit );
@@ -724,7 +780,7 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
 	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = ( _weaponType == 1 ) ? FIREMODE_SEMI : FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bFireModeInitialized = false; m_bNeedPump = false; m_flPumpTime = 0.0f; m_hLaserDot = NULL; m_bSocomLaserOn = false; }
 
-#define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
+#define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _playerDamageConVar, _npcDamageConVar ) \
 	acttable_t _className::m_acttable[] = \
 	{ \
 		{ ACT_MELEE_ATTACK1, ACT_MELEE_ATTACK_SWING, true }, \
@@ -734,16 +790,16 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_pDamage = &_damageConVar; m_bDelayedMeleeAttack = false; m_flDelayedMeleeAttackTime = 0.0f; }
+	_className::_className() { m_pPlayerDamage = &_playerDamageConVar; m_pNPCDamage = &_npcDamageConVar; m_bDelayedMeleeAttack = false; m_flDelayedMeleeAttackTime = 0.0f; }
 
 //-----------------------------------------------------------------------------
 // Melee
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_MELEE( CWeaponAxe,		weapon_melee_axe,		WeaponAxe,		sk_plr_dmg_axe )
-UH_IMPLEMENT_MELEE( CWeaponBaton,		weapon_melee_baton,		WeaponBaton,	sk_plr_dmg_baton )
-UH_IMPLEMENT_MELEE( CWeaponPipe,		weapon_melee_pipe,		WeaponPipe,		sk_plr_dmg_pipe )
-UH_IMPLEMENT_MELEE( CWeaponWrench,		weapon_melee_wrench,	WeaponWrench,	sk_plr_dmg_wrench )
-UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	sk_plr_dmg_cleaver )
+UH_IMPLEMENT_MELEE( CWeaponAxe,		weapon_melee_axe,		WeaponAxe,		sk_plr_dmg_axe,		sk_npc_dmg_axe )
+UH_IMPLEMENT_MELEE( CWeaponBaton,		weapon_melee_baton,		WeaponBaton,	sk_plr_dmg_baton,		sk_npc_dmg_baton )
+UH_IMPLEMENT_MELEE( CWeaponPipe,		weapon_melee_pipe,		WeaponPipe,		sk_plr_dmg_pipe,		sk_npc_dmg_pipe )
+UH_IMPLEMENT_MELEE( CWeaponWrench,		weapon_melee_wrench,	WeaponWrench,	sk_plr_dmg_wrench,	sk_npc_dmg_wrench )
+UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	sk_plr_dmg_cleaver,	sk_npc_dmg_cleaver )
 
 //-----------------------------------------------------------------------------
 // Pistols — semi-auto. Service pistols use a 0.1 s mechanical cooldown but
