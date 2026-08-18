@@ -59,22 +59,22 @@ extern ConVar hl2_walkspeed;
 #define UH_WEAPON_OBSTRUCTION_LEAVE 44.0f
 
 //-----------------------------------------------------------------------------
-// Purpose: Drive the weapon's authored lowered pose when its barrel is close
-// to solid geometry. Underhell's player/weapon path uses the ordinary
-// ACT_VM_IDLE_LOWERED / ACT_VM_LOWERED_TO_IDLE activities plus the separate
-// hard-lowered player state; this proximity test supplies the missing runtime
-// trigger in the reconstructed SDK.
+// Purpose: Drive the weapon's authored raised/sideways pose when its barrel is
+// close to solid geometry. The original has a distinct raised state using
+// activities 204/205/206; the friendly/scripted lowered state (201/202/203) is
+// not the wall-obstruction pose.
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_UpdateWeaponObstruction( void )
 {
 	CBaseHLCombatWeapon *pWeapon = dynamic_cast<CBaseHLCombatWeapon *>( GetActiveWeapon() );
 	if ( !IsAlive() || !pWeapon || pWeapon->GetWpnData().m_bMeleeWeapon ||
-		 !pWeapon->CanLower() )
+		 pWeapon->SelectWeightedSequence( ACT_VM_IDLE_RAISED ) == ACTIVITY_NOT_AVAILABLE )
 	{
 		if ( m_bUHWeaponObstructed )
 		{
 			m_bUHWeaponObstructed = false;
-			Weapon_Ready();
+			if ( pWeapon )
+				pWeapon->SendWeaponAnim( ACT_VM_RAISED_TO_IDLE );
 		}
 		return;
 	}
@@ -97,17 +97,15 @@ void CHL2_Player::UH_UpdateWeaponObstruction( void )
 	if ( bObstructed )
 	{
 		UH_DisableIronsight();
-		Weapon_Lower();
-		if ( pWeapon->SelectWeightedSequence( ACT_VM_IDLE_TO_LOWERED ) != ACTIVITY_NOT_AVAILABLE )
-			pWeapon->SendWeaponAnim( ACT_VM_IDLE_TO_LOWERED );
+		if ( pWeapon->SelectWeightedSequence( ACT_VM_IDLE_TO_RAISED ) != ACTIVITY_NOT_AVAILABLE )
+			pWeapon->SendWeaponAnim( ACT_VM_IDLE_TO_RAISED );
 		else
-			pWeapon->SendWeaponAnim( ACT_VM_IDLE_LOWERED );
+			pWeapon->SendWeaponAnim( ACT_VM_IDLE_RAISED );
 	}
 	else
 	{
-		Weapon_Ready();
-		if ( pWeapon->SelectWeightedSequence( ACT_VM_LOWERED_TO_IDLE ) != ACTIVITY_NOT_AVAILABLE )
-			pWeapon->SendWeaponAnim( ACT_VM_LOWERED_TO_IDLE );
+		if ( pWeapon->SelectWeightedSequence( ACT_VM_RAISED_TO_IDLE ) != ACTIVITY_NOT_AVAILABLE )
+			pWeapon->SendWeaponAnim( ACT_VM_RAISED_TO_IDLE );
 		else
 			pWeapon->SendWeaponAnim( ACT_VM_IDLE );
 	}

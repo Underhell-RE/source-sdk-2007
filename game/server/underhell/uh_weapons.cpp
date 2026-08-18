@@ -328,9 +328,23 @@ void CUHGunWeapon::UH_ToggleFireMode( void )
 //-----------------------------------------------------------------------------
 void CUHGunWeapon::WeaponIdle( void )
 {
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+	CHL2_Player *pHL2Player = pPlayer ? dynamic_cast<CHL2_Player *>( pPlayer ) : NULL;
+
+	// Wall obstruction is the original raised/sideways state (activity 205),
+	// not the scripted lowered state. Keep its looping idle after the short
+	// 204 transition instead of letting BaseClass replace it with ACT_VM_IDLE.
+	if ( pHL2Player && pHL2Player->UH_IsWeaponObstructed() )
+	{
+		if ( HasWeaponIdleTimeElapsed() )
+			SendWeaponAnim( ACT_VM_IDLE_RAISED );
+		if ( !( pPlayer->m_nButtons & IN_ATTACK ) )
+			m_bFireOnEdge = true;
+		return;
+	}
+
 	BaseClass::WeaponIdle();
 
-	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 	if ( pPlayer && !( pPlayer->m_nButtons & IN_ATTACK ) )
 		m_bFireOnEdge = true;
 }

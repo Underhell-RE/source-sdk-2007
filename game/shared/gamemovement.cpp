@@ -4434,7 +4434,10 @@ void CGameMovement::PlayerMove( void )
 #if defined( CLIENT_DLL )
 	if ( cl_viewbob_enabled.GetBool() && !player->IsInAVehicle() )
 	{
-		const float flSpeed = player->GetAbsVelocity().Length();
+		// Use the currently predicted move velocity. GetAbsVelocity can still be
+		// the previous simulation value here, which made the airborne oscillator
+		// read zero on the first/short jump frames.
+		const float flSpeed = mv->m_vecVelocity.Length();
 		QAngle vecOscillation(
 			flSpeed * sin( cl_viewbob_frequency_x.GetFloat() * gpGlobals->curtime + cl_viewbob_phase_x.GetFloat() ) * cl_viewbob_magnitude_x.GetFloat() * 0.01f,
 			flSpeed * sin( cl_viewbob_frequency_y.GetFloat() * gpGlobals->curtime + cl_viewbob_phase_y.GetFloat() ) * cl_viewbob_magnitude_y.GetFloat() * 0.01f,
