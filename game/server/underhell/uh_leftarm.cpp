@@ -23,6 +23,7 @@
 #include "ammodef.h"
 #include "grenade_frag.h"
 #include "hl2/weapon_flaregun.h"
+#include "sprite.h"
 #include "hl2/info_darknessmode_lightsource.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -82,6 +83,10 @@ void CHL2_Player::UH_UpdateLeftArm( void )
 		UH_SetLeftArmModel( UH_LEFTARM_FLARE, 1, true );
 		return;
 	}
+
+	// Clean up a held-only visual if a save/input cleared the flare state.
+	if ( m_hHeldFlareSprite ) { UTIL_Remove( m_hHeldFlareSprite ); m_hHeldFlareSprite = NULL; }
+	if ( m_hHeldFlareEffect ) { UTIL_Remove( m_hHeldFlareEffect ); m_hHeldFlareEffect = NULL; }
 
 	// Hand-held (non-shoulder) flashlight, raised while on and the left arm is
 	// free: no weapon, a one-handed weapon (pistol) or melee. Must match
@@ -204,6 +209,8 @@ void CHL2_Player::UH_EquipFlare( void )
 
 	if ( m_hHeldFlareEffect ) UTIL_Remove( m_hHeldFlareEffect );
 	m_hHeldFlareEffect = NULL;
+	if ( m_hHeldFlareSprite ) UTIL_Remove( m_hHeldFlareSprite );
+	m_hHeldFlareSprite = NULL;
 	CBaseViewModel *pVM = GetViewModel( 1 );
 	if ( pVM )
 	{
@@ -232,6 +239,20 @@ void CHL2_Player::UH_EquipFlare( void )
 				// C_Flare supplies the visible client dlight/elight and sprites.
 				AddEntityToDarknessCheck( pFlare, 307.20001f );
 				m_hHeldFlareEffect = pFlare;
+
+				// C_Flare's particle emitter is world-space and can be culled when
+				// its entity is parented to a predicted viewmodel. The original has
+				// a bright fuse sprite in addition to the visible flare model; keep a
+				// networked world-glow sprite directly on the same VM attachment.
+				CSprite *pGlow = CSprite::SpriteCreate( "effects/yellowflare_noz.vmt", org, false );
+				if ( pGlow )
+				{
+					pGlow->SetTransparency( kRenderWorldGlow, 255, 150, 80, 255, kRenderFxNoDissipation );
+					pGlow->SetScale( 0.18f );
+					pGlow->SetGlowProxySize( 2.0f );
+					pGlow->SetAttachment( pVM, attachment );
+					m_hHeldFlareSprite = pGlow;
+				}
 			}
 		}
 	}
@@ -345,6 +366,11 @@ void CHL2_Player::UH_ThrowFlare( void )
 	{
 		UTIL_Remove( m_hHeldFlareEffect );
 		m_hHeldFlareEffect = NULL;
+	}
+	if ( m_hHeldFlareSprite )
+	{
+		UTIL_Remove( m_hHeldFlareSprite );
+		m_hHeldFlareSprite = NULL;
 	}
 
 	CBaseEntity *pFlare = CreateEntityByName( "prop_physics" );

@@ -368,6 +368,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_bHoldingFlare, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flFlareStartTime, FIELD_TIME ),
 	DEFINE_FIELD( m_hHeldFlareEffect, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_hHeldFlareSprite, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_bFlareMarker, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bFlareStrikePending, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flNextFlareStrike, FIELD_TIME ),
@@ -508,6 +509,7 @@ CHL2_Player::CHL2_Player()
 	m_bHoldingFlare = false;
 	m_flFlareStartTime = 0.0f;
 	m_hHeldFlareEffect = NULL;
+	m_hHeldFlareSprite = NULL;
 	m_bFlareMarker = false;
 	m_bFlareStrikePending = false;
 	m_flNextFlareStrike = 0.0f;

@@ -51,6 +51,7 @@ class CNPC_UH_Butcher : public CNPC_BaseZombie
 {
 	DECLARE_CLASS( CNPC_UH_Butcher, CNPC_BaseZombie );
 	DECLARE_DATADESC();
+	DEFINE_CUSTOM_AI;
 public:
 	CNPC_UH_Butcher() : m_bChargeEnabled( true ), m_bCower( false ), m_bCharging( false ), m_flNextCharge( 0.0f ), m_flChargeEndTime( 0.0f ) {}
 	void Spawn(); void Precache(); void PrescheduleThink();

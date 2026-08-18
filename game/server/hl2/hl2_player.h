@@ -591,6 +591,7 @@ private:
 	CNetworkVar( bool, m_bHoldingFlare );		// holding a flare (throws flare, not grenade)
 	float				m_flFlareStartTime;		// total 90 s burn starts when equipped
 	EHANDLE				m_hHeldFlareEffect;		// env_flare parented to viewmodel fuse
+	EHANDLE				m_hHeldFlareSprite;		// visible fuse sprite parented to viewmodel fuse
 	bool				m_bFlareMarker;			// grenade throw anim in progress
 	bool				m_bFlareStrikePending;	// delayed melee impact
 	float				m_flNextFlareStrike;
