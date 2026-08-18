@@ -7,6 +7,7 @@
 #include "cbase.h"
 #include "npc_combines.h"
 #include "hl2_player.h"
+#include "particle_parse.h"
 
 #include "tier0/memdbgon.h"
 
