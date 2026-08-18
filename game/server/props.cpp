@@ -2179,6 +2179,35 @@ void CDynamicProp::AnimThink( void )
 			// Fire output
 			m_pOutputAnimOver.FireOutput(NULL,this);
 
+			// Underhell's House wake-up camera is parented to models/blackout.mdl.
+			// The map normally releases it indirectly through OnAnimationDone ->
+			// Relay_Disable_Blackout -> trigger_knockout_teleport.  If the relay and
+			// trigger are enabled on the same simulation frame, Orange Box can miss
+			// the already-overlapping player's StartTouch: the prop then returns to
+			// its default lying animation while point_viewcontrol keeps all controls
+			// locked. Release only an *active* point_viewcontrol parented to this
+			// completed blackout prop; the normal map I/O remains authoritative for
+			// teleporting and the remaining wake-up outputs.
+			if ( GetModelName() != NULL_STRING &&
+				 !Q_stricmp( STRING( GetModelName() ), "models/blackout.mdl" ) )
+			{
+				CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
+				if ( pPlayer )
+				{
+					CBaseEntity *pCamera = gEntList.FindEntityByClassname( NULL, "point_viewcontrol" );
+					while ( pCamera )
+					{
+						if ( pCamera->GetMoveParent() == this && pPlayer->GetViewEntity() == pCamera )
+						{
+							variant_t empty;
+							pCamera->AcceptInput( "Disable", this, this, empty, 0 );
+							break;
+						}
+						pCamera = gEntList.FindEntityByClassname( pCamera, "point_viewcontrol" );
+					}
+				}
+			}
+
 			// If I'm a random animator, think again when it's time to change sequence
 			if ( m_bRandomAnimator )
 			{

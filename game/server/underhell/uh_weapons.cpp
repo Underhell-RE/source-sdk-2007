@@ -16,6 +16,7 @@
 #include "in_buttons.h"
 #include "soundent.h"
 #include "npcevent.h"
+#include "rumble_shared.h"
 #include "ai_basenpc.h"
 #include "hl2_player.h"
 #include "uh_weapons.h"
