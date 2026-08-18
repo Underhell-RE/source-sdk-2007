@@ -862,13 +862,20 @@ void CAmbientGeneric::SendSound( SoundFlags_t flags)
 	{
 		if ( flags == SND_STOP )
 		{
-			UTIL_EmitAmbientSound(pSoundSource->GetSoundSourceIndex(), pSoundSource->GetAbsOrigin(), szSoundFile, 
+			UTIL_EmitAmbientSound(pSoundSource->GetSoundSourceIndex(), pSoundSource->GetAbsOrigin(), szSoundFile,
 						0, SNDLVL_NONE, flags, 0);
+			m_fActive = false;
 		}
 		else
 		{
-			UTIL_EmitAmbientSound(pSoundSource->GetSoundSourceIndex(), pSoundSource->GetAbsOrigin(), szSoundFile, 
+			UTIL_EmitAmbientSound(pSoundSource->GetSoundSourceIndex(), pSoundSource->GetAbsOrigin(), szSoundFile,
 				(m_dpv.vol * 0.01), m_iSoundLevel, flags, m_dpv.pitch);
+
+			// Keep active state at the emission boundary. This fixes StopSound /
+			// ToggleSound and allows volume/pitch inputs after map-start playback.
+			// One-shot sounds must remain retriggerable.
+			if ( m_fLooping )
+				m_fActive = true;
 		}
 	}	
 	else
@@ -876,8 +883,9 @@ void CAmbientGeneric::SendSound( SoundFlags_t flags)
 		if ( ( flags == SND_STOP ) && 
 			( m_nSoundSourceEntIndex != -1 ) )
 		{
-			UTIL_EmitAmbientSound(m_nSoundSourceEntIndex, GetAbsOrigin(), szSoundFile, 
+			UTIL_EmitAmbientSound(m_nSoundSourceEntIndex, GetAbsOrigin(), szSoundFile,
 					0, SNDLVL_NONE, flags, 0);
+			m_fActive = false;
 		}
 	}
 }
