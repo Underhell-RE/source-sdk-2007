@@ -37,9 +37,12 @@ public:
 	void		OnListened();
 
 	void		ClearAttackConditions( void );
+	void		SpawnUHShield( void );
 
 	bool		m_fIsBlocking;
 	float		m_flNextUHPainSoundTime;
+	int			m_iUHShieldType;
+	EHANDLE		m_hUHShield;
 
 	bool		IsLightDamage( const CTakeDamageInfo &info );
 	bool		IsHeavyDamage( const CTakeDamageInfo &info );
