@@ -232,10 +232,9 @@ void CUHGunWeapon::PrimaryAttack( void )
 
 	pPlayer->FireBullets( info );
 
-	// Underhell BT retains hit-scan damage but spawns a visible slow-motion
-	// projectile for every resolved pellet direction.
-	for ( int i = 0; i < info.m_iShots; ++i )
-		UH_BulletTimeSpawnTracer( pPlayer, info.m_vecSrc, info.m_vecDirShooting, info.m_iAmmoType, false );
+	// Bullet time interception is centralized in CBaseEntity::FireBullets so
+	// spread directions, NPC fire and player fire all create one CBtBullet per
+	// actual shot without layering a second visual tracer.
 
 	// Consume a round.
 	if ( UsesClipsForAmmo1() )

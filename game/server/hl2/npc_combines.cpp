@@ -170,22 +170,9 @@ void CNPC_CombineS::DeathSound( const CTakeDamageInfo &info )
 	if ( GetFlags() & FL_DISSOLVING )
 		return;
 
-	// Original sub_10359D10 chooses a dedicated scream when a lethal hit has
-	// removed an arm or leg. Prison guards use their own sentence groups.
-	const bool bPrisonGuard = V_stristr( STRING( GetModelName() ), "prisonguard" ) != NULL;
-	const int nRoll = random->RandomInt( 0, 99 );
-	const bool bLostArm = ( m_nUHSeveredParts & ( ( 1u << 1 ) | ( 1u << 2 ) ) ) != 0;
-	const bool bLostLeg = ( m_nUHSeveredParts & ( ( 1u << 3 ) | ( 1u << 4 ) ) ) != 0;
-
-	const char *pszSentence;
-	if ( bLostArm && nRoll <= 35 )
-		pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_LOSTARM" : "COMBINE_LOSTARM";
-	else if ( bLostLeg && nRoll >= 36 && nRoll <= 69 )
-		pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_LOSTLEG" : "COMBINE_LOSTLEG";
-	else
-		pszSentence = bPrisonGuard ? "COMBINEPRISONGUARD_DIE" : "COMBINE_DIE";
-
-	GetSentences()->Speak( pszSentence, SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
+	// Exact CNPC_CombineS::DeathSound, sub_1033FB20. The previously assigned
+	// dismemberment sentence selector belongs to a different Combine path.
+	GetSentences()->Speak( "COMBINE_DIE", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
 }
 
 
