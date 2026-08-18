@@ -46,10 +46,7 @@ public:
 	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 	{
 		CBasePlayer *pPlayer = ToBasePlayer( pActivator );
-		if ( pPlayer )
-		{
-			MyTouch( pPlayer );
-		}
+		if ( pPlayer ) MyTouch( pPlayer );
 	}
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
@@ -62,6 +59,7 @@ public:
 		if ( pHL2Player->UH_GetBatteryCount() >= UH_MAX_BATTERIES )
 			return false;
 
+		FirePlayerPickupOutput( pHL2Player );
 		pHL2Player->UH_AddBattery( 1 );
 
 		CPASAttenuationFilter filter( pPlayer, "ItemBattery.Touch" );

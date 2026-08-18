@@ -21,12 +21,10 @@
 #include "materialsystem/imaterial.h"
 #include "view_scene.h"
 #include "c_basehlplayer.h"
+#include "underhell/shadereditor/uh_shadereditor_system.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
-
-#define UH_NIGHTVISION_MAT "shader/nightvision"
-#define UH_GASMASK_MAT     "shader/gasmask"
 
 //-----------------------------------------------------------------------------
 // CUHGearOverlayEffect — draws the night vision / gas mask overlays.
@@ -34,7 +32,7 @@
 class CUHGearOverlayEffect : public IScreenSpaceEffect
 {
 public:
-	CUHGearOverlayEffect( void ) {}
+	CUHGearOverlayEffect( void ) : m_bRuntimeMaterialsCreated( false ) {}
 
 	virtual void Init( void );
 	virtual void Shutdown( void );
@@ -47,8 +45,10 @@ public:
 	virtual void Render( int x, int y, int w, int h );
 
 private:
+	void EnsureRuntimeMaterials();
 	CMaterialReference m_NightVisionMaterial;
 	CMaterialReference m_GasMaskMaterial;
+	bool m_bRuntimeMaterialsCreated;
 };
 
 ADD_SCREENSPACE_EFFECT( CUHGearOverlayEffect, underhell_gear );
@@ -56,8 +56,7 @@ ADD_SCREENSPACE_EFFECT( CUHGearOverlayEffect, underhell_gear );
 //-----------------------------------------------------------------------------
 void CUHGearOverlayEffect::Init( void )
 {
-	m_NightVisionMaterial.Init( UH_NIGHTVISION_MAT, TEXTURE_GROUP_OTHER );
-	m_GasMaskMaterial.Init( UH_GASMASK_MAT, TEXTURE_GROUP_OTHER );
+	m_bRuntimeMaterialsCreated = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -68,6 +67,41 @@ void CUHGearOverlayEffect::Shutdown( void )
 }
 
 //-----------------------------------------------------------------------------
+// Resolve the original wrapper VMTs only after ShaderEditor005 has registered
+// editor_shader. This avoids caching an error material during early startup.
+//-----------------------------------------------------------------------------
+void CUHGearOverlayEffect::EnsureRuntimeMaterials()
+{
+	if ( m_bRuntimeMaterialsCreated || !g_UHShaderEditorSystem.IsReady() )
+		return;
+
+	// The original materials are thin wrappers around Shader Editor's single
+	// registered CPU-side shader. Their $shadername selects the compiled graph:
+	//
+	// "editor_shader" { "$shadername" "postproc_nightvision" }
+	//
+	// The graph name itself is not a Source shader and cannot be used as the
+	// KeyValues root.
+	m_NightVisionMaterial.Init( "shader/nightvision", TEXTURE_GROUP_OTHER );
+	IMaterial *pNightVision = m_NightVisionMaterial;
+	if ( !pNightVision || IsErrorMaterial( pNightVision ) )
+	{
+		m_NightVisionMaterial.Shutdown();
+		Warning( "[UH shader] shader/nightvision.vmt failed to resolve after ShaderEditor startup\n" );
+	}
+
+	m_GasMaskMaterial.Init( "shader/gasmask", TEXTURE_GROUP_OTHER );
+	IMaterial *pGasMask = m_GasMaskMaterial;
+	if ( !pGasMask || IsErrorMaterial( pGasMask ) )
+	{
+		m_GasMaskMaterial.Shutdown();
+		Warning( "[UH shader] shader/gasmask.vmt failed to resolve after ShaderEditor startup\n" );
+	}
+
+	m_bRuntimeMaterialsCreated = true;
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Draw the overlays when the local player has the gear active.
 //-----------------------------------------------------------------------------
 void CUHGearOverlayEffect::Render( int x, int y, int w, int h )
@@ -75,6 +109,8 @@ void CUHGearOverlayEffect::Render( int x, int y, int w, int h )
 	C_BaseHLPlayer *pPlayer = dynamic_cast<C_BaseHLPlayer *>( C_BasePlayer::GetLocalPlayer() );
 	if ( !pPlayer || !pPlayer->IsAlive() )
 		return;
+
+	EnsureRuntimeMaterials();
 
 	if ( pPlayer->m_bNightVisionOn && m_NightVisionMaterial.IsValid() )
 	{

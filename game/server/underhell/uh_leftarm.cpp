@@ -18,9 +18,13 @@
 
 #include "cbase.h"
 #include "hl2_player.h"
+#include "props.h"
 #include "baseviewmodel_shared.h"
 #include "ammodef.h"
 #include "grenade_frag.h"
+#include "hl2/weapon_flaregun.h"
+#include "sprite.h"
+#include "hl2/info_darknessmode_lightsource.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -31,7 +35,9 @@ static const char *UH_LEFTARM_FLARE      = "models/weapons/v_flare_pg.mdl";
 static const char *UH_FLARE_PROP         = "models/PG_props/pg_obj/pg_flare.mdl";
 
 #define UH_THROW_STAGE_DELAY  0.4f   // command -> grenade actually leaves the hand
-#define UH_FLARE_FUSE         90.0f  // seconds a thrown flare burns
+#define UH_FLARE_FUSE         90.0f  // total burn starts when equipped
+static ConVar uh_flare_throw_scale( "uh_flare_throw_scale", "1200", FCVAR_ARCHIVE );
+CBaseEntity *CreateFlare( Vector vOrigin, QAngle angles, CBaseEntity *pOwner, float flDuration );
 #define UH_GRENADE_TIMER      3.0f   // frag detonation fuse (vanilla GRENADE_TIMER)
 
 //-----------------------------------------------------------------------------
@@ -77,6 +83,10 @@ void CHL2_Player::UH_UpdateLeftArm( void )
 		UH_SetLeftArmModel( UH_LEFTARM_FLARE, 1, true );
 		return;
 	}
+
+	// Clean up a held-only visual if a save/input cleared the flare state.
+	if ( m_hHeldFlareSprite ) { UTIL_Remove( m_hHeldFlareSprite ); m_hHeldFlareSprite = NULL; }
+	if ( m_hHeldFlareEffect ) { UTIL_Remove( m_hHeldFlareEffect ); m_hHeldFlareEffect = NULL; }
 
 	// Hand-held (non-shoulder) flashlight, raised while on and the left arm is
 	// free: no weapon, a one-handed weapon (pistol) or melee. Must match
@@ -192,7 +202,60 @@ CBaseCombatWeapon *CHL2_Player::UH_FindOneHandedWeapon( void )
 void CHL2_Player::UH_EquipFlare( void )
 {
 	m_bHoldingFlare = true;
+	m_flFlareStartTime = gpGlobals->curtime;
 	UH_UpdateLeftArm();
+	CBaseViewModel *pDeployVM = GetViewModel( 1 );
+	if ( pDeployVM ) { pDeployVM->SetCycle( 0.0f ); pDeployVM->SetPlaybackRate( 1.0f ); pDeployVM->SendViewModelMatchingSequence( 1 ); }
+
+	if ( m_hHeldFlareEffect ) UTIL_Remove( m_hHeldFlareEffect );
+	m_hHeldFlareEffect = NULL;
+	if ( m_hHeldFlareSprite ) UTIL_Remove( m_hHeldFlareSprite );
+	m_hHeldFlareSprite = NULL;
+	CBaseViewModel *pVM = GetViewModel( 1 );
+	if ( pVM )
+	{
+		Vector org; QAngle ang;
+		int attachment = pVM->LookupAttachment( "fuse" );
+		if ( attachment > 0 && pVM->GetAttachment( attachment, org, ang ) )
+		{
+			CFlare *pFlare = CFlare::Create( org, ang, this, UH_FLARE_FUSE );
+			if ( pFlare )
+			{
+				// sub_10172E80 performs this setup after creating the flare:
+				// stop its fly-gravity movement, make it non-interactive, freeze
+				// gravity, preserve the fuse's world transform, then attach it to
+				// viewmodel 1.  Parenting a live MOVETYPE_FLYGRAVITY flare (our old
+				// code) leaves the networked effect in an invalid/moving state, so
+				// the client never keeps its glow at the flare in the player's hand.
+				pFlare->m_bPropFlare = true;
+				pFlare->SetMoveType( MOVETYPE_NONE );
+				pFlare->SetCollisionGroup( COLLISION_GROUP_INTERACTIVE );
+				pFlare->SetGravity( 0.0f );
+				pFlare->SetAbsOrigin( org );
+				pFlare->SetParent( pVM, attachment );
+
+				// Also matches the final AddEntityToDarknessCheck call in the
+				// original.  This is the server-side illumination registration;
+				// C_Flare supplies the visible client dlight/elight and sprites.
+				AddEntityToDarknessCheck( pFlare, 307.20001f );
+				m_hHeldFlareEffect = pFlare;
+
+				// C_Flare's particle emitter is world-space and can be culled when
+				// its entity is parented to a predicted viewmodel. The original has
+				// a bright fuse sprite in addition to the visible flare model; keep a
+				// networked world-glow sprite directly on the same VM attachment.
+				CSprite *pGlow = CSprite::SpriteCreate( "effects/yellowflare_noz.vmt", org, false );
+				if ( pGlow )
+				{
+					pGlow->SetTransparency( kRenderWorldGlow, 255, 150, 80, 255, kRenderFxNoDissipation );
+					pGlow->SetScale( 0.18f );
+					pGlow->SetGlowProxySize( 2.0f );
+					pGlow->SetAttachment( pVM, attachment );
+					m_hHeldFlareSprite = pGlow;
+				}
+			}
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -212,7 +275,11 @@ void CHL2_Player::UH_ThrowNade( void )
 	// A held flare is thrown instead of a grenade.
 	if ( m_bHoldingFlare )
 	{
-		UH_ThrowFlare();
+		CBaseViewModel *pFlareVM = GetViewModel( 1 );
+		if ( pFlareVM ) { pFlareVM->SetCycle( 0.0f ); pFlareVM->SetPlaybackRate( 1.0f ); pFlareVM->SendViewModelMatchingSequence( 4 ); }
+		m_bFlareMarker = true;
+		float delay = pFlareVM ? max( 0.1f, pFlareVM->SequenceDuration() * 0.5f ) : 0.35f;
+		SetContextThink( &CHL2_Player::UH_LeftArmContextThink, gpGlobals->curtime + delay, "FlashLightContext" );
 		return;
 	}
 
@@ -233,10 +300,11 @@ void CHL2_Player::UH_ThrowNade( void )
 	m_bFlareMarker = true;
 	UH_SetLeftArmModel( UH_LEFTARM_GRENADE, 1, true );
 
-	// Throw gesture on the active weapon's viewmodel.
-	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
-	if ( pWeapon )
-		pWeapon->SendWeaponAnim( ACT_VM_THROW );
+	// Original sends authored sequence 1 on the left-arm grenade model.
+	CBaseViewModel *pGrenadeVM = GetViewModel( 1 );
+	if ( pGrenadeVM ) { pGrenadeVM->SetCycle( 0.0f ); pGrenadeVM->SetPlaybackRate( 1.0f ); pGrenadeVM->SendViewModelMatchingSequence( 1 ); }
+	CBaseCombatWeapon *pCurrentWeapon = GetActiveWeapon();
+	if ( pCurrentWeapon ) pCurrentWeapon->SendWeaponAnim( ACT_VM_IDLE );
 
 	SetContextThink( &CHL2_Player::UH_LeftArmContextThink, gpGlobals->curtime + UH_THROW_STAGE_DELAY, "FlashLightContext" );
 }
@@ -248,6 +316,11 @@ void CHL2_Player::UH_ThrowNade( void )
 void CHL2_Player::UH_LeftArmContextThink( void )
 {
 	m_bFlareMarker = false;
+	if ( m_bHoldingFlare )
+	{
+		UH_ThrowFlare();
+		return;
+	}
 
 	// Actually throw the grenade: spawn the frag projectile and consume one
 	// grenade ammo. This replicates CWeaponFrag::ThrowGrenade + DecrementAmmo
@@ -286,37 +359,94 @@ void CHL2_Player::UH_ThrowFlare( void )
 {
 	Vector vecForward;
 	EyeVectors( &vecForward );
+	VectorNormalize( vecForward );
+	Vector vecSrc = Weapon_ShootPosition();
 
-	Vector vecSrc = EyePosition() + vecForward * 16.0f;
+	if ( m_hHeldFlareEffect )
+	{
+		UTIL_Remove( m_hHeldFlareEffect );
+		m_hHeldFlareEffect = NULL;
+	}
+	if ( m_hHeldFlareSprite )
+	{
+		UTIL_Remove( m_hHeldFlareSprite );
+		m_hHeldFlareSprite = NULL;
+	}
 
 	CBaseEntity *pFlare = CreateEntityByName( "prop_physics" );
-	if ( !pFlare )
-		return;
-
+	if ( !pFlare ) return;
 	pFlare->SetModel( UH_FLARE_PROP );
 	pFlare->SetAbsOrigin( vecSrc );
 	pFlare->SetAbsAngles( GetAbsAngles() );
 	DispatchSpawn( pFlare );
+	pFlare->SetCollisionGroup( COLLISION_GROUP_INTERACTIVE_DEBRIS );
 
-	// Light the flare: glow render mode + a dlight tint so it actually emits
-	// light when thrown (matches the original's lit flare prop).
-	pFlare->SetRenderColor( 255, 200, 80 );
-	pFlare->SetRenderMode( kRenderGlow );
-	pFlare->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
+	const float flRemaining = max( 0.1f, m_flFlareStartTime + UH_FLARE_FUSE - gpGlobals->curtime );
+	CBreakableProp *pProp = dynamic_cast<CBreakableProp *>( pFlare );
+	if ( pProp ) pProp->CreateFlare( flRemaining );
 
-	// Throw velocity (original: view direction * 200).
 	IPhysicsObject *pPhys = pFlare->VPhysicsGetObject();
 	if ( pPhys )
 	{
-		Vector vecVel = vecForward * 200.0f + Vector( 0, 0, 40.0f );
-		AngularImpulse angImp( 0, 0, 0 );
+		Vector vecVel = vecForward * uh_flare_throw_scale.GetFloat();
+		AngularImpulse angImp( 200.0f, 200.0f, 200.0f );
 		pPhys->SetVelocity( &vecVel, &angImp );
 	}
 
-	// Burn out after the fuse.
-	pFlare->SetThink( &CBaseEntity::SUB_Remove );
-	pFlare->SetNextThink( gpGlobals->curtime + UH_FLARE_FUSE );
-
 	m_bHoldingFlare = false;
+	m_flFlareStartTime = 0.0f;
 	UH_UpdateLeftArm();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Melee strike with the lit flare. The original starts sequence 4,
+// then executes its bludgeon swing from FlareHitContext after half of the
+// animation (sub_101E97E0 / sub_101F2A20).
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_StartFlareStrike( void )
+{
+	if ( !m_bHoldingFlare || m_bFlareStrikePending || gpGlobals->curtime < m_flNextFlareStrike )
+		return;
+
+	CBaseViewModel *pVM = GetViewModel( 1 );
+	if ( !pVM )
+		return;
+
+	pVM->SetCycle( 0.0f );
+	pVM->SetPlaybackRate( 1.0f );
+	// sub_101E96F0 randomly selects one of the three authored hit animations.
+	pVM->SendViewModelMatchingSequence( random->RandomInt( 5, 7 ) );
+	ViewPunch( QAngle( -1.0f, 0.0f, 0.0f ) );
+	SuitPower_Drain( 5.0f );
+	m_bFlareStrikePending = true;
+
+	SetContextThink( &CHL2_Player::UH_FlareHitContextThink,
+		gpGlobals->curtime + 0.35f, "FlareHitContext" );
+}
+
+void CHL2_Player::UH_FlareHitContextThink( void )
+{
+	if ( !m_bFlareStrikePending )
+		return;
+
+	m_bFlareStrikePending = false;
+	m_flNextFlareStrike = gpGlobals->curtime + 0.15f;
+
+	if ( !m_bHoldingFlare || !IsAlive() )
+		return;
+
+	CBaseEntity *pHit = CheckTraceHullAttack( 64.0f, Vector( -16, -16, -16 ),
+		Vector( 16, 16, 16 ), 10, DMG_CLUB | DMG_BURN, 1.0f );
+	if ( pHit )
+	{
+		EmitSound( "Weapon_Crowbar.Melee_Hit" );
+	}
+	else
+	{
+		EmitSound( "Weapon_Crowbar.Single" );
+	}
+
+	CBaseViewModel *pVM = GetViewModel( 1 );
+	if ( pVM )
+		pVM->SendViewModelMatchingSequence( 1 );
 }

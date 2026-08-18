@@ -289,7 +289,7 @@ void CBaseHLBludgeonWeapon::ImpactEffect( trace_t &traceHit )
 // Purpose : Starts the swing of the weapon and determines the animation
 // Input   : bIsSecondary - is this a secondary attack?
 //------------------------------------------------------------------------------
-void CBaseHLBludgeonWeapon::Swing( int bIsSecondary )
+void CBaseHLBludgeonWeapon::Swing( int bIsSecondary, bool bSkipAnimation, bool bSkipTiming )
 {
 	trace_t traceHit;
 
@@ -372,12 +372,17 @@ void CBaseHLBludgeonWeapon::Swing( int bIsSecondary )
 		Hit( traceHit, nHitActivity, bIsSecondary ? true : false );
 	}
 
-	// Send the anim
-	SendWeaponAnim( nHitActivity );
+	// Send the anim unless a derived weapon already started it before a
+	// delayed impact.
+	if ( !bSkipAnimation )
+		SendWeaponAnim( nHitActivity );
 
-	//Setup our next attack times
-	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
-	m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration();
+	// Setup our next attack times unless they were fixed at wind-up start.
+	if ( !bSkipTiming )
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
+		m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration();
+	}
 
 	//Play swing sound
 	WeaponSound( SINGLE );

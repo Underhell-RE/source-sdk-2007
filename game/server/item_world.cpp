@@ -1,4 +1,4 @@
-//===== Copyright © 1996-2005, Valve Corporation, All rights reserved. ======//
+//===== Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: Handling for the base world item. Most of this was moved from items.cpp.
 //
@@ -103,7 +103,9 @@ BEGIN_DATADESC( CItem )
 #endif
 
 	// Outputs
-	DEFINE_OUTPUT( m_OnPlayerTouch, "OnPlayerTouch" ),
+	// Underhell's CItem output is named OnPlayerPickup (server Diaphora
+	// datamap m_OnPlayerPickup); chapter VMFs consistently target this name.
+	DEFINE_OUTPUT( m_OnPlayerTouch, "OnPlayerPickup" ),
 	DEFINE_OUTPUT( m_OnCacheInteraction, "OnCacheInteraction" ),
 
 END_DATADESC()

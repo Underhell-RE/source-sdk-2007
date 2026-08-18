@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: An entity that creates NPCs in the game. There are two types of NPC
 //			makers -- one which creates NPCs using a template NPC, and one which
@@ -93,6 +93,8 @@ BEGIN_DATADESC( CBaseNPCMaker )
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetMaxChildren", InputSetMaxChildren ),
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "AddMaxChildren", InputAddMaxChildren ),
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetMaxLiveChildren", InputSetMaxLiveChildren ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "AddMaxChildrenHard", InputAddMaxChildrenHard ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetMaxLiveChildrenHard", InputSetMaxLiveChildrenHard ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT,	 "SetSpawnFrequency", InputSetSpawnFrequency ),
 
 	// Outputs
@@ -357,6 +359,18 @@ void CBaseNPCMaker::InputAddMaxChildren( inputdata_t &inputdata )
 void CBaseNPCMaker::InputSetMaxLiveChildren( inputdata_t &inputdata )
 {
 	m_nMaxLiveChildren = inputdata.value.Int();
+}
+
+void CBaseNPCMaker::InputAddMaxChildrenHard( inputdata_t &inputdata )
+{
+	if ( g_iSkillLevel == SKILL_HARD )
+		m_nMaxNumNPCs += inputdata.value.Int();
+}
+
+void CBaseNPCMaker::InputSetMaxLiveChildrenHard( inputdata_t &inputdata )
+{
+	if ( g_iSkillLevel == SKILL_HARD )
+		m_nMaxLiveChildren = inputdata.value.Int();
 }
 
 void CBaseNPCMaker::InputSetSpawnFrequency( inputdata_t &inputdata )

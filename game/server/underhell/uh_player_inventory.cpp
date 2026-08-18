@@ -12,6 +12,8 @@
 
 #include "cbase.h"
 #include "hl2_player.h"
+#include "props.h"
+#include "hl2/weapon_flaregun.h"
 
 #include "underhell/uh_inventory.h"
 #include "underhell/uh_items.h"
@@ -105,6 +107,7 @@ void CHL2_Player::UH_InitializeInventory( void )
 	m_bFlashlightOn = false;
 	m_bInventoryEnabled = true;
 	m_hActiveGlowStick = NULL;
+	m_hActiveGlowStickLight = NULL;
 	m_bIronSighted = false;
 	m_fIronsightedTime = 0.0f;
 }
@@ -125,27 +128,52 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 	Vector vecOrigin = EyePosition() + vecForward * 56.0f + Vector( 0, 0, 64.0f );
 	QAngle angItem( 0, EyeAngles().y - 90.0f, 0 );
 
-	// Glowsticks (unlit 14..18 AND lit 19..23) drop as a coloured lit prop.
-	// The lit ids have classname "nothing" (no world entity), so they must be
-	// spawned as a glowstick prop directly instead of going through
-	// CreateEntityByName("nothing"), which returns NULL and lost the item.
+	// Original drop switch uses the individual stick model and m_nSkin
+	// 0/2/4/6/8. Lit inventory ids release the tracked flare prop.
 	if ( UH_IsGlowstick( iItem ) || UH_IsLitGlowstick( iItem ) )
 	{
-		CBaseEntity *pGlow = CreateEntityByName( "prop_physics" );
-		if ( !pGlow )
-			return;
+		CBaseEntity *pGlow = UH_IsLitGlowstick( iItem ) ? UH_GetActiveGlowStick() : NULL;
+		if ( pGlow )
+		{
+			// The carried prop was spawned hidden/non-solid. Rebuilding the
+			// dropped prop is safer than attempting to turn that entity back into
+			// VPhysics after it has been parented to the player.
+			CBaseEntity *pLight = UH_GetActiveGlowStickLight();
+			if ( pLight ) UTIL_Remove( pLight );
+			UTIL_Remove( pGlow );
+			UH_SetActiveGlowStick( NULL );
+			UH_SetActiveGlowStickLight( NULL );
+			pGlow = NULL;
+		}
 
+		pGlow = CreateEntityByName( "prop_physics" );
+		if ( !pGlow ) return;
 		pGlow->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
-		static_cast<CBaseAnimating *>( pGlow )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
-
-		Color glowColor = UH_GetGlowstickColor( iItem );
-		pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
-		pGlow->SetRenderMode( kRenderGlow );
-		pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
-
 		pGlow->SetAbsOrigin( vecOrigin );
 		pGlow->SetAbsAngles( angItem );
-		pGlow->Spawn();
+		DispatchSpawn( pGlow );
+		pGlow->GetBaseAnimating()->m_nSkin = UH_GetGlowstickBodyGroup( iItem ) + ( UH_IsLitGlowstick( iItem ) ? 1 : 0 );
+		if ( UH_IsLitGlowstick( iItem ) )
+		{
+			CBaseAnimating *pGlowAnim = pGlow->GetBaseAnimating();
+			int attachment = pGlowAnim ? pGlowAnim->LookupAttachment( "fuse" ) : 0;
+			Vector org = pGlow->GetAbsOrigin(); QAngle ang = pGlow->GetAbsAngles();
+			if ( attachment > 0 ) pGlowAnim->GetAttachment( attachment, org, ang );
+			CBaseEntity *pLight = CreateEntityByName( "light_dynamic" );
+			if ( pLight )
+			{
+				Color color = UH_GetGlowstickColor( iItem );
+				pLight->KeyValue( "_light", UTIL_VarArgs( "%d %d %d 255", color.r(), color.g(), color.b() ) );
+				pLight->KeyValue( "distance", "256" );
+				pLight->KeyValue( "brightness", "2" );
+				pLight->SetAbsOrigin( org );
+				pLight->SetAbsAngles( ang );
+				DispatchSpawn( pLight );
+				pLight->SetOwnerEntity( pGlow );
+				pLight->SetParent( pGlow, attachment );
+			}
+			pGlow->AddEffects( EF_NOSHADOW );
+		}
 		return;
 	}
 
@@ -168,21 +196,19 @@ void CHL2_Player::UH_SpawnItemInWorld( int iItem )
 		break;
 
 	default:
-		{
-			// TODO: original wrote the body group on a raw field (entity
-			// offset +212) — verify the exact member (m_nBody? m_nSkin?).
-			int iBodyGroup = UH_GetDropBodyGroup( iItem );
-			if ( iBodyGroup >= 0 )
-			{
-				static_cast<CBaseAnimating *>( pItem )->SetBodygroup( 0, iBodyGroup );
-			}
-		}
 		break;
 	}
 
 	pItem->SetAbsOrigin( vecOrigin );
 	pItem->SetAbsAngles( angItem );
 	pItem->Spawn();
+
+	// The original dispatches Spawn first, then overwrites m_nSkin. This is
+	// significant for apple/soda skin 0 because both Spawn functions randomize
+	// their default skin.
+	int iSkin = UH_GetDropBodyGroup( iItem );
+	if ( iSkin >= 0 && pItem->GetBaseAnimating() )
+		pItem->GetBaseAnimating()->m_nSkin = iSkin;
 }
 
 //-----------------------------------------------------------------------------
@@ -330,9 +356,27 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 	}
 
 	// The original item virtual returns success before the slot is cleared. The
-	// SDK CItem::Use signature is void, so preserve the known deny gates here.
-	// In particular, a full-health/non-bleeding bandage must remain in inventory.
-	if ( iItem == UH_ITEM_BANDAGES && GetHealth() >= 100 && UH_GetBleedCounter() <= 0 )
+	// SDK CItem::Use signature is void, so reproduce its refusal gates here.
+	const bool bFoodOrDrink =
+		( iItem >= UH_ITEM_APPLE_RED && iItem <= UH_ITEM_SODA_LAST ) ||
+		iItem == UH_ITEM_CHOCOBAR || iItem == UH_ITEM_ORANGE;
+	if ( UH_IsGasMaskOn() && ( bFoodOrDrink || iItem == UH_ITEM_PAINKILLERS ) )
+	{
+		EmitSound( "HL2Player.UseDeny" );
+		engine->ClientCommand( edict(), "UpdateInventory" );
+		return false;
+	}
+
+	if ( iItem == UH_ITEM_BANDAGES && GetHealth() >= GetMaxHealth() && UH_GetBleedCounter() <= 0 )
+	{
+		EmitSound( "HL2Player.UseDeny" );
+		engine->ClientCommand( edict(), "UpdateInventory" );
+		return false;
+	}
+
+	if ( ( iItem == UH_ITEM_PAINKILLERS || iItem == UH_ITEM_SYRINGE ||
+		   iItem == UH_ITEM_HEALTHKIT || iItem == UH_ITEM_HEALTH_VIAL ) &&
+		 GetHealth() >= GetMaxHealth() )
 	{
 		EmitSound( "HL2Player.UseDeny" );
 		engine->ClientCommand( edict(), "UpdateInventory" );
@@ -354,6 +398,9 @@ bool CHL2_Player::UH_ItemAction( int iSlot, bool bUse )
 			UH_RemoveInventoryItem( iSlot );
 
 			CBaseEntity *pGlow = UH_GetActiveGlowStick();
+			CBaseEntity *pGlowLight = UH_GetActiveGlowStickLight();
+			if ( pGlowLight ) UTIL_Remove( pGlowLight );
+			UH_SetActiveGlowStickLight( NULL );
 			if ( pGlow )
 			{
 				UTIL_Remove( pGlow );

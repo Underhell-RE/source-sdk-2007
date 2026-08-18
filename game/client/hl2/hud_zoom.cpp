@@ -112,24 +112,8 @@ void CHudZoom::ApplySchemeSettings( vgui::IScheme *scheme )
 //-----------------------------------------------------------------------------
 bool CHudZoom::ShouldDraw( void )
 {
-	bool bNeedsDraw = false;
-
-	C_BaseHLPlayer *pPlayer = dynamic_cast<C_BaseHLPlayer *>(C_BasePlayer::GetLocalPlayer());
-	if ( pPlayer == NULL )
-		return false;
-
-	if ( pPlayer->m_HL2Local.m_bZooming )
-	{
-		// need to paint
-		bNeedsDraw = true;
-	}
-	else if ( m_bPainted )
-	{
-		// keep painting until state is finished
-		bNeedsDraw = true;
-	}
-
-	return ( bNeedsDraw && CHudElement::ShouldDraw() );
+	// Underhell uses the FOV focus but omits HL2's circular HEV zoom overlay.
+	return false;
 }
 
 #define	ZOOM_FADE_TIME	0.4f

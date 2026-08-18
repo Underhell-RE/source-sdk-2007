@@ -291,7 +291,8 @@ float CBaseHLCombatWeapon::CalcViewmodelBob( void )
 		return 0.0f;// just use old value
 	}
 
-	//Find the speed of the player
+	// Find the horizontal speed of the player. Jump/fall oscillation is the
+	// separate original cl_viewbob camera effect in CGameMovement.
 	float speed = player->GetLocalVelocity().Length2D();
 
 	//FIXME: This maximum speed value must come from the server.

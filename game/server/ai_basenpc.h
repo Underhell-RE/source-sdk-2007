@@ -1224,6 +1224,7 @@ public:
 	// local capabilities access
 	int					CapabilitiesAdd( int capabilities );
 	int					CapabilitiesRemove( int capabilities );
+	virtual bool		Weapon_CanUse( CBaseCombatWeapon *pWeapon );
 	void				CapabilitiesClear( void );
 
 private:
@@ -1880,16 +1881,22 @@ public:
 	COutputEvent			m_OnSpotInfectedBody;		// fired when an npc_infected body is spotted
 	COutputEvent			m_OnSpotDefaultBody;		// fired when any other NPC body is spotted
 
-	// Gib/dismemberment runtime state (per-hitgroup accumulated damage).
-	float					m_flGibDamage[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
-	float					m_flHelmetDamage;			// accumulated damage to the helmet (shot off at uh_helmethealth)
+	// Original Underhell dismemberment state.  The five counters are remaining
+	// part health, not accumulated damage; they are copied verbatim to the
+	// server ragdoll when this NPC dies.
+	bool					m_bUHGibable;
+	int						m_iUHGibType;				// original family/variant discriminator (0..8/10)
+	int						m_iUHPartHealth[5];		// head/left arm/right arm/left leg/right leg
+	int						m_iUHHelmetHealth;
+	unsigned int			m_nUHSeveredParts;		// bits 0=head, 1=LA, 2=RA, 3=LL, 4=RL
+	string_t				m_iszUHGibModel[4];		// left arm/right arm/left leg/right leg
 	float					m_flNextSpotBodiesTime;		// throttle the spot-bodies scan
 	float					m_flNextTempSquadTime;		// throttle the temp-squad scan
 
 	// Methods (implemented in underhell/uh_ai.cpp).
 	void					UH_ApplySpawnSettings( void );	// bodygroup string + FOV/view distance
 	void					UH_PrecacheGibModels( void );	// severed-limb + helmet models for this NPC's body
-	void					UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, const Vector &vecDir );
+	bool					UH_GibBodyPart( int iHitGroup, const Vector &vecPosition, const Vector &vecDir );
 	bool					UH_ConsiderGib( int iHitGroup, float flDamage, const Vector &vecPosition, const Vector &vecDir );
 	void					UH_ShootOffHelmet( const Vector &vecPosition, const Vector &vecDir );
 	void					UH_SpotBodiesThink( void );
@@ -1901,6 +1908,8 @@ public:
 	void					InputSetViewDistance( inputdata_t &inputdata );
 	void					InputSetSpotBodiesOn( inputdata_t &inputdata );
 	void					InputSetSpotBodiesOff( inputdata_t &inputdata );
+	void					InputRushEntity( inputdata_t &inputdata );
+	void					InputWalkToEntity( inputdata_t &inputdata );
 	void					InputGibHead( inputdata_t &inputdata );
 	void					InputGibLeftArm( inputdata_t &inputdata );
 	void					InputGibRightArm( inputdata_t &inputdata );

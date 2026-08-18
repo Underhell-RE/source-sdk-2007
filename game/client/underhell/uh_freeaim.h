@@ -18,6 +18,7 @@ class CUserCmd;
 #ifdef CLIENT_DLL
 void UH_FreeAimUpdateCursor( float mouseX, float mouseY, CUserCmd *pCmd );
 bool UH_FreeAimGetCursor( Vector2D &cursor );
+void UH_FreeAimClampDirection( const QAngle &viewAngles, Vector &direction );
 #endif
 
 #endif // UH_FREEAIM_H

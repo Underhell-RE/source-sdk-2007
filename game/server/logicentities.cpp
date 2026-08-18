@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ====
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ====
 //
 // Purpose: Implements many of the entities that control logic flow within a map.
 //
@@ -882,6 +882,7 @@ public:
 	int			m_triggermode;
 	int			m_initialstate;
 	int			m_counter;			// A counter value associated with this global.
+	bool		m_bIgnoreNextTransitionReset;
 };
 
 
@@ -891,6 +892,7 @@ BEGIN_DATADESC( CEnvGlobal )
 	DEFINE_FIELD( m_triggermode, FIELD_INTEGER ),
 	DEFINE_KEYFIELD( m_initialstate, FIELD_INTEGER, "initialstate" ),
 	DEFINE_KEYFIELD( m_counter, FIELD_INTEGER, "counter" ),
+	DEFINE_FIELD( m_bIgnoreNextTransitionReset, FIELD_BOOLEAN ),
 
 	// Inputs
 	DEFINE_INPUTFUNC( FIELD_VOID, "TurnOn",	InputTurnOn ),
@@ -907,7 +909,7 @@ BEGIN_DATADESC( CEnvGlobal )
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetGlobalOff",	InputSetGlobalOff ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetGlobalDead",	InputSetGlobalDead ),
 	
-	DEFINE_OUTPUT( m_outCounter, "Counter" ),
+	DEFINE_OUTPUT( m_outCounter, "OutCounter" ),
 
 END_DATADESC()
 
@@ -920,6 +922,7 @@ LINK_ENTITY_TO_CLASS( env_global, CEnvGlobal );
 //-----------------------------------------------------------------------------
 void CEnvGlobal::Spawn( void )
 {
+	m_bIgnoreNextTransitionReset = false;
 	if ( !m_globalstate )
 	{
 		UTIL_Remove( this );
@@ -945,6 +948,18 @@ void CEnvGlobal::Spawn( void )
 		{
 			GlobalEntity_SetCounter( m_globalstate, m_counter );
 		}
+	}
+
+	// Chapter transitions recreate map-side initialisation relays that send
+	// SetCounter 0. Preserve the lifetime card totals for that first reset only;
+	// per-quest Current/Total counters are intentionally allowed to reset.
+	const char *globalName = STRING( m_globalstate );
+	const bool isPersistentCardCount = !Q_stricmp( globalName, "GC_HermitCards" ) ||
+		!Q_stricmp( globalName, "GC_HermitCardsBoard" );
+	if ( gpGlobals->eLoadType == MapLoad_Transition && isPersistentCardCount &&
+		 GlobalEntity_IsInTable( m_globalstate ) && GlobalEntity_GetCounter( m_globalstate ) > 0 )
+	{
+		m_bIgnoreNextTransitionReset = true;
 	}
 }
 
@@ -1038,6 +1053,13 @@ void CEnvGlobal::InputSetGlobalDead( inputdata_t &inputdata )
 //------------------------------------------------------------------------------
 void CEnvGlobal::InputSetCounter( inputdata_t &inputdata )
 {
+	if ( m_bIgnoreNextTransitionReset )
+	{
+		m_bIgnoreNextTransitionReset = false;
+		if ( inputdata.value.Int() == 0 )
+			return;
+	}
+
 	if ( !GlobalEntity_IsInTable( m_globalstate ) )
 	{
 		GlobalEntity_Add( m_globalstate, gpGlobals->mapname, GLOBAL_ON );
@@ -2313,6 +2335,7 @@ class CLogicAutosave : public CLogicalEntity
 protected:
 	// Inputs
 	void InputSave( inputdata_t &inputdata );
+	void InputHardSave( inputdata_t &inputdata );
 	void InputSaveDangerous( inputdata_t &inputdata );
 	void InputSetMinHitpointsThreshold( inputdata_t &inputdata );
 
@@ -2330,6 +2353,7 @@ BEGIN_DATADESC( CLogicAutosave )
 	DEFINE_KEYFIELD( m_minHitPointsToCommit, FIELD_INTEGER, "MinHitPointsToCommit" ),
 	// Inputs
 	DEFINE_INPUTFUNC( FIELD_VOID, "Save", InputSave ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "HardSave", InputHardSave ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "SaveDangerous", InputSaveDangerous ),
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetMinHitpointsThreshold", InputSetMinHitpointsThreshold ),
 END_DATADESC()
@@ -2350,6 +2374,25 @@ void CLogicAutosave::InputSave( inputdata_t &inputdata )
 //-----------------------------------------------------------------------------
 // Purpose: Save safely!
 //-----------------------------------------------------------------------------
+void CLogicAutosave::InputHardSave( inputdata_t &inputdata )
+{
+	const char *pszName = inputdata.value.String();
+	if ( !pszName || !pszName[0] )
+	{
+		InputSave( inputdata );
+		return;
+	}
+
+	// Some shipped outputs pass "save name", while House passes only the
+	// filename. Normalize both forms and reject command separators.
+	if ( !Q_strnicmp( pszName, "save ", 5 ) ) pszName += 5;
+	while ( *pszName == ' ' || *pszName == '\t' ) ++pszName;
+	if ( !pszName[0] || V_stristr( pszName, ";" ) || V_stristr( pszName, "\n" ) || V_stristr( pszName, "\r" ) )
+		return;
+
+	engine->ServerCommand( UTIL_VarArgs( "save %s\n", pszName ) );
+}
+
 void CLogicAutosave::InputSaveDangerous( inputdata_t &inputdata )
 {
 	CBasePlayer *pPlayer = UTIL_PlayerByIndex( 1 );

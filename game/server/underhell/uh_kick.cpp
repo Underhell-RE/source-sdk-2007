@@ -20,6 +20,7 @@
 #include "baseviewmodel_shared.h"
 #include "entityoutput.h"
 #include "soundent.h"
+#include "basepropdoor.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -84,8 +85,17 @@ void CHL2_Player::UH_SetKickViewModel( const char *pszModel )
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_DoKickStrike( void )
 {
-	Vector vecForward;
-	EyeVectors( &vecForward );
+	// Original sub_101F0050 calls GetAutoaimVector( 1.0, 72.0 ), so the leg
+	// follows the same bounded free-aim ray as firearms instead of raw eye
+	// pitch.  Using EyeVectors here allowed upward kicks into ceilings.
+	Vector vecForward = static_cast<CBasePlayer *>( this )->GetAutoaimVector( 1.0f, UH_KICK_REACH );
+	// Match the index-2 viewmodel clamp in Cliento sub_10014D80: the kick may
+	// angle down, but never above the player's horizontal facing plane.
+	if ( vecForward.z > 0.0f )
+	{
+		vecForward.z = 0.0f;
+		VectorNormalize( vecForward );
+	}
 
 	Vector vecOrigin = EyePosition();
 	trace_t tr;
@@ -144,11 +154,18 @@ void CHL2_Player::UH_DoKickStrike( void )
 
 	// The impact path adds its own, lighter rumble pulse after a real hit.
 	RumbleEffect( 4, 0, 4 );
+
+	// sub_101E5A60 calls the dedicated CBasePropDoor breach virtual before the
+	// generic OnKicked output and damage-force path.
+	CBasePropDoor *pPropDoor = dynamic_cast<CBasePropDoor *>( pHit );
+	if ( pPropDoor && pHit->IsUHKickableDoor() && !pPropDoor->IsDoorLocked() )
+		pPropDoor->UHBreachDoor( this, this, false, tr.endpos );
+
+	// The VMF's breakaway doors use OnKicked -> EnableMotion. Fire it before
+	// applying damage so the subsequent impulse reaches an enabled physbox.
+	pHit->FireOnKicked( this );
 	pHit->TakeDamage( info );
 
-	// Let the victim react (OnKicked output; the map uses e.g.
-	// "OnKicked" "door_KillingRoom,EnableMotion").
-	pHit->FireOnKicked( this );
 }
 
 //-----------------------------------------------------------------------------

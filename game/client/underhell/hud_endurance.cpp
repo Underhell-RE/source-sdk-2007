@@ -124,9 +124,11 @@ void CHudEndurance::Paint()
 
 	vgui::surface()->DrawSetColor( 255, 255, 255, 255 );
 	vgui::surface()->DrawSetTexture( m_iIconTexture );
+	// Original sub_100C87B0 treats iconwide/icontall as right/bottom panel
+	// coordinates. Adding iconx/icony shifted and clipped both HUD icons.
 	vgui::surface()->DrawTexturedRect(
 		(int)m_fIconX, (int)m_fIconY,
-		(int)( m_fIconX + m_fIconWide ), (int)( m_fIconY + m_fIconTall ) );
+		(int)m_fIconWide, (int)m_fIconTall );
 
 	float flChunkStep = m_flBarChunkHeight + m_flBarChunkGap;
 	int chunkCount = ( flChunkStep > 0.0f ) ? (int)( m_flBarHeight / flChunkStep ) : 0;

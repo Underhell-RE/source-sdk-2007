@@ -53,11 +53,13 @@ enum UHInventoryItem_t
 	// Light sources.
 	UH_ITEM_FLARE_PACK = 13,
 
-	UH_ITEM_GLOWSTICK_FIRST = 14,	// GlowStick (Red)
-	UH_ITEM_GLOWSTICK_YELLOW = 15,
-	UH_ITEM_GLOWSTICK_GREEN = 16,
-	UH_ITEM_GLOWSTICK_BLUE = 17,
-	UH_ITEM_GLOWSTICK_LAST = 18,	// GlowStick (Purple)
+	UH_ITEM_GLOWSTICK_FIRST = 14,
+	UH_ITEM_GLOWSTICK_GREEN = 14,
+	UH_ITEM_GLOWSTICK_RED = 15,
+	UH_ITEM_GLOWSTICK_BLUE = 16,
+	UH_ITEM_GLOWSTICK_YELLOW = 17,
+	UH_ITEM_GLOWSTICK_PURPLE = 18,
+	UH_ITEM_GLOWSTICK_LAST = 18,
 
 	// Lit glowsticks. No world entity ("nothing" classname); the lit prop is
 	// parented to the player and removed when the slot is consumed.
@@ -119,20 +121,20 @@ inline int UH_GetGlowstickBodyGroup( int iItem )
 {
 	switch ( iItem )
 	{
-	case UH_ITEM_GLOWSTICK_FIRST:	// red
-	case UH_ITEM_LIT_GLOWSTICK_FIRST:
-		return 0;
-	case UH_ITEM_GLOWSTICK_YELLOW:	// yellow
-	case UH_ITEM_GLOWSTICK_YELLOW + 5:
-		return 2;
-	case UH_ITEM_GLOWSTICK_GREEN:	// green
+	case UH_ITEM_GLOWSTICK_GREEN:
 	case UH_ITEM_GLOWSTICK_GREEN + 5:
-		return 4;
-	case UH_ITEM_GLOWSTICK_BLUE:	// blue
+		return 0;
+	case UH_ITEM_GLOWSTICK_RED:
+	case UH_ITEM_GLOWSTICK_RED + 5:
+		return 2;
+	case UH_ITEM_GLOWSTICK_BLUE:
 	case UH_ITEM_GLOWSTICK_BLUE + 5:
+		return 4;
+	case UH_ITEM_GLOWSTICK_YELLOW:
+	case UH_ITEM_GLOWSTICK_YELLOW + 5:
 		return 6;
-	case UH_ITEM_GLOWSTICK_LAST:	// purple
-	case UH_ITEM_GLOWSTICK_LAST + 5:
+	case UH_ITEM_GLOWSTICK_PURPLE:
+	case UH_ITEM_GLOWSTICK_PURPLE + 5:
 		return 8;
 	default:
 		return 0;
@@ -149,18 +151,18 @@ inline const char *UH_GetInventoryItemName( int iItem )
 	return UH_GetInventoryItemInfo( iItem )->pszPrintName;
 }
 
-// Light colour per glowstick (red/yellow/green/blue/purple). Shared between the
+// Light colour per glowstick (green/red/blue/yellow/purple, original id order). Shared between the
 // lit-glowstick pickup (uh_items.cpp) and the dropped glowstick prop.
 inline Color UH_GetGlowstickColor( int iItem )
 {
 	switch ( UH_GetGlowstickBodyGroup( iItem ) )
 	{
-	case 0:		return Color( 255, 40, 40, 255 );	// red
-	case 2:		return Color( 255, 255, 60, 255 );	// yellow
-	case 4:		return Color( 60, 255, 60, 255 );	// green
-	case 6:		return Color( 60, 120, 255, 255 );	// blue
-	case 8:		return Color( 200, 60, 255, 255 );	// purple
-	default:	return Color( 255, 40, 40, 255 );
+	case 0:		return Color( 0, 255, 0, 255 );		// green
+	case 2:		return Color( 255, 0, 0, 255 );		// red
+	case 4:		return Color( 80, 170, 255, 255 );	// blue
+	case 6:		return Color( 240, 250, 50, 255 );	// yellow
+	case 8:		return Color( 200, 25, 240, 255 );	// purple
+	default:	return Color( 0, 255, 0, 255 );
 	}
 }
 

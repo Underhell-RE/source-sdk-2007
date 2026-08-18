@@ -557,13 +557,72 @@ public:
 	void InputCommand( inputdata_t& inputdata );
 };
 
+// Experimental migration switch for the shipped House JSAV snapshots.
+// 0 preserves the original load command; 1 rewrites known hidden saves to a
+// fresh changelevel so campaign-state/bootstrap work can be tested without
+// depending on an old binary datamap snapshot.
+ConVar uh_hidden_save_proxy( "uh_hidden_save_proxy", "0", FCVAR_ARCHIVE,
+	"Proxy known Underhell .hiddensave loads to fresh map transitions." );
+
+static bool UH_ProxyHiddenSaveLoad( const char *pszCommand )
+{
+	if ( !uh_hidden_save_proxy.GetBool() || !pszCommand )
+		return false;
+
+	const char *pszName = pszCommand;
+	if ( !Q_strnicmp( pszName, "load ", 5 ) )
+		pszName += 5;
+	else if ( !Q_strnicmp( pszName, "uh_load_hidden_save ", 20 ) )
+		pszName += 20;
+
+	while ( *pszName == ' ' || *pszName == '\t' || *pszName == '"' ) ++pszName;
+
+	if ( V_stristr( pszName, "house0.restart.hiddensave" ) ||
+		 V_stristr( pszName, "house0.hiddensave" ) )
+	{
+		engine->ServerCommand( "changelevel Uh_House_0\n" );
+		Msg( "[UH save proxy] %s -> changelevel Uh_House_0\n", pszName );
+		return true;
+	}
+	if ( V_stristr( pszName, "house1.hiddensave" ) )
+	{
+		engine->ServerCommand( "changelevel Uh_House_1\n" );
+		Msg( "[UH save proxy] %s -> changelevel Uh_House_1\n", pszName );
+		return true;
+	}
+	if ( V_stristr( pszName, "house.hiddensave" ) )
+	{
+		engine->ServerCommand( "changelevel Uh_House_0\n" );
+		Msg( "[UH save proxy] %s -> changelevel Uh_House_0\n", pszName );
+		return true;
+	}
+	return false;
+}
+
+static void CC_UHLoadHiddenSave( const CCommand &args )
+{
+	if ( args.ArgC() < 2 )
+	{
+		Msg( "usage: uh_load_hidden_save <name.hiddensave>\n" );
+		return;
+	}
+	if ( UH_ProxyHiddenSaveLoad( args[1] ) )
+		return;
+	engine->ServerCommand( UTIL_VarArgs( "load %s\n", args[1] ) );
+}
+static ConCommand uh_load_hidden_save( "uh_load_hidden_save", CC_UHLoadHiddenSave,
+	"Load a legacy Underhell hidden save, or proxy it when uh_hidden_save_proxy is 1." );
+
 //-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : inputdata - 
+// Purpose:
+// Input  : inputdata -
 //-----------------------------------------------------------------------------
 void CPointServerCommand::InputCommand( inputdata_t& inputdata )
 {
 	if ( !inputdata.value.String()[0] )
+		return;
+
+	if ( UH_ProxyHiddenSaveLoad( inputdata.value.String() ) )
 		return;
 
 	engine->ServerCommand( UTIL_VarArgs( "%s\n", inputdata.value.String() ) );

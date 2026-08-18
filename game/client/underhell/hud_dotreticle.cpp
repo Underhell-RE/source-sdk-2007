@@ -3,17 +3,14 @@
 // Purpose: Underhell dot reticle HUD element — implementation.
 //
 // Behavioural re-implementation of the original CHudDotReticle:
-//   * a small centered dot,
+//   * a small centered white ring with a black outer outline,
 //   * lights at full alpha when the player presses +use,
 //   * fades linearly to zero over 3.0 s (alpha = (3.0 - elapsed) * 85, from
 //     the original paint sub_100BC870),
 //   * hidden while iron-sighted.
 //
-// Divergence (documented): the original stores the trigger timestamp on the
-// player (client offset 3456) and stamps it from the free-aim input path;
-// that free-aim camera is still TODO. This port detects the +use press edge
-// directly in OnThink and keeps the timestamp on the panel, so the dot behaves
-// identically without the free-aim dependency.
+// The trigger timestamp is stored on C_BaseHLPlayer and stamped from CreateMove
+// whenever the generated command contains IN_USE, matching client+3456.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -23,9 +20,8 @@
 #include "hud_macros.h"
 #include "hud_dotreticle.h"
 #include "underhell/uh_freeaim.h"
-#include "c_basehlplayer.h"}ાજેતળીажәлар to=functions.edit_file  天天中彩票中了和天天中彩票】【。】【”】【av不卡免费播放  手机天天彩票Error? Let's see result.numerusform to=functions.edit_file 񹚒 ฝ่ายขายละคร  天天中彩票无法  彩神争霸的={
+#include "c_basehlplayer.h"
 #include "iclientmode.h"
-#include "in_buttons.h"
 #include <vgui/ISurface.h>
 
 void ScreenToWorld( int mousex, int mousey, float fov, const Vector& vecRenderOrigin,
@@ -57,9 +53,7 @@ CHudDotReticle::CHudDotReticle( const char *pElementName ) : CHudElement( pEleme
 	SetParent( pParent );
 
 	SetHiddenBits( HIDEHUD_UH_RETICLE );
-
-	m_flTriggerTime = -100.0f;
-	m_bUseHeld = false;
+	SetAlpha( 128 );
 }
 
 //-----------------------------------------------------------------------------
@@ -67,8 +61,6 @@ CHudDotReticle::CHudDotReticle( const char *pElementName ) : CHudElement( pEleme
 //-----------------------------------------------------------------------------
 void CHudDotReticle::Init( void )
 {
-	m_flTriggerTime = -100.0f;
-	m_bUseHeld = false;
 }
 
 void CHudDotReticle::Reset( void )
@@ -100,20 +92,11 @@ bool CHudDotReticle::ShouldDraw( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Stamp the fade anchor on the +use press edge.
+// Purpose: Timestamping is performed by C_BaseHLPlayer::CreateMove.
 //-----------------------------------------------------------------------------
 void CHudDotReticle::OnThink( void )
 {
-	C_BaseHLPlayer *pPlayer = (C_BaseHLPlayer *)C_BasePlayer::GetLocalPlayer();
-	if ( !pPlayer )
-		return;
-
-	bool bUse = ( pPlayer->m_nButtons & IN_USE ) != 0;
-	if ( bUse && !m_bUseHeld )
-	{
-		m_flTriggerTime = gpGlobals->curtime;
-	}
-	m_bUseHeld = bUse;
+	// Timestamping happens in C_BaseHLPlayer::CreateMove, as in the original.
 }
 
 //-----------------------------------------------------------------------------
@@ -138,8 +121,12 @@ void CHudDotReticle::Paint()
 			ScreenToWorld( (int)( ( cursor.x * 0.25f + 0.5f ) * wide ),
 				(int)( ( cursor.y * 0.25f + 0.5f ) * tall ), pPlayer->GetFOV(),
 				pPlayer->EyePosition(), pPlayer->EyeAngles(), ray );
-			Vector target = pPlayer->EyePosition() + ray * MAX_TRACE_LENGTH;
-			engine->ClientCmd( VarArgs( "update_freeaim %f %f %f", target.x, target.y, target.z ) );
+			UH_FreeAimClampDirection( pPlayer->EyeAngles(), ray );
+
+			// Original sub_100BC870 sends the normalized ray itself.  Sending a
+			// world-space endpoint made server attacks interpret huge coordinates
+			// as a direction, which is why the kick could strike the ceiling.
+			engine->ClientCmd( VarArgs( "update_freeaim %f %f %f", ray.x, ray.y, ray.z ) );
 		}
 	}
 
@@ -148,7 +135,7 @@ void CHudDotReticle::Paint()
 	if ( pPlayer->m_bIronSighted )
 		return;
 
-	float flElapsed = gpGlobals->curtime - m_flTriggerTime;
+	float flElapsed = gpGlobals->curtime - pPlayer->m_flUseReticleTime;
 	if ( flElapsed < 0.0f || flElapsed >= UH_DOTRETICLE_FADE_TIME )
 		return;
 
@@ -157,16 +144,15 @@ void CHudDotReticle::Paint()
 	if ( iAlpha <= 0 )
 		return;
 
-	// The original (sub_100BC870) draws two small filled rects — a 3x8 black
-	// tick with a 2x8 white tick on top — a tiny crosshair caret, NOT a filled
-	// square. dotx/doty (8,8) mark the CENTER of the 16x16 panel; draw the
-	// caret centered on them. Black outline tick first, then white tick.
+	// vgui::ISurface vtable+384 is DrawOutlinedCircle (the IAppSystem base adds
+	// two slots). The original draws an 8-segment white radius-2 ring followed
+	// by a black radius-3 outline at dotx/doty.
 	int cx = (int)m_fdotx;
 	int cy = (int)m_fdoty;
 
-	vgui::surface()->DrawSetColor( 0, 0, 0, iAlpha );
-	vgui::surface()->DrawFilledRect( cx - 1, cy - 4, cx + 2, cy + 4 );
-
 	vgui::surface()->DrawSetColor( 255, 255, 255, iAlpha );
-	vgui::surface()->DrawFilledRect( cx - 1, cy - 4, cx + 1, cy + 4 );
+	vgui::surface()->DrawOutlinedCircle( cx, cy, 2, 8 );
+
+	vgui::surface()->DrawSetColor( 0, 0, 0, iAlpha );
+	vgui::surface()->DrawOutlinedCircle( cx, cy, 3, 8 );
 }

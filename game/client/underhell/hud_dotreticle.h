@@ -1,7 +1,7 @@
 //========= Copyright (c) 2008, Mxthe (Underhell). All rights reserved. ============//
 //
-// Purpose: Underhell dot reticle HUD element — a small centered aiming dot
-//          that lights up when the player presses +use and then fades out.
+// Purpose: Underhell dot reticle HUD element — a tiny centered two-ring marker
+//          that lights up while the player uses +use and then fades out.
 //
 // Original CHudDotReticle (panel "HudDotReticle" in scripts/HudLayout.res,
 // class "CHudDotReticle" in the client RTTI dump). Decoded:
@@ -12,8 +12,7 @@
 //     the trigger and a linear fade to 0 over 3.0 s; skipped while iron-sighted
 //     (m_bIronSighted @4140).
 //   * the trigger timestamp is a client-local float at player offset 3456,
-//     stamped by the free-aim input code. We stamp it here on the +use press
-//     edge instead (see .cpp note) for a clean, self-contained port.
+//     stamped every CreateMove command containing IN_USE.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -51,8 +50,6 @@ private:
 	CPanelAnimationVarAliasType( float, m_fdotwide, "dotwide", "4", "proportional_float" );
 	CPanelAnimationVarAliasType( float, m_fdottall, "dottall", "4", "proportional_float" );
 
-	float	m_flTriggerTime;	// curtime of the last +use press (fade anchor)
-	bool	m_bUseHeld;			// +use held last think (press-edge detection)
 };
 
 #endif // HUD_DOTRETICLE_H

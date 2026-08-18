@@ -56,7 +56,7 @@ void CHL2_Player::UH_ToggleNightVision( void )
 	if ( !m_bNightVisionOn )
 	{
 		// Turning on: refuse without a battery (or a nearly-full current charge).
-		if ( m_iUHBatteryCount <= 0 && m_flUHBatteryCharge <= 10.0f )
+		if ( m_iUHBatteryCount <= 0 && m_HL2Local.m_flFlashBattery <= 10.0f )
 		{
 			EmitSound( "HL2Player.UseDeny" );
 			return;

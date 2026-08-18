@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -631,6 +631,8 @@ public:
 	void InputAlternativeSorting( inputdata_t &inputdata );
 	void InputAlpha( inputdata_t &inputdata );
 	void InputColor( inputdata_t &inputdata );
+	void InputGlow( inputdata_t &inputdata );
+	void InputSetGlowColor( inputdata_t &inputdata );
 	void InputSetParent( inputdata_t &inputdata );
 	void SetParentAttachment( const char *szInputName, const char *szAttachment, bool bMaintainOffset );
 	void InputSetParentAttachment( inputdata_t &inputdata );
@@ -1649,6 +1651,9 @@ public:
 
 	// Underhell: fire the "OnKicked" output (player kick hit this entity).
 	void	FireOnKicked( CBaseEntity *pActivator ) { m_OnKicked.FireOutput( pActivator, pActivator ); }
+	bool	IsUHKickableDoor( void ) const { return m_bUHKickableDoor; }
+	bool	IsUHHardGlow( void ) const { return m_bHardGlow; }
+	void	SetUHAutomaticGlow( bool enabled ) { if ( !m_bHardGlow ) m_bGlow = enabled; }
 private:
 
 	// User outputs. Fired when the "FireInputX" input is triggered.
@@ -1659,6 +1664,10 @@ private:
 
 	// Underhell: fired when the player kicks this entity (uh_jake_kick).
 	COutputEvent m_OnKicked;
+	bool m_bUHKickableDoor;
+	CNetworkVar( bool, m_bGlow );
+	bool m_bHardGlow;
+	CNetworkColor32( m_GlowColor );
 
 	QAngle			m_angAbsRotation;
 

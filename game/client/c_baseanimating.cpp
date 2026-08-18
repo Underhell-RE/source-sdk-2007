@@ -1,10 +1,11 @@
-//===== Copy	right © 1996-2005, Valve Corporation, All rights reserved. ==//
+//===== Copy	right ï¿½ 1996-2005, Valve Corporation, All rights reserved. ==//
 //
 // Purpose: 
 //
 // $NoKeywords: $
 //===========================================================================//
 #include "cbase.h"
+#include "c_baseplayer.h"
 #include "c_baseanimating.h"
 #include "c_Sprite.h"
 #include "model_types.h"
@@ -2780,10 +2781,46 @@ int C_BaseAnimating::DrawModel( int flags )
 	if ( !m_bReadyToDraw )
 		return 0;
 
-	// Underhell: mirror/monitor-only studio models (player model, ghost actors)
-	// draw only during the reflective/refractive glass pass.
+	C_BasePlayer *pLocalPlayer = C_BasePlayer::GetLocalPlayer();
+	if ( cl_uh_render_debug.GetBool() && g_bRenderingReflectiveGlass )
+	{
+		const model_t *pDebugModel = GetModel();
+		const char *pszDebugModel = pDebugModel ? modelinfo->GetModelName( pDebugModel ) : "<null>";
+		if ( V_stristr( pszDebugModel, "jake" ) )
+		{
+			static float s_flNextJakeTargetLog = 0.0f;
+			if ( gpGlobals->curtime >= s_flNextJakeTargetLog )
+			{
+				s_flNextJakeTargetLog = gpGlobals->curtime + 1.0f;
+				const QAngle &debugAngles = GetAbsAngles();
+				Msg( "[UH render] Jake target DrawModel ent=%d local=%d mirrorOnly=%d pass=%d model=%s origin=%.1f %.1f %.1f angles=%.1f %.1f %.1f renderMode=%d alpha=%d effects=0x%x\n",
+					entindex(), this == pLocalPlayer, IsMirrorOnly(), g_bRenderingReflectiveGlass,
+					pszDebugModel, GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z,
+					debugAngles.x, debugAngles.y, debugAngles.z, GetRenderMode(), GetRenderColor().a, GetEffects() );
+			}
+		}
+	}
+	if ( cl_uh_render_debug.GetBool() && this == pLocalPlayer )
+	{
+		static float s_flNextPlayerRenderLog = 0.0f;
+		if ( gpGlobals->curtime >= s_flNextPlayerRenderLog )
+		{
+			s_flNextPlayerRenderLog = gpGlobals->curtime + 1.0f;
+			const model_t *pModel = GetModel();
+			Msg( "[UH render] player DrawModel mirrorOnly=%d pass=%d cvar=%d ots=%d model=%s\n",
+				IsMirrorOnly(), g_bRenderingReflectiveGlass, cl_player_render_mirror.GetBool(),
+				pLocalPlayer->AllowOvertheShoulderView(), pModel ? modelinfo->GetModelName( pModel ) : "<null>" );
+		}
+	}
+
+	// Same gate as the working mirror implementation in 1781e2a. OTS is the
+	// only main-view exception for the local player body.
 	if ( IsMirrorOnly() && ( !cl_player_render_mirror.GetBool() || !g_bRenderingReflectiveGlass ) )
-		return 0;
+	{
+		C_BasePlayer *pLocal = C_BasePlayer::GetLocalPlayer();
+		if ( this != pLocal || !pLocal->AllowOvertheShoulderView() )
+			return 0;
+	}
 
 	int drawn = 0;
 

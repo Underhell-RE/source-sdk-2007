@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Normal HUD mode
 //
@@ -46,6 +46,16 @@ static vgui::HContext s_hVGuiContext = DEFAULT_VGUI_CONTEXT;
 
 ConVar cl_drawhud( "cl_drawhud", "1", FCVAR_CHEAT, "Enable the rendering of the hud" );
 ConVar hud_takesshots( "hud_takesshots", "0", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Auto-save a scoreboard screenshot at the end of a map." );
+
+// Underhell over-the-shoulder camera (original Cliento cvar defaults).
+static ConVar cam_ots_offset( "cam_ots_offset", "15 -40 0", FCVAR_ARCHIVE );
+static ConVar cam_ots_offsetlag( "cam_ots_offset_lag", "64.0", FCVAR_ARCHIVE );
+static ConVar cam_ots_originlag( "cam_ots_origin_lag", "38.0", FCVAR_ARCHIVE );
+static ConVar cam_ots_translucencythreshold( "cam_ots_translucencyThreshold", "32.0", FCVAR_ARCHIVE );
+static ConVar cam_ots_shake_enable( "cam_ots_shake_enable", "1", FCVAR_ARCHIVE );
+static ConVar cam_ots_shake_speed( "cam_ots_shake_speed", "400", FCVAR_ARCHIVE );
+static ConVar cam_ots_shake_amount( "cam_ots_shake_amount", "2", FCVAR_ARCHIVE );
+static ConVar cam_ots_shake_interpspeed( "cam_ots_shake_interpspeed", "5", FCVAR_ARCHIVE );
 
 extern ConVar v_viewmodel_fov;
 
@@ -252,44 +262,160 @@ bool ClientModeShared::CreateMove( float flInputSampleTime, CUserCmd *cmd )
 //-----------------------------------------------------------------------------
 void ClientModeShared::OverrideView( CViewSetup *pSetup )
 {
-	QAngle camAngles;
-
-	// Let the player override the view.
 	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
-	if(!pPlayer)
+	if ( !pPlayer )
 		return;
 
 	pPlayer->OverrideView( pSetup );
 
-	if( ::input->CAM_IsThirdPerson() )
+	static Vector s_vecLaggedEye = vec3_origin;
+	static Vector s_vecCamera = vec3_origin;
+	static float s_flShakeTimer = 0.0f;
+	static float s_flGroundBlend = 1.0f;
+	static float s_flAirSpeed = 0.0f;
+	static bool s_bWasOTSTranslucent = false;
+
+	if ( ::input->CAM_IsThirdPerson() && pPlayer->AllowOvertheShoulderView() )
 	{
-		Vector cam_ofs;
+		QAngle viewAngles;
+		engine->GetViewAngles( viewAngles );
 
-		::input->CAM_GetCameraOffset( cam_ofs );
+		Vector velocity;
+		pPlayer->EstimateAbsVelocity( velocity );
+		s_flGroundBlend = Approach( ( pPlayer->GetFlags() & FL_ONGROUND ) ? 1.0f : 0.0f,
+			s_flGroundBlend, gpGlobals->frametime * cam_ots_shake_interpspeed.GetFloat() );
+		s_flAirSpeed = Approach( velocity.z, s_flAirSpeed, gpGlobals->frametime * 1000.0f );
 
-		camAngles[ PITCH ] = cam_ofs[ PITCH ];
-		camAngles[ YAW ] = cam_ofs[ YAW ];
-		camAngles[ ROLL ] = 0;
+		if ( cam_ots_shake_enable.GetBool() )
+		{
+			s_flShakeTimer += gpGlobals->frametime * cam_ots_shake_speed.GetFloat();
+			if ( s_flShakeTimer > 360.0f )
+				s_flShakeTimer -= 360.0f;
+			const float moveScale = velocity.Length2DSqr() / 90000.0f;
+			const float shake = cam_ots_shake_amount.GetFloat();
+			viewAngles.y += s_flGroundBlend * moveScale * FastCos( DEG2RAD( s_flShakeTimer ) ) * shake;
+			viewAngles.x += s_flGroundBlend * moveScale * sin( DEG2RAD( s_flShakeTimer ) * 2.0f ) * shake * 0.5f;
+			viewAngles.x -= ( 1.0f - s_flGroundBlend ) * clamp( s_flAirSpeed, -1000.0f, 1000.0f ) / 25.0f;
+		}
 
-		Vector camForward, camRight, camUp;
-		AngleVectors( camAngles, &camForward, &camRight, &camUp );
+		float offsetRight = 15.0f, offsetForward = -40.0f, offsetUp = 0.0f;
+		CCommand offsetCommand;
+		offsetCommand.Tokenize( cam_ots_offset.GetString() );
+		if ( offsetCommand.ArgC() >= 3 )
+		{
+			offsetRight = atof( offsetCommand[0] );
+			offsetForward = atof( offsetCommand[1] );
+			offsetUp = atof( offsetCommand[2] );
+		}
 
-		VectorMA( pSetup->origin, -cam_ofs[ ROLL ], camForward, pSetup->origin );
+		const Vector eye = pPlayer->EyePosition();
+		if ( s_vecLaggedEye == vec3_origin || eye.DistTo( s_vecLaggedEye ) > 128.0f )
+			s_vecLaggedEye = eye;
+		else
+		{
+			Vector delta = eye - s_vecLaggedEye;
+			float distance = VectorNormalize( delta );
+			float speedVariety = distance / 128.0f;
+			s_vecLaggedEye += delta * min( distance, gpGlobals->frametime *
+				( cam_ots_originlag.GetFloat() + cam_ots_originlag.GetFloat() * cam_ots_originlag.GetFloat() * speedVariety ) );
+		}
 
-		// Override angles from third person camera
-		VectorCopy( camAngles, pSetup->angles );
+		Vector forward, right, up;
+		AngleVectors( viewAngles, &forward, &right, &up );
+		const Vector hull( 10, 10, 10 );
+		trace_t tr;
+
+		// Test preferred shoulder, opposite shoulder and centered camera. Pick
+		// the route which preserves the largest unobstructed camera distance.
+		Vector candidates[3];
+		float sideOffsets[3] = { offsetRight, -offsetRight, 0.0f };
+		float bestDistance = -1.0f;
+		int best = 0;
+		for ( int i = 0; i < 3; ++i )
+		{
+			Vector desired = s_vecLaggedEye + right * sideOffsets[i] + forward * offsetForward + up * offsetUp;
+			UTIL_TraceHull( s_vecLaggedEye, desired, -hull, hull, MASK_SOLID, pPlayer,
+				COLLISION_GROUP_DEBRIS, &tr );
+			candidates[i] = tr.endpos;
+			float available = candidates[i].DistTo( s_vecLaggedEye ) - i * 5.0f;
+			if ( available > bestDistance )
+			{
+				bestDistance = available;
+				best = i;
+			}
+		}
+
+		Vector targetCamera = candidates[best];
+		if ( s_vecCamera == vec3_origin || targetCamera.DistTo( s_vecCamera ) > 128.0f )
+			s_vecCamera = targetCamera;
+		else
+		{
+			const float step = gpGlobals->frametime * cam_ots_offsetlag.GetFloat();
+			s_vecCamera.x = Approach( targetCamera.x, s_vecCamera.x, step );
+			s_vecCamera.y = Approach( targetCamera.y, s_vecCamera.y, step );
+			s_vecCamera.z = Approach( targetCamera.z, s_vecCamera.z, step );
+			UTIL_TraceHull( s_vecLaggedEye, s_vecCamera, -hull, hull, MASK_SOLID, pPlayer,
+				COLLISION_GROUP_DEBRIS, &tr );
+			s_vecCamera = tr.endpos;
+		}
+
+		pSetup->origin = s_vecCamera;
+		pSetup->angles = viewAngles + pPlayer->GetPunchAngle();
+
+		const float threshold = cam_ots_translucencythreshold.GetFloat();
+		const float distanceSqr = s_vecCamera.DistToSqr( pPlayer->GetAbsOrigin() );
+		const float alphaFraction = threshold > 0.0f ? min( 1.0f, distanceSqr / ( threshold * threshold ) ) : 1.0f;
+		const bool translucent = alphaFraction < 1.0f;
+		if ( translucent )
+		{
+			unsigned char alpha = (unsigned char)( alphaFraction * 255.0f );
+			pPlayer->SetRenderMode( kRenderTransTexture, true );
+			pPlayer->SetRenderColorA( alpha );
+			if ( pPlayer->GetActiveWeapon() )
+			{
+				pPlayer->GetActiveWeapon()->SetRenderMode( kRenderTransTexture, true );
+				pPlayer->GetActiveWeapon()->SetRenderColorA( alpha );
+			}
+		}
+		else if ( s_bWasOTSTranslucent )
+		{
+			pPlayer->SetRenderMode( kRenderNormal, true );
+			pPlayer->SetRenderColorA( 255 );
+			if ( pPlayer->GetActiveWeapon() )
+			{
+				pPlayer->GetActiveWeapon()->SetRenderMode( kRenderNormal, true );
+				pPlayer->GetActiveWeapon()->SetRenderColorA( 255 );
+			}
+		}
+		s_bWasOTSTranslucent = translucent;
 	}
-	else if (::input->CAM_IsOrthographic())
+	else if ( ::input->CAM_IsOrthographic() )
 	{
 		pSetup->m_bOrtho = true;
 		float w, h;
 		::input->CAM_OrthographicSize( w, h );
 		w *= 0.5f;
 		h *= 0.5f;
-		pSetup->m_OrthoLeft   = -w;
-		pSetup->m_OrthoTop    = -h;
-		pSetup->m_OrthoRight  = w;
+		pSetup->m_OrthoLeft = -w;
+		pSetup->m_OrthoTop = -h;
+		pSetup->m_OrthoRight = w;
 		pSetup->m_OrthoBottom = h;
+	}
+	else
+	{
+		s_vecLaggedEye = vec3_origin;
+		s_vecCamera = vec3_origin;
+		if ( s_bWasOTSTranslucent )
+		{
+			pPlayer->SetRenderMode( kRenderNormal, true );
+			pPlayer->SetRenderColorA( 255 );
+			if ( pPlayer->GetActiveWeapon() )
+			{
+				pPlayer->GetActiveWeapon()->SetRenderMode( kRenderNormal, true );
+				pPlayer->GetActiveWeapon()->SetRenderColorA( 255 );
+			}
+			s_bWasOTSTranslucent = false;
+		}
 	}
 }
 

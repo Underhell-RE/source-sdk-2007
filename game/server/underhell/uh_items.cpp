@@ -12,12 +12,16 @@
 #include "ammodef.h"
 #include "gamerules.h"
 #include "hl2_player.h"
+#include "props.h"
+#include "hl2/weapon_flaregun.h"
 #include "uh_items.h"
 #include "explode.h"
 #include "soundent.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
+
+extern ConVar sk_battery;
 
 // skill convar used by the radiocracker detonation (defined in hl2_gamerules.cpp)
 extern ConVar sk_plr_dmg_smg1_grenade;
@@ -62,10 +66,7 @@ void CUHItem::Spawn( void )
 void CUHItem::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( pActivator );
-	if ( pPlayer )
-	{
-		MyTouch( pPlayer );
-	}
+	if ( pPlayer ) MyTouch( pPlayer );
 }
 
 //-----------------------------------------------------------------------------
@@ -87,6 +88,7 @@ bool CUHItem::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
 	pHL2Player->UH_GiveItem( iItem );
@@ -109,10 +111,6 @@ static CHL2_Player *UH_GetItemConsumer( CBaseEntity *pActivator )
 	if ( !pPlayer || !pPlayer->IsAlive() )
 		return NULL;
 
-	// Can't eat / drink through a gas mask.
-	if ( pPlayer->UH_IsGasMaskOn() )
-		return NULL;
-
 	return pPlayer;
 }
 
@@ -131,7 +129,7 @@ void CUHFoodItem::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE u
 	}
 
 	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
-	if ( !pPlayer )
+	if ( !pPlayer || pPlayer->UH_IsGasMaskOn() )
 		return;
 
 	pPlayer->UH_Eat( GetEnduranceGain(), GetHealthGain(), GetEatSound() );
@@ -153,7 +151,7 @@ void CItemUHSoda::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE u
 	}
 
 	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
-	if ( !pPlayer )
+	if ( !pPlayer || pPlayer->UH_IsGasMaskOn() )
 		return;
 
 	// Original sub_101772F0: flavour = item id - 7 (0..5).
@@ -242,6 +240,7 @@ bool CItemApple::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
 
@@ -253,8 +252,8 @@ bool CItemApple::MyTouch( CBasePlayer *pPlayer )
 }
 
 //-----------------------------------------------------------------------------
-// Sodas: six flavours, ids 7..12.
-// TODO: verify the original picks the flavour on spawn (skin) or on pickup.
+// Sodas: six flavours, ids 7..12. sub_10177380 randomizes skin 0 at
+// Spawn; sub_10177230 converts skin 0..4 to id 7..11 and skin 5 to id 12.
 //-----------------------------------------------------------------------------
 LINK_ENTITY_TO_CLASS( item_uhsoda, CItemUHSoda );
 
@@ -286,6 +285,7 @@ bool CItemUHSoda::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
 
@@ -331,6 +331,7 @@ bool CItemGlowStick::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
 
@@ -349,8 +350,6 @@ bool CItemGlowStick::MyTouch( CBasePlayer *pPlayer )
 //-----------------------------------------------------------------------------
 void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
-	// World "+use" picks the item up; only the inventory "useitem" (USE_ON)
-	// path lights it.
 	if ( useType != USE_ON )
 	{
 		BaseClass::Use( pActivator, pCaller, useType, value );
@@ -358,56 +357,68 @@ void CItemGlowStick::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 	}
 
 	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
-	if ( !pPlayer )
-		return;
+	if ( !pPlayer ) return;
+	const int iItem = (int)value;
 
-	int iItem = (int)value;
-	Color glowColor = UH_GetGlowstickColor( iItem );
-
-	// Replace any existing lit glowstick with the new one.
+	// Activating another stick releases the previous hidden lit prop at the
+	// player's feet. sub_101742D0 restores draw/solid/physics before replacing
+	// m_hActiveGlowStick and clears the old lit inventory entry.
 	CBaseEntity *pOldGlow = pPlayer->UH_GetActiveGlowStick();
 	if ( pOldGlow )
 	{
-		UTIL_Remove( pOldGlow );
+		pOldGlow->SetParent( NULL );
+		pOldGlow->RemoveEffects( EF_NODRAW | EF_NOSHADOW );
+		pOldGlow->RemoveSolidFlags( FSOLID_NOT_SOLID );
+		pOldGlow->SetSolid( SOLID_VPHYSICS );
+		if ( !pOldGlow->VPhysicsGetObject() )
+			pOldGlow->VPhysicsInitNormal( SOLID_VPHYSICS, 0, false );
+		pOldGlow->SetAbsOrigin( pPlayer->GetAbsOrigin() );
 		pPlayer->UH_SetActiveGlowStick( NULL );
+		pPlayer->UH_SetActiveGlowStickLight( NULL );
+		for ( int id = UH_ITEM_LIT_GLOWSTICK_FIRST; id <= UH_ITEM_LIT_GLOWSTICK_LAST; ++id )
+		{
+			int slot = pPlayer->UH_FindInventoryItem( id );
+			if ( slot >= 0 ) { pPlayer->UH_RemoveInventoryItem( slot ); break; }
+		}
 	}
 
-	// The original uses a prop_physics (sub_101742D0) and lights it via
-	// EF_BRIGHTLIGHT (dlight tinted by m_clrRender) + EF_NOSHADOW + a glow
-	// render mode, then straps it to the player. Match that: prop_dynamic has
-	// no physics/dlight path and produced no visible light.
 	CBaseEntity *pGlow = CreateEntityByName( "prop_physics" );
-	if ( !pGlow )
-		return;
-
+	if ( !pGlow ) return;
 	pGlow->SetModel( "models/PG_props/pg_obj/pg_glow_stick.mdl" );
-	static_cast<CBaseAnimating *>( pGlow )->SetBodygroup( 0, UH_GetGlowstickBodyGroup( iItem ) );
-
+	pGlow->GetBaseAnimating()->m_nSkin = UH_GetGlowstickBodyGroup( iItem ); // 0/2/4/6/8 unlit skins
 	pGlow->SetAbsOrigin( pPlayer->GetAbsOrigin() + Vector( 0, 0, 36 ) );
 	pGlow->SetAbsAngles( pPlayer->GetAbsAngles() );
-
-	pGlow->Spawn();
-
-	// It rides on the player's waist and must not collide: drop the physics
-	// object prop_physics created and make it non-solid (keeps the dlight).
-	pGlow->SetSolid( SOLID_NONE );
+	pGlow->AddEffects( EF_NODRAW | EF_NOSHADOW );
 	pGlow->AddSolidFlags( FSOLID_NOT_SOLID );
-	pGlow->VPhysicsDestroyObject();
+	pGlow->SetSolid( SOLID_NONE );
+	DispatchSpawn( pGlow );
 
-	pGlow->SetRenderColor( glowColor.r(), glowColor.g(), glowColor.b() );
-	pGlow->SetRenderMode( kRenderGlow );
-	pGlow->AddEffects( EF_BRIGHTLIGHT | EF_NOSHADOW );
-
-	// The original creates the lit prop at player origin + 36 and records it
-	// as the active glowstick; it does not parent a visible model to the waist.
-	// Parenting was our reconstruction and is the reason a glowstick rendered
-	// permanently on the belt.
+	// A glowstick needs light only. env_flare cannot be used here: Create()
+	// starts its burn sound, sprite emitter and spark think before callers can
+	// modify it. A light_dynamic has no visible flare, smoke, sparks or sound.
+	CBaseAnimating *pGlowAnim = pGlow->GetBaseAnimating();
+	int attachment = pGlowAnim ? pGlowAnim->LookupAttachment( "fuse" ) : 0;
+	Vector lightOrigin = pGlow->GetAbsOrigin(); QAngle lightAngles = pGlow->GetAbsAngles();
+	if ( attachment > 0 ) pGlowAnim->GetAttachment( attachment, lightOrigin, lightAngles );
+	CBaseEntity *pLight = CreateEntityByName( "light_dynamic" );
+	if ( pLight )
+	{
+		Color color = UH_GetGlowstickColor( iItem );
+		pLight->KeyValue( "_light", UTIL_VarArgs( "%d %d %d 255", color.r(), color.g(), color.b() ) );
+		pLight->KeyValue( "distance", "256" );
+		pLight->KeyValue( "brightness", "2" );
+		pLight->SetAbsOrigin( lightOrigin );
+		pLight->SetAbsAngles( lightAngles );
+		DispatchSpawn( pLight );
+		pLight->SetOwnerEntity( pGlow );
+		pLight->SetParent( pGlow, attachment );
+	}
+	pGlow->GetBaseAnimating()->m_nSkin = pGlow->GetBaseAnimating()->m_nSkin + 1; // odd = lit
 	pGlow->SetOwnerEntity( pPlayer );
-	pGlow->SetContextThink( &CBaseEntity::SUB_Remove, gpGlobals->curtime + 360.0f, "GlowStickLifetime" );
-
+	pGlow->SetParent( pPlayer );
 	pPlayer->UH_SetActiveGlowStick( pGlow );
+	pPlayer->UH_SetActiveGlowStickLight( pLight );
 	pPlayer->EmitSound( "glowstick.crack" );
-
 	UTIL_Remove( this );
 }
 
@@ -517,6 +528,7 @@ bool CItemBatteryPack::MyTouch( CBasePlayer *pPlayer )
 	if ( pHL2Player->UH_GetBatteryCount() >= UH_MAX_BATTERIES )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->UH_AddBattery( UH_BATTERY_PACK_COUNT );
 
 	pHL2Player->EmitSound( "ItemBattery.Touch" );
@@ -539,13 +551,16 @@ bool CItemHeavyArmor::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
-	if ( pHL2Player->ArmorValue() >= 200 )
+	// Original shared armor helper refuses every armor pickup at 100+, even
+	// though heavy armor itself can raise the cap to 200.
+	if ( !pHL2Player->IsSuitEquipped() || pHL2Player->ArmorValue() >= 100 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
 	SetOwnerEntity( pHL2Player );
 
-	pHL2Player->IncrementArmorValue( 45, 200 );
+	pHL2Player->IncrementArmorValue( (int)( sk_battery.GetFloat() * 45.0f ), 200 );
 	UTIL_Remove( this );
 
 	return true;
@@ -562,8 +577,12 @@ bool CItemFlashlight::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
-	pHL2Player->UH_SetFlashlightOn( true );
-	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	// Original CItemFlashlight::Use (sub_10173320): fire OnPlayerPickup,
+	// play ItemBattery.Touch, add two batteries, then remove the world item.
+	// The map's Branch_Player_Flashlight output grants/enables flashlight use.
+	FirePlayerPickupOutput( pHL2Player );
+	pHL2Player->UH_AddBattery( 2 );
+	pHL2Player->EmitSound( "ItemBattery.Touch" );
 	SetOwnerEntity( pHL2Player );
 	UTIL_Remove( this );
 
@@ -576,6 +595,7 @@ bool CItemNightVision::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->UH_SetHaveNightVision( true );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
@@ -590,6 +610,7 @@ bool CItemGasMask::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->UH_SetHaveGasMask( true );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
@@ -604,6 +625,7 @@ bool CItemShoulderFlashlight::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->UH_SetShoulderFlashlight( true );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	SetOwnerEntity( pHL2Player );
@@ -624,12 +646,14 @@ static bool UH_GiveArmorPickup( CBasePlayer *pPlayer, CBaseEntity *pItem, int iA
 	if ( !pHL2Player )
 		return false;
 
-	if ( pHL2Player->ArmorValue() >= iMax )
+	if ( !pHL2Player->IsSuitEquipped() || pHL2Player->ArmorValue() >= 100 )
 		return false;
 
+	CItem *pWorldItem = dynamic_cast<CItem *>( pItem );
+	if ( pWorldItem ) pWorldItem->FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
 	pItem->SetOwnerEntity( pHL2Player );
-	pHL2Player->IncrementArmorValue( iAmount, iMax );
+	pHL2Player->IncrementArmorValue( (int)( sk_battery.GetFloat() * (float)iAmount ), iMax );
 	UTIL_Remove( pItem );
 
 	return true;
@@ -655,6 +679,25 @@ UH_DEFINE_ARMOR_ITEM( CItemHelmetPrison,	item_helmet_prison,	"models/items/helme
 UH_DEFINE_ARMOR_ITEM( CItemHelmetPMC,		item_helmet_pmc,	"models/items/pmc_helmet.mdl" )
 UH_DEFINE_ARMOR_ITEM( CItemHelmetWorker,	item_helmet_worker,	"models/items/worker_helmet.mdl" )
 UH_DEFINE_ITEM( CItemFlarePack,		item_flarepack,		"models/pg_props/pg_obj/pg_flare_pack.mdl" )
+
+bool CItemFlarePack::MyTouch( CBasePlayer *pPlayer )
+{
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( !pHL2Player || pHL2Player->UH_FindFreeSlot() < 0 )
+		return false;
+
+	// sub_10172CB0 calls the inventory-give virtual three times with item 13:
+	// one flare pack pickup therefore supplies three individual flares.
+	FirePlayerPickupOutput( pHL2Player );
+	pHL2Player->EmitSound( "HL2Player.PickupItems" );
+	SetOwnerEntity( pHL2Player );
+	pHL2Player->UH_GiveItem( UH_ITEM_FLARE_PACK );
+	pHL2Player->UH_GiveItem( UH_ITEM_FLARE_PACK );
+	pHL2Player->UH_GiveItem( UH_ITEM_FLARE_PACK );
+	UTIL_Remove( this );
+	return true;
+}
+
 UH_DEFINE_ITEM( CItemFMRadio,		item_fmradio,		"models/items/fmradio.mdl" )
 UH_DEFINE_ITEM( CItemRadioCracker,	item_radiocracker,	"models/items/fmradio.mdl" )
 
@@ -687,13 +730,14 @@ bool CItemArmor::MyTouch( CBasePlayer *pPlayer )
 		return false;
 
 	// Original gate: only pick up while armour is below full.
-	if ( pHL2Player->ArmorValue() >= 100 )
+	if ( !pHL2Player->IsSuitEquipped() || pHL2Player->ArmorValue() >= 100 )
 		return false;
 
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
 	SetOwnerEntity( pHL2Player );
 
-	pHL2Player->IncrementArmorValue( 10, 100 );
+	pHL2Player->IncrementArmorValue( (int)( sk_battery.GetFloat() * 10.0f ), 100 );
 	UTIL_Remove( this );
 
 	return true;
@@ -719,7 +763,7 @@ void CItemPainkillers::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_T
 	}
 
 	CHL2_Player *pPlayer = UH_GetItemConsumer( pActivator );
-	if ( !pPlayer )
+	if ( !pPlayer || pPlayer->UH_IsGasMaskOn() )
 		return;
 
 	pPlayer->TakeHealth( 10.0f, DMG_GENERIC );
@@ -769,13 +813,11 @@ bool CItemBandages::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
-	// A bandage is always collectable. Its health/bleeding condition belongs to
-	// the consumption path below, not to the inventory pickup path.
+	// sub_101724D0 uses the same free-slot gate as every inventory pickup.
+	if ( pHL2Player->UH_FindFreeSlot() < 0 )
+		return false;
 
-	// Unlike the generic inventory pickups, bandages do not reject the touch
-	// merely because every slot is occupied. UH_GiveItem owns the full-inventory
-	// fallback and recreates the world item when required, matching the original
-	// item's pickup route.
+	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupBandages" );
 	SetOwnerEntity( pHL2Player );
 	pHL2Player->UH_GiveItem( UH_ITEM_BANDAGES );
@@ -980,6 +1022,7 @@ BEGIN_DATADESC( CItemRandom )
 	DEFINE_KEYFIELD( m_bitem_heavyarmor,			FIELD_BOOLEAN,	"item_heavyarmor" ),
 	DEFINE_KEYFIELD( m_bitem_battery,			FIELD_BOOLEAN,	"item_battery" ),
 	DEFINE_KEYFIELD( m_bitem_batterypack,		FIELD_BOOLEAN,	"item_battery_pack" ),
+	DEFINE_KEYFIELD( m_bitem_batterypack,		FIELD_BOOLEAN,	"item_batterypack" ),
 	DEFINE_KEYFIELD( m_bitem_healthkit,			FIELD_BOOLEAN,	"item_healthkit" ),
 	DEFINE_KEYFIELD( m_bitem_healthvial,			FIELD_BOOLEAN,	"item_healthvial" ),
 	DEFINE_KEYFIELD( m_bitem_nightvision,		FIELD_BOOLEAN,	"item_nightvision" ),

@@ -63,6 +63,8 @@ public:
 	inline bool IsOpener(CBaseEntity *pEnt);
 
 	bool NPCOpenDoor(CAI_BaseNPC *pNPC);
+	// Underhell dedicated kick/breach path (original CBasePropDoor vtable +852).
+	void UHBreachDoor( CBaseEntity *pActivator, CBaseEntity *pCaller, bool bNPCBreach, const Vector &vecImpact );
 	bool TestCollision( const Ray_t &ray, unsigned int mask, trace_t& trace );
 	// }
 

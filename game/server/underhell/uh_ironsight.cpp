@@ -13,11 +13,9 @@
 //   - CHL2_Player::m_bIronSighted     — authoritative flag (accuracy + HUD).
 //   - CHL2_Player::m_fIronsightedTime — last toggle time (debounce).
 //
-// The FOV zoom is a mild multiplier (uh_ironsight_zoom, default 0.9 — the
-// original does FOV = GetDefaultFOV() * uh_ironsight_zoom). Despite its name,
-// uh_ironsight_zoom_focus is NOT subtracted from the FOV: the original writes
-// it to m_flMaxspeed (hexrays sub_100EA7B0 → player offset 4132, the networked
-// m_flMaxspeed), so it is the aim-walk speed while sighted.
+// Ironsight FOV uses uh_ironsight_zoom (default 0.9). The separate +zoom focus
+// subtracts uh_ironsight_zoom_focus (40) from default FOV. Ironsight movement
+// switches to hl2_walkspeed and restores hl2_normspeed.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -36,12 +34,10 @@
 static ConVar uh_ironsight_zoom( "uh_ironsight_zoom", "0.9", 0,
 	"FOV multiplier when ironsighted (sighted FOV = defaultFOV * this)." );
 
-// Despite the name, this is the aim-walk speed while ironsighted, NOT a FOV
-// value: sub_101ECF40 writes it to m_flMaxspeed on enter and restores
-// hl2_walkspeed on leave. (The original help text claims it is subtracted from
-// the default FOV — that is stale; the code uses it as a move speed.)
-static ConVar uh_ironsight_zoom_focus( "uh_ironsight_zoom_focus", "40", FCVAR_ARCHIVE,
-	"Aim-walk speed while ironsighted (original writes this to m_flMaxspeed)." );
+// Suit +zoom subtracts this value from the default FOV (sub_102DEE20).
+// Ironsight itself uses hl2_walkspeed/hl2_normspeed for movement.
+ConVar uh_ironsight_zoom_focus( "uh_ironsight_zoom_focus", "40", FCVAR_ARCHIVE,
+	"Amount subtracted from default FOV by the +zoom focus control." );
 
 // FOV transition duration in seconds (original passes a data-section constant,
 // flt_1063C554, that Hex-Rays could not resolve — reconstructed to match the
@@ -52,6 +48,65 @@ static ConVar uh_ironsight_zoom_focus( "uh_ironsight_zoom_focus", "40", FCVAR_AR
 #define UH_IRONSIGHT_TOGGLE_DELAY 0.1f
 
 extern ConVar hl2_walkspeed;
+extern ConVar hl2_normspeed;
+
+// Enter slightly earlier than we leave to prevent the animation oscillating
+// when the muzzle sits exactly on a wall plane.
+#define UH_WEAPON_OBSTRUCTION_ENTER 36.0f
+#define UH_WEAPON_OBSTRUCTION_LEAVE 44.0f
+
+//-----------------------------------------------------------------------------
+// Purpose: Drive the weapon's authored raised/sideways pose when its barrel is
+// close to solid geometry. The original has a distinct raised state using
+// activities 204/205/206; the friendly/scripted lowered state (201/202/203) is
+// not the wall-obstruction pose.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_UpdateWeaponObstruction( void )
+{
+	CBaseHLCombatWeapon *pWeapon = dynamic_cast<CBaseHLCombatWeapon *>( GetActiveWeapon() );
+	if ( !IsAlive() || !pWeapon || pWeapon->GetWpnData().m_bMeleeWeapon ||
+		 pWeapon->SelectWeightedSequence( ACT_VM_IDLE_RAISED ) == ACTIVITY_NOT_AVAILABLE )
+	{
+		if ( m_bUHWeaponObstructed )
+		{
+			m_bUHWeaponObstructed = false;
+			if ( pWeapon )
+				pWeapon->SendWeaponAnim( ACT_VM_RAISED_TO_IDLE );
+		}
+		return;
+	}
+
+	const float flDistance = m_bUHWeaponObstructed ?
+		UH_WEAPON_OBSTRUCTION_LEAVE : UH_WEAPON_OBSTRUCTION_ENTER;
+	Vector vecDirection = static_cast<CBasePlayer *>( this )->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT, flDistance );
+	Vector vecStart = Weapon_ShootPosition();
+
+	trace_t tr;
+	UTIL_TraceHull( vecStart, vecStart + vecDirection * flDistance,
+		Vector( -2.0f, -2.0f, -2.0f ), Vector( 2.0f, 2.0f, 2.0f ),
+		MASK_SHOT, this, COLLISION_GROUP_NONE, &tr );
+
+	const bool bObstructed = tr.startsolid || tr.fraction < 1.0f;
+	if ( bObstructed == m_bUHWeaponObstructed )
+		return;
+
+	m_bUHWeaponObstructed = bObstructed;
+	if ( bObstructed )
+	{
+		UH_DisableIronsight();
+		if ( pWeapon->SelectWeightedSequence( ACT_VM_IDLE_TO_RAISED ) != ACTIVITY_NOT_AVAILABLE )
+			pWeapon->SendWeaponAnim( ACT_VM_IDLE_TO_RAISED );
+		else
+			pWeapon->SendWeaponAnim( ACT_VM_IDLE_RAISED );
+	}
+	else
+	{
+		if ( pWeapon->SelectWeightedSequence( ACT_VM_RAISED_TO_IDLE ) != ACTIVITY_NOT_AVAILABLE )
+			pWeapon->SendWeaponAnim( ACT_VM_RAISED_TO_IDLE );
+		else
+			pWeapon->SendWeaponAnim( ACT_VM_IDLE );
+	}
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Toggle ironsight (called from the "ironsight_toggle" client
@@ -80,10 +135,11 @@ void CHL2_Player::UH_ToggleIronsight( void )
 	//  - not a melee weapon (weapon script "MeleeWeapon" flag → info.m_bMeleeWeapon,
 	//    hexrays sub_100D0E00 reads weapon-info offset 1832). No escape clause:
 	//    a melee weapon can never sight.
-	//  - the original also gates on a weapon flag @1144 (likely "weapon lowered")
-	//    and m_bHardLowered, each with an "|| m_bIronSighted" escape so you can
-	//    always UN-sight while lowered. TODO: both are not ported yet (no-ops).
+	//  - lowered/hard-lowered blocks entering sight, with an escape allowing an
+	//    already sighted player to leave it.
 	if ( pWeapon->GetWpnData().m_bMeleeWeapon )
+		return;
+	if ( m_bUHWeaponObstructed && !m_bIronSighted )
 		return;
 
 	// Can't sight while sprinting — drop sprint first.
@@ -121,10 +177,9 @@ void CHL2_Player::UH_ToggleIronsight( void )
 
 		m_bIronSighted = true;
 
-		// Aim-walk slowdown (original writes uh_ironsight_zoom_focus to
-		// m_flMaxspeed if it is lower than the current speed).
-		if ( uh_ironsight_zoom_focus.GetFloat() < MaxSpeed() )
-			SetMaxSpeed( uh_ironsight_zoom_focus.GetFloat() );
+		// sub_101ECF40 enters aim movement at hl2_walkspeed (150).
+		if ( hl2_walkspeed.GetFloat() < MaxSpeed() )
+			SetMaxSpeed( hl2_walkspeed.GetFloat() );
 	}
 	else
 	{
@@ -139,9 +194,9 @@ void CHL2_Player::UH_ToggleIronsight( void )
 		m_iFOV = 0;
 		m_Local.m_flFOVRate = UH_IRONSIGHT_FOV_TIME;
 
-		// Restore walk speed (original restores hl2_walkspeed if it is higher).
-		if ( hl2_walkspeed.GetFloat() > MaxSpeed() )
-			SetMaxSpeed( hl2_walkspeed.GetFloat() );
+		// Leaving ironsight restores hl2_normspeed (190).
+		if ( hl2_normspeed.GetFloat() > MaxSpeed() )
+			SetMaxSpeed( hl2_normspeed.GetFloat() );
 	}
 
 	m_fIronsightedTime = gpGlobals->curtime;
@@ -171,8 +226,8 @@ void CHL2_Player::UH_DisableIronsight( void )
 	m_iFOV = 0;
 	m_Local.m_flFOVRate = UH_IRONSIGHT_FOV_TIME;
 
-	if ( hl2_walkspeed.GetFloat() > MaxSpeed() )
-		SetMaxSpeed( hl2_walkspeed.GetFloat() );
+	if ( hl2_normspeed.GetFloat() > MaxSpeed() )
+		SetMaxSpeed( hl2_normspeed.GetFloat() );
 
 	m_fIronsightedTime = gpGlobals->curtime;
 }
@@ -217,14 +272,17 @@ void CHL2_Player::UH_ToggleLaser( void )
 	// The laser sight belongs to the SOCOM path; keeping a global player flag
 	// but allowing every weapon to toggle it made the beam appear on unrelated
 	// pistols, SMGs and rifles.
-	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	CUHGunWeapon *pWeapon = dynamic_cast<CUHGunWeapon *>( GetActiveWeapon() );
 	if ( !pWeapon || !FClassnameIs( pWeapon, "weapon_pistol_socom" ) )
 	{
 		m_bLaserToggleState = false;
 		return;
 	}
 
-	m_bLaserToggleState = !m_bLaserToggleState;
+	// Keep the compatibility command on the same authoritative path as
+	// IN_ATTACK2: weapon state, sprite lifecycle and sequences 12/13 must toggle
+	// together rather than changing only the player's network HUD bit.
+	pWeapon->SecondaryAttack();
 }
 
 //-----------------------------------------------------------------------------

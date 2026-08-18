@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Has init functions for all the standard render targets used by most games.
 //			Mods who wish to make their own render targets can inherit from this class
@@ -35,9 +35,11 @@ class CBaseClientRenderTargets : public IClientRenderTargets
 	DECLARE_CLASS_GAMEROOT( CBaseClientRenderTargets, IClientRenderTargets );
 public:
 	// Interface called by engine during material system startup.
-	virtual void InitClientRenderTargets ( IMaterialSystem* pMaterialSystem, IMaterialSystemHardwareConfig* pHardwareConfig, int iWaterTextureSize = 1024, int iCameraTextureSize = 256 );
+	virtual void InitClientRenderTargets ( IMaterialSystem* pMaterialSystem, IMaterialSystemHardwareConfig* pHardwareConfig );
 	// Shutdown all custom render targets here.
 	virtual void ShutdownClientRenderTargets ( void );
+	ITexture *GetCustomCameraTextureByIndex( int index );
+	ITexture *GetScopeTexture() { return m_ScopeTexture; }
 
 protected:
 	
@@ -50,11 +52,15 @@ protected:
 
 	// Used for monitors
 	CTextureReference		m_CameraTexture;
+	CTextureReference		m_CustomCameraTexture[4];
+	CTextureReference		m_ScopeTexture;
 
 	// Init functions for the common render targets
 	ITexture* CreateWaterReflectionTexture( IMaterialSystem* pMaterialSystem, int iSize = 1024 );
 	ITexture* CreateWaterRefractionTexture( IMaterialSystem* pMaterialSystem, int iSize = 1024 );
 	ITexture* CreateCameraTexture( IMaterialSystem* pMaterialSystem, int iSize = 256 );
+	ITexture* CreateCustomCameraTexture( IMaterialSystem* pMaterialSystem, int index, int size );
+	ITexture* CreateScopeTexture( IMaterialSystem* pMaterialSystem );
 
 };
 

@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -81,6 +81,7 @@ public:
 	float							m_flUHBatteryCharge;				// 0..100 current battery charge
 	bool								m_bIronSighted;						// ironsight active
 	float								m_fIronsightedTime;					// last ironsight toggle time
+	float								m_flUseReticleTime;					// last CreateMove tick containing IN_USE
 	bool								m_bHavePistolSilencer;				// silencer gear (client mirror)
 	bool								m_bHaveRifleSilencer;
 	bool								m_bLaserToggleState;

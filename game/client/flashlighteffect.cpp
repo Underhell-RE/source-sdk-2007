@@ -32,22 +32,24 @@ extern ConVar r_flashlightdepthtexture;
 
 void r_newflashlightCallback_f( IConVar *pConVar, const char *pOldString, float flOldValue );
 
-static ConVar r_newflashlight( "r_newflashlight", "1", FCVAR_CHEAT, "", r_newflashlightCallback_f );
-static ConVar r_swingflashlight( "r_swingflashlight", "1", FCVAR_CHEAT );
-static ConVar r_flashlightlockposition( "r_flashlightlockposition", "0", FCVAR_CHEAT );
-static ConVar r_flashlightfov( "r_flashlightfov", "45.0", FCVAR_CHEAT );
-static ConVar r_flashlightoffsetx( "r_flashlightoffsetx", "10.0", FCVAR_CHEAT );
-static ConVar r_flashlightoffsety( "r_flashlightoffsety", "-20.0", FCVAR_CHEAT );
-static ConVar r_flashlightoffsetz( "r_flashlightoffsetz", "24.0", FCVAR_CHEAT );
-static ConVar r_flashlightnear( "r_flashlightnear", "4.0", FCVAR_CHEAT );
-static ConVar r_flashlightfar( "r_flashlightfar", "750.0", FCVAR_CHEAT );
-static ConVar r_flashlightconstant( "r_flashlightconstant", "0.0", FCVAR_CHEAT );
-static ConVar r_flashlightlinear( "r_flashlightlinear", "100.0", FCVAR_CHEAT );
-static ConVar r_flashlightquadratic( "r_flashlightquadratic", "0.0", FCVAR_CHEAT );
-static ConVar r_flashlightvisualizetrace( "r_flashlightvisualizetrace", "0", FCVAR_CHEAT );
-static ConVar r_flashlightambient( "r_flashlightambient", "0.0", FCVAR_CHEAT );
-static ConVar r_flashlightshadowatten( "r_flashlightshadowatten", "0.35", FCVAR_CHEAT );
-static ConVar r_flashlightladderdist( "r_flashlightladderdist", "40.0", FCVAR_CHEAT );
+static ConVar r_newflashlight( "r_newflashlight", "1", 0, "", r_newflashlightCallback_f );
+static ConVar r_swingflashlight( "r_swingflashlight", "1", 0 );
+static ConVar r_flashlightlockposition( "r_flashlightlockposition", "0", 0 );
+static ConVar r_flashlightfov( "r_flashlightfov", "45.0", 0 );
+static ConVar r_flashlightoffsetx( "r_flashlightoffsetx", "0", 0 );
+static ConVar r_flashlightoffsety( "r_flashlightoffsety", "0", 0 );
+static ConVar r_flashlightoffsetz( "r_flashlightoffsetz", "0", 0 );
+static ConVar r_flashlightnear( "r_flashlightnear", "4.0", 0 );
+static ConVar r_flashlightfar( "r_flashlightfar", "750.0", 0 );
+static ConVar r_flashlightconstant( "r_flashlightconstant", "0.0", 0 );
+static ConVar r_flashlightlinear( "r_flashlightlinear", "100.0", 0 );
+static ConVar r_flashlightquadratic( "r_flashlightquadratic", "0.0", 0 );
+static ConVar r_flashlightvisualizetrace( "r_flashlightvisualizetrace", "0", 0 );
+static ConVar r_flashlightambient( "r_flashlightambient", "0.0", 0 );
+static ConVar r_flashlightshadowatten( "r_flashlightshadowatten", "0.35", 0 );
+static ConVar r_flashlightladderdist( "r_flashlightladderdist", "40.0", 0 );
+static ConVar r_flashlightforceflicker( "r_flashlightforceflicker", "0", 0, "Force flashlight flicker", true, 0.0f, true, 1.0f );
+static ConVar r_flashlightflickermode( "r_flashlightflickermode", "0", 0, "Flicker when the flashlight battery is low or empty" );
 static ConVar mat_slopescaledepthbias_shadowmap( "mat_slopescaledepthbias_shadowmap", "16", FCVAR_CHEAT );
 static ConVar mat_depthbias_shadowmap(	"mat_depthbias_shadowmap", "0.0005", FCVAR_CHEAT  );
 
@@ -270,6 +272,8 @@ void CFlashlightEffect::UpdateLightNew(const Vector &vecPos, const Vector &vecFo
 	if ( pPlayer )
 	{
 		float flBatteryPower = ( pPlayer->m_HL2Local.m_flFlashBattery >= 0.0f ) ? ( pPlayer->m_HL2Local.m_flFlashBattery ) : pPlayer->m_HL2Local.m_flSuitPower;
+		if ( r_flashlightforceflicker.GetBool() || r_flashlightflickermode.GetBool() )
+			flBatteryPower = 0.0f;
 		if ( flBatteryPower <= 10.0f )
 		{
 			float flScale;

@@ -16,8 +16,12 @@
 #include "in_buttons.h"
 #include "soundent.h"
 #include "npcevent.h"
+#include "rumble_shared.h"
 #include "ai_basenpc.h"
 #include "hl2_player.h"
+#include "hl2/npc_metropolice.h"
+#include "baseviewmodel_shared.h"
+#include "sprite.h"
 #include "uh_weapons.h"
 #include "underhell/uh_bullettime.h"
 #include "hl2/weapon_rpg.h"
@@ -47,7 +51,40 @@ void CUHMeleeWeapon::PrimaryAttack( void )
 			? "Player.Voice.Melee.Exhausted" : "Player.Voice.Melee" );
 	}
 
-	BaseClass::PrimaryAttack();
+	// Original sub_102B0A00 starts ACT_VM_HITCENTER now, but sub_102AFCC0
+	// does not invoke the hit trace until MeleeDelayedFire has elapsed.
+	m_bDelayedMeleeAttack = true;
+	m_flDelayedMeleeAttackTime = gpGlobals->curtime + GetWpnData().m_flMeleeDelayedFire;
+	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
+	m_flNextSecondaryAttack = m_flNextPrimaryAttack;
+
+	// sub_102B0A00 sends activity 195 = ACT_VM_MISSCENTER for the wind-up.
+	// ACT_VM_HITCENTER (189) is selected only later by the delayed trace.
+	SendWeaponAnim( ACT_VM_MISSCENTER );
+	if ( pPlayer )
+	{
+		pPlayer->SetAnimation( PLAYER_ATTACK1 );
+		pPlayer->RumbleEffect( RUMBLE_CROWBAR_SWING, 0, RUMBLE_FLAG_RESTART );
+	}
+}
+
+void CUHMeleeWeapon::ItemPostFrame( void )
+{
+	if ( m_bDelayedMeleeAttack && gpGlobals->curtime >= m_flDelayedMeleeAttackTime )
+	{
+		m_bDelayedMeleeAttack = false;
+		// The animation and refire timers were established at wind-up start.
+		// Resolve only the actual trace, damage, impact and swing sound now.
+		Swing( false, true, true );
+	}
+
+	BaseClass::ItemPostFrame();
+}
+
+bool CUHMeleeWeapon::Holster( CBaseCombatWeapon *pSwitchingTo )
+{
+	m_bDelayedMeleeAttack = false;
+	return BaseClass::Holster( pSwitchingTo );
 }
 
 void CUHMeleeWeapon::SecondaryAttack( void )
@@ -82,14 +119,69 @@ void CUHMeleeWeapon::HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCh
 		}
 	}
 
+	// The baton has the original stunstick-derived NPC strike: 32 units and a
+	// hull stretched downward. Other Underhell melee weapons use the crowbar
+	// strike dimensions.
+	const bool bBaton = FClassnameIs( this, "weapon_melee_baton" );
 	Vector vecEnd;
-	VectorMA( pOperator->Weapon_ShootPosition(), 50, vecDirection, vecEnd );
+	VectorMA( pOperator->Weapon_ShootPosition(), bBaton ? 32.0f : 50.0f, vecDirection, vecEnd );
 	CBaseEntity *pHurt = pOperator->CheckTraceHullAttack( pOperator->Weapon_ShootPosition(), vecEnd,
-		Vector(-16,-16,-16), Vector(36,36,36), GetDamage(), DMG_CLUB, 0.75 );
+		bBaton ? Vector(-16,-16,-40) : Vector(-16,-16,-16),
+		bBaton ? Vector(16,16,16) : Vector(36,36,36),
+		(int)GetDamage(), DMG_CLUB, bBaton ? 0.5f : 0.75f );
 
 	if ( pHurt )
 	{
 		WeaponSound( MELEE_HIT );
+
+		// CWeaponBaton::Operator_HandleAnimEvent in the original is the
+		// stunstick handler, not the generic crowbar handler. In particular,
+		// StunnedTarget fires npc_metropolice.OnStunnedPlayer. Chapter 03's
+		// shower guards count that output to end the punishment sequence; if it
+		// is omitted they can beat the player forever even though attacks animate.
+		if ( bBaton )
+		{
+			CBasePlayer *pPlayer = ToBasePlayer( pHurt );
+			CNPC_MetroPolice *pCop = dynamic_cast<CNPC_MetroPolice *>( pOperator );
+			bool bKnockedOut = false;
+
+			if ( pCop && pPlayer )
+			{
+				if ( pCop->ShouldKnockOutTarget( pHurt ) )
+				{
+					pPlayer->ViewPunch( QAngle( -16, random->RandomFloat( -48, -24 ), 2 ) );
+					color32 white = { 255, 255, 255, 255 };
+					UTIL_ScreenFade( pPlayer, white, 0.2f, 1.0f, FFADE_OUT|FFADE_PURGE|FFADE_STAYOUT );
+					pCop->KnockOutTarget( pHurt );
+					bKnockedOut = true;
+				}
+				else
+				{
+					pCop->StunnedTarget( pHurt );
+				}
+			}
+
+			if ( pPlayer && !bKnockedOut && !( pPlayer->GetFlags() & FL_GODMODE ) )
+			{
+				pPlayer->ViewPunch( QAngle( -16, random->RandomFloat( -48, -24 ), 2 ) );
+
+				Vector vecImpulse = pHurt->GetAbsOrigin() - GetAbsOrigin();
+				if ( pPlayer->GetGroundEntity() == pOperator )
+				{
+					vecImpulse = vecDirection;
+					vecImpulse.z = 0;
+				}
+				VectorNormalize( vecImpulse );
+				vecImpulse *= 500.0f;
+				if ( !( pPlayer->GetFlags() & FL_ONGROUND ) )
+					vecImpulse.z = 0.0f;
+				pHurt->ApplyAbsVelocityImpulse( vecImpulse );
+
+				color32 red = { 128, 0, 0, 128 };
+				UTIL_ScreenFade( pPlayer, red, 0.5f, 0.1f, FFADE_IN );
+				pPlayer->ForceDropOfCarriedPhysObjects();
+			}
+		}
 
 		trace_t traceHit;
 		UTIL_TraceLine( pOperator->Weapon_ShootPosition(), pHurt->GetAbsOrigin(), MASK_SHOT_HULL, pOperator, COLLISION_GROUP_NONE, &traceHit );
@@ -113,6 +205,17 @@ void CUHMeleeWeapon::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatC
 		BaseClass::Operator_HandleAnimEvent( pEvent, pOperator );
 		break;
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: SOCOM's original Precache path (sub_1027B980) explicitly loads
+// sprites/laserpointer.vmt. Keeping it here is harmless for the thin sibling
+// classes and guarantees SpriteCreate never performs a late model load.
+//-----------------------------------------------------------------------------
+void CUHGunWeapon::Precache( void )
+{
+	BaseClass::Precache();
+	PrecacheModel( "sprites/laserpointer.vmt" );
 }
 
 //-----------------------------------------------------------------------------
@@ -144,6 +247,10 @@ void CUHGunWeapon::PrimaryAttack( void )
 
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 	if ( !pPlayer )
+		return;
+
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( pHL2Player && pHL2Player->UH_IsWeaponObstructed() )
 		return;
 
 	// Semi-auto gate (decode sub_102B18E0): in semi mode the shot is only fired
@@ -181,10 +288,9 @@ void CUHGunWeapon::PrimaryAttack( void )
 
 	pPlayer->FireBullets( info );
 
-	// Underhell BT retains hit-scan damage but spawns a visible slow-motion
-	// projectile for every resolved pellet direction.
-	for ( int i = 0; i < info.m_iShots; ++i )
-		UH_BulletTimeSpawnTracer( pPlayer, info.m_vecSrc, info.m_vecDirShooting, info.m_iAmmoType, false );
+	// Bullet time interception is centralized in CBaseEntity::FireBullets so
+	// spread directions, NPC fire and player fire all create one CBtBullet per
+	// actual shot without layering a second visual tracer.
 
 	// Consume a round.
 	if ( UsesClipsForAmmo1() )
@@ -200,7 +306,7 @@ void CUHGunWeapon::PrimaryAttack( void )
 
 	// Underhell shotguns are pump-action. The old thin gun base used their
 	// 0.8 s refire time but never sent the intervening pump sequence.
-	if ( m_iShotsPerFire > 1 )
+	if ( m_iShotsPerFire > 1 && !FClassnameIs( this, "weapon_shotgun_xm1014" ) )
 	{
 		m_bNeedPump = true;
 		m_flPumpTime = gpGlobals->curtime + 0.4f;
@@ -217,8 +323,8 @@ void CUHGunWeapon::PrimaryAttack( void )
 	// Accumulate an accuracy penalty so spamming a gun spreads it out (the
 	// vanilla pistol's model; the Underhell scripts carry the accuracy
 	// multipliers, not the penalty curve).
-	m_flAccuracyPenalty += 0.1f;
-	m_flAccuracyPenalty = clamp( m_flAccuracyPenalty, 0.0f, 1.0f );
+	m_flAccuracyPenalty += ( m_iWeaponType == 1 ) ? 0.2f : 0.1f;
+	m_flAccuracyPenalty = clamp( m_flAccuracyPenalty, 0.0f, 1.5f );
 }
 
 //-----------------------------------------------------------------------------
@@ -243,10 +349,30 @@ void CUHGunWeapon::SecondaryAttack( void )
 		}
 		else if ( !m_hLaserDot.Get() )
 		{
-			m_hLaserDot = CreateLaserDot( pOwner->Weapon_ShootPosition(), this, true );
+			// The original SOCOM precaches laserpointer.vmt and owns a removable
+			// sprite handle. env_laserdot uses redglow1.vmt and is the RPG path,
+			// not the SOCOM visual.
+			CSprite *pDot = CSprite::SpriteCreate( "sprites/laserpointer.vmt",
+				pOwner->Weapon_ShootPosition(), false );
+			if ( pDot )
+			{
+				pDot->SetTransparency( kRenderWorldGlow, 255, 255, 255, 255,
+					kRenderFxNoDissipation );
+				pDot->SetScale( 0.15f );
+				pDot->SetGlowProxySize( 1.0f );
+				pDot->SetOwnerEntity( this );
+				m_hLaserDot = pDot;
+			}
 		}
 
-		SendWeaponAnim( m_bSocomLaserOn ? (Activity)12 : (Activity)13 );
+		// Original sub_1027B9E0 selects SOCOM viewmodel sequence 12/13 with a
+		// zero blend time. They are sequence indices, not global Activity ids.
+		CBaseViewModel *pViewModel = pOwner->GetViewModel();
+		if ( pViewModel )
+		{
+			pViewModel->SendViewModelMatchingSequence( m_bSocomLaserOn ? 12 : 13 );
+			SetWeaponIdleTime( gpGlobals->curtime + pViewModel->SequenceDuration() );
+		}
 		m_flNextSecondaryAttack = gpGlobals->curtime + 0.2f;
 		return;
 	}
@@ -262,6 +388,12 @@ void CUHGunWeapon::SecondaryAttack( void )
 //-----------------------------------------------------------------------------
 void CUHGunWeapon::UH_ToggleFireMode( void )
 {
+	// Only weapons authored with UH_Weapon_Special/FireMode expose select fire.
+	// In the shipped scripts this is the G36K; pistol scripts omit the key and
+	// retain their dedicated semi-auto trigger latch.
+	if ( GetWpnData().m_iFireMode == 0 )
+		return;
+
 	if ( m_iFireMode == FIREMODE_FULLAUTO )
 	{
 		m_iFireMode = FIREMODE_SEMI;
@@ -284,15 +416,39 @@ void CUHGunWeapon::UH_ToggleFireMode( void )
 //-----------------------------------------------------------------------------
 void CUHGunWeapon::WeaponIdle( void )
 {
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+	CHL2_Player *pHL2Player = pPlayer ? dynamic_cast<CHL2_Player *>( pPlayer ) : NULL;
+
+	// Wall obstruction is the original raised/sideways state (activity 205),
+	// not the scripted lowered state. Keep its looping idle after the short
+	// 204 transition instead of letting BaseClass replace it with ACT_VM_IDLE.
+	if ( pHL2Player && pHL2Player->UH_IsWeaponObstructed() )
+	{
+		if ( HasWeaponIdleTimeElapsed() )
+			SendWeaponAnim( ACT_VM_IDLE_RAISED );
+		if ( !( pPlayer->m_nButtons & IN_ATTACK ) )
+			m_bFireOnEdge = true;
+		return;
+	}
+
 	BaseClass::WeaponIdle();
 
-	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 	if ( pPlayer && !( pPlayer->m_nButtons & IN_ATTACK ) )
 		m_bFireOnEdge = true;
 }
 
 void CUHGunWeapon::ItemPostFrame( void )
 {
+	CBasePlayer *pPenaltyOwner = ToBasePlayer( GetOwner() );
+	if ( m_iWeaponType == 1 && pPenaltyOwner &&
+		 !( pPenaltyOwner->m_nButtons & IN_ATTACK ) &&
+		 gpGlobals->curtime > m_flNextPrimaryAttack )
+	{
+		// Original CWeaponPistol::UpdatePenaltyTime, sub_10279CB0.
+		m_flAccuracyPenalty = clamp( m_flAccuracyPenalty - gpGlobals->frametime,
+			0.0f, 1.5f );
+	}
+
 	// sub_1027F4E0's pump sits between the fire event and the 0.8 s refire
 	// window. Run it from ItemPostFrame so it also happens while IN_ATTACK is
 	// held; WeaponIdle alone is skipped during sustained fire.
@@ -312,7 +468,7 @@ void CUHGunWeapon::ItemPostFrame( void )
 			Vector dir = pOwner->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );
 			trace_t tr;
 			UTIL_TraceLine( start, start + dir * MAX_TRACE_LENGTH, MASK_SHOT, pOwner, COLLISION_GROUP_NONE, &tr );
-			SetLaserDotPosition( m_hLaserDot.Get(), tr.endpos, tr.plane.normal );
+			m_hLaserDot->SetAbsOrigin( tr.endpos + tr.plane.normal * 0.5f );
 		}
 	}
 
@@ -432,7 +588,7 @@ const Vector &CUHGunWeapon::GetBulletSpread( void )
 	else
 	{
 		// Spam penalty ramps the cone from ~1 to ~6 degrees.
-		float ramp = RemapValClamped( m_flAccuracyPenalty, 0.0f, 1.0f, 0.0f, 1.0f );
+		float ramp = RemapValClamped( m_flAccuracyPenalty, 0.0f, 1.5f, 0.0f, 1.0f );
 		VectorLerp( VECTOR_CONE_1DEGREES, VECTOR_CONE_6DEGREES, ramp, cone );
 	}
 
@@ -525,7 +681,9 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 // Registers one weapon class under its entity name and its send table.
 // Damage comes from the sk_plr_dmg_<weapon> convar. Fire rates extracted from
 // serveror.dll:
-//   - pistols: 0.2 s (shared fire routine sub_1027AEC0)
+//   - Glock/Beretta/Dualies/SOCOM: semi-auto latch, next attack +0.1 s
+//     (sub_10279600/sub_1027A920/sub_1027AC00 and shared pistol path)
+//   - Python: +0.75 s in sub_1027B490
 //   - SMGs + BFG minigun: 0.075 s (GetFireRate vtable slot 277 -> sub_102801F0)
 //   - G36K: 0.1 s (select-fire GetFireRate sub_103F5150)
 // Shotgun / sniper / BFG MGL use custom pump/delay fire paths (not GetFireRate);
@@ -620,9 +778,9 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bFireModeInitialized = false; m_bNeedPump = false; m_flPumpTime = 0.0f; m_hLaserDot = NULL; m_bSocomLaserOn = false; }
+	_className::_className() { m_flFireRate = _fireRate; m_pDamage = &_damageConVar; m_iWeaponType = _weaponType; m_iShotsPerFire = _shotsPerFire; m_flAccuracyPenalty = 0.0f; m_iFireMode = ( _weaponType == 1 ) ? FIREMODE_SEMI : FIREMODE_FULLAUTO; m_bFireOnEdge = true; m_bFireModeInitialized = false; m_bNeedPump = false; m_flPumpTime = 0.0f; m_hLaserDot = NULL; m_bSocomLaserOn = false; }
 
-#define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _damageConVar ) \
+#define UH_IMPLEMENT_MELEE( _className, _entityName, _shortName, _playerDamageConVar, _npcDamageConVar ) \
 	acttable_t _className::m_acttable[] = \
 	{ \
 		{ ACT_MELEE_ATTACK1, ACT_MELEE_ATTACK_SWING, true }, \
@@ -632,26 +790,27 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_pDamage = &_damageConVar; }
+	_className::_className() { m_pPlayerDamage = &_playerDamageConVar; m_pNPCDamage = &_npcDamageConVar; m_bDelayedMeleeAttack = false; m_flDelayedMeleeAttackTime = 0.0f; }
 
 //-----------------------------------------------------------------------------
 // Melee
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_MELEE( CWeaponAxe,		weapon_melee_axe,		WeaponAxe,		sk_plr_dmg_axe )
-UH_IMPLEMENT_MELEE( CWeaponBaton,		weapon_melee_baton,		WeaponBaton,	sk_plr_dmg_baton )
-UH_IMPLEMENT_MELEE( CWeaponPipe,		weapon_melee_pipe,		WeaponPipe,		sk_plr_dmg_pipe )
-UH_IMPLEMENT_MELEE( CWeaponWrench,		weapon_melee_wrench,	WeaponWrench,	sk_plr_dmg_wrench )
-UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	sk_plr_dmg_cleaver )
+UH_IMPLEMENT_MELEE( CWeaponAxe,		weapon_melee_axe,		WeaponAxe,		sk_plr_dmg_axe,		sk_npc_dmg_axe )
+UH_IMPLEMENT_MELEE( CWeaponBaton,		weapon_melee_baton,		WeaponBaton,	sk_plr_dmg_baton,		sk_npc_dmg_baton )
+UH_IMPLEMENT_MELEE( CWeaponPipe,		weapon_melee_pipe,		WeaponPipe,		sk_plr_dmg_pipe,		sk_npc_dmg_pipe )
+UH_IMPLEMENT_MELEE( CWeaponWrench,		weapon_melee_wrench,	WeaponWrench,	sk_plr_dmg_wrench,	sk_npc_dmg_wrench )
+UH_IMPLEMENT_MELEE( CWeaponCleaver,		weapon_cleaver,			WeaponCleaver,	sk_plr_dmg_cleaver,	sk_npc_dmg_cleaver )
 
 //-----------------------------------------------------------------------------
-// Pistols — semi-auto, shared fire routine (0.2 s).
+// Pistols — semi-auto. Service pistols use a 0.1 s mechanical cooldown but
+// require a fresh trigger edge; Python uses its authored 0.75 s delay.
 // Weapon type 1 = pistol (silencer-gated on m_bHavePistolSilencer).
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.2f, sk_plr_dmg_pistol_glock, 1, UH_ACTTABLE_PISTOL, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.2f, sk_plr_dmg_pistol_beretta, 1, UH_ACTTABLE_PISTOL, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.2f, sk_plr_dmg_pistol_socom, 1, UH_ACTTABLE_PISTOL, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.5f, sk_plr_dmg_pistol_python, 1, UH_ACTTABLE_PISTOL, 1 )
-UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.2f, sk_plr_dmg_pistol_dualberetta, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolGlock,	weapon_pistol_glock,		WeaponPistolGlock,		0.1f, sk_plr_dmg_pistol_glock, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolBeretta,	weapon_pistol_beretta,		WeaponPistolBeretta,	0.1f, sk_plr_dmg_pistol_beretta, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolSocom,	weapon_pistol_socom,		WeaponPistolSocom,		0.1f, sk_plr_dmg_pistol_socom, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPython,			weapon_pistol_python,		WeaponPython,			0.75f, sk_plr_dmg_pistol_python, 1, UH_ACTTABLE_PISTOL, 1 )
+UH_IMPLEMENT_WEAPON( CWeaponPistolDualies,	weapon_pistol_dualberetta,	WeaponPistolDualies,	0.1f, sk_plr_dmg_pistol_dualberetta, 1, UH_ACTTABLE_PISTOL, 1 )
 
 //-----------------------------------------------------------------------------
 // SMGs — full auto, 0.075 s (exact, GetFireRate).
@@ -661,13 +820,13 @@ UH_IMPLEMENT_WEAPON( CWeaponSMGMP5EOD,		weapon_smg_mp5_eod,	WeaponSMGMP5EOD,	0.0
 UH_IMPLEMENT_WEAPON( CWeaponSMGMP7,			weapon_smg_mp7,		WeaponSMGMP7,		0.075f, sk_plr_dmg_smg_mp7, 0, UH_ACTTABLE_SMG1, 1 )
 
 //-----------------------------------------------------------------------------
-// Shotguns — pump-action. All four share one fire/pump routine (sub_1027E0A0 +
-// sub_1027F4E0); the pump cycle constant in the DLL is 0.8 s (0x10487878).
+// Shotguns — 12 pellets from the shipped sk_plr_num_shotgun_pellets setting.
+// M3/M5/SPAS use the pump path; XM1014 is self-loading and skips it.
 //-----------------------------------------------------------------------------
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0, UH_ACTTABLE_SHOTGUN, 7 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0, UH_ACTTABLE_SHOTGUN, 7 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0, UH_ACTTABLE_SHOTGUN, 7 )
-UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0, UH_ACTTABLE_SHOTGUN, 7 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM3,		weapon_shotgun_m3,		WeaponShotgunM3,		0.8f, sk_plr_dmg_shotgun_m3, 0, UH_ACTTABLE_SHOTGUN, 12 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunM5,		weapon_shotgun_m5,		WeaponShotgunM5,		0.8f, sk_plr_dmg_shotgun_m5, 0, UH_ACTTABLE_SHOTGUN, 12 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunSpas12,	weapon_shotgun_spas12,	WeaponShotgunSpas12,	0.8f, sk_plr_dmg_shotgun_spas12, 0, UH_ACTTABLE_SHOTGUN, 12 )
+UH_IMPLEMENT_WEAPON( CWeaponShotgunXM1014,	weapon_shotgun_xm1014,	WeaponShotgunXM1014,	0.8f, sk_plr_dmg_shotgun_xm1014, 0, UH_ACTTABLE_SHOTGUN, 12 )
 
 //-----------------------------------------------------------------------------
 // Rifles — G36K is select-fire (0.1 s full-auto). Weapon type 4 = rifle.

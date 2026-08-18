@@ -15,8 +15,8 @@
 // Original classnames are preserved verbatim — "nothing" marks ids that have
 // no world entity (lit glowsticks: the lit prop is a player child instead).
 //
-// TODO: verify the exact print names for the soda flavours and health items
-// against the original string table (hexrays sub_102E27A0).
+// Names and order verified against server sub_102E27A0 and the client inventory
+// switch around 0x10130F50.
 //-----------------------------------------------------------------------------
 static const UHInventoryItemInfo_t s_InventoryItemTable[] =
 {
@@ -27,23 +27,23 @@ static const UHInventoryItemInfo_t s_InventoryItemTable[] =
 	{ "item_burrito",	"Burrito"				},	// UH_ITEM_BURRITO
 	{ "item_sandwich",	"Sandwich"				},	// UH_ITEM_SANDWICH
 	{ "item_bananabunch","Banana Bunch"			},	// UH_ITEM_BANANA_BUNCH
-	{ "item_uhsoda",	"Soda"					},	// UH_ITEM_SODA_FIRST .. UH_ITEM_SODA_LAST
-	{ "item_uhsoda",	"Soda"					},
-	{ "item_uhsoda",	"Soda"					},
-	{ "item_uhsoda",	"Soda"					},
-	{ "item_uhsoda",	"Soda"					},
-	{ "item_uhsoda",	"Soda"					},
+	{ "item_uhsoda",	"Soda1"					},	// UH_ITEM_SODA_FIRST .. UH_ITEM_SODA_LAST
+	{ "item_uhsoda",	"Soda2"					},
+	{ "item_uhsoda",	"Soda3"					},
+	{ "item_uhsoda",	"Soda4"					},
+	{ "item_uhsoda",	"Soda5"					},
+	{ "item_uhsoda",	"Mega Soda"				},
 	{ "item_flarepack",	"Flare"					},	// UH_ITEM_FLARE_PACK
-	{ "item_glowstick",	"GlowStick (Red)"		},	// UH_ITEM_GLOWSTICK_FIRST
-	{ "item_glowstick",	"GlowStick (Yellow)"	},
-	{ "item_glowstick",	"GlowStick (Green)"		},
-	{ "item_glowstick",	"GlowStick (Blue)"		},
-	{ "item_glowstick",	"GlowStick (Purple)"	},	// UH_ITEM_GLOWSTICK_LAST
-	{ "nothing",		"Lit GlowStick (Red)"	},	// UH_ITEM_LIT_GLOWSTICK_FIRST
-	{ "nothing",		"Lit GlowStick (Yellow)"},
-	{ "nothing",		"Lit GlowStick (Green)"	},
-	{ "nothing",		"Lit GlowStick (Blue)"	},
-	{ "nothing",		"Lit GlowStick (Purple)"},	// UH_ITEM_LIT_GLOWSTICK_LAST
+	{ "item_glowstick",	"GlowStick (Green)"		},	// id 14
+	{ "item_glowstick",	"GlowStick (Red)"		},	// id 15
+	{ "item_glowstick",	"GlowStick (Blue)"		},	// id 16
+	{ "item_glowstick",	"GlowStick (Yellow)"	},	// id 17
+	{ "item_glowstick",	"GlowStick (Purple)"	},	// id 18
+	{ "nothing",		"Lit GlowStick (Green)"},	// id 19
+	{ "nothing",		"Lit GlowStick (Red)"	},	// id 20
+	{ "nothing",		"Lit GlowStick (Blue)"	},	// id 21
+	{ "nothing",		"Lit GlowStick (Yellow)"},	// id 22
+	{ "nothing",		"Lit GlowStick (Purple)"},	// id 23
 	{ "item_painkillers","PainKillers"			},	// UH_ITEM_PAINKILLERS
 	{ "item_syringe",	"Syringe"				},	// UH_ITEM_SYRINGE
 	{ "item_bandages",	"Bandages"				},	// UH_ITEM_BANDAGES

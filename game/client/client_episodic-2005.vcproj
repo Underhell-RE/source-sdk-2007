@@ -285,7 +285,15 @@
 					>
 				</File>
 				<File
+					RelativePath=".\underhell\c_btbullet.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\underhell\uh_gear_overlay.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\uh_entglow.cpp"
 					>
 				</File>
 				<File
@@ -310,6 +318,10 @@
 				</File>
 				<File
 					RelativePath=".\underhell\hud_dotreticle.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\underhell\hud_grenadeammo.cpp"
 					>
 				</File>
 				<File
@@ -5205,6 +5217,14 @@
 				RelativePath=".\game_controls\vguitextwindow.h"
 				>
 			</File>
+		</Filter>
+		<Filter
+			Name="Underhell Shader Editor Bridge"
+			>
+			<File RelativePath=".\underhell\shadereditor\uh_shadereditor_system.cpp"></File>
+			<File RelativePath=".\underhell\shadereditor\uh_shadereditor_system.h"></File>
+			<File RelativePath=".\underhell\shadereditor\ivshadereditor.h"></File>
+			<File RelativePath=".\underhell\shadereditor\README.md"></File>
 		</Filter>
 	</Files>
 	<Globals>

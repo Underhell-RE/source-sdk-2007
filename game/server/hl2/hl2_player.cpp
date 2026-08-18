@@ -62,6 +62,9 @@ extern ConVar weapon_showproficiency;
 extern ConVar autoaim_max_dist;
 extern ConVar uh_flashlight_battery_time;
 
+// Original sub_100D02C0 weapon-category gate.
+ConVar uh_weapon_category( "uh_weapon_category", "1", FCVAR_CHEAT );
+
 // Do not touch with without seeing me, please! (sjb)
 // For consistency's sake, enemy gunfire is traced against a scaled down
 // version of the player's hull, not the hitboxes for the player's model
@@ -83,6 +86,7 @@ ConVar sv_autojump( "sv_autojump", "0" );
 ConVar hl2_walkspeed( "hl2_walkspeed", "150" );
 ConVar hl2_normspeed( "hl2_normspeed", "190" );
 ConVar hl2_sprintspeed( "hl2_sprintspeed", "320" );
+extern ConVar uh_ironsight_zoom_focus;
 
 ConVar hl2_darkness_flashlight_factor ( "hl2_darkness_flashlight_factor", "1" );
 
@@ -317,6 +321,13 @@ BEGIN_DATADESC( CHL2_Player )
 	// Underhell inventory save data (original datamap, hexrays sub_102E21B0)
 	DEFINE_ARRAY( m_iInventory, FIELD_INTEGER, UH_INVENTORY_SLOTS ),
 	DEFINE_FIELD( m_bShoulderFlashlight, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bFlashlightOn, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bInventoryEnabled, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_iUHBatteryCount, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iUHHermitCardsCount, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iUHHermitCurrentQuestCount, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iUHHermitTotalQuestCount, FIELD_INTEGER ),
+	DEFINE_FIELD( m_bDisplayHermitCard, FIELD_BOOLEAN ),
 
 	// Underhell endurance / hunger save data (names match the original save format).
 	DEFINE_FIELD( m_iEndurance, FIELD_INTEGER ),
@@ -328,11 +339,21 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flLastBleedTickBase, FIELD_TIME ),
 	DEFINE_FIELD( m_iEHealthCount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hActiveGlowStick, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_hActiveGlowStickLight, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_hUHLookGlowTarget, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_flNextUHLookGlowTime, FIELD_TIME ),
 	DEFINE_FIELD( m_hCarryingRagdoll, FIELD_EHANDLE ),
-	DEFINE_FIELD( m_flCarryingRagdollSavedSpeed, FIELD_FLOAT ),
+	DEFINE_FIELD( m_fSavedSensitivity, FIELD_FLOAT ),
 	DEFINE_FIELD( m_vecUHFreeAimTarget, FIELD_VECTOR ),
+	DEFINE_FIELD( m_bBulletTimeDisabled, FIELD_BOOLEAN ),
+	DEFINE_THINKFUNC( UH_EndBulletTimeThink ),
+	DEFINE_THINKFUNC( UH_LeftArmContextThink ),
+	DEFINE_THINKFUNC( UH_FlashlightViewModelThink ),
+	DEFINE_THINKFUNC( UH_FlareHitContextThink ),
+	DEFINE_THINKFUNC( UH_KickThink ),
 	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bUHWeaponObstructed, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
 	DEFINE_FIELD( m_bHavePistolSilencer, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bHaveRifleSilencer, FIELD_BOOLEAN ),
@@ -346,7 +367,12 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_SOUNDPATCH( m_pGasMaskBreathLoop ),
 	DEFINE_FIELD( m_bLeftArmDeployed, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bHoldingFlare, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_flFlareStartTime, FIELD_TIME ),
+	DEFINE_FIELD( m_hHeldFlareEffect, FIELD_EHANDLE ),
+	DEFINE_FIELD( m_hHeldFlareSprite, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_bFlareMarker, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bFlareStrikePending, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_flNextFlareStrike, FIELD_TIME ),
 	DEFINE_FIELD( m_bFlashlightHolstered, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bDisableWeaponDrop, FIELD_BOOLEAN ),
 
@@ -418,6 +444,13 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetPlayerSkin", InputSetPlayerSkin ),
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "ViewModelSkin", InputViewModelSkin ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetPlayerKickModel", InputSetPlayerKickModel ),
+	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "Bleedplayer", InputBleedPlayer ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "DisableInventory", InputDisableInventory ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "EnableInventory", InputEnableInventory ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "DisplayHermitCards", InputDisplayHermitCards ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "RemoveEndurance", InputRemoveEndurance ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "RemoveLitGlowstick", InputRemoveLitGlowstick ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetStatusVisibility", InputSetStatusVisibility ),
 
 	// Underhell "give" inputs (classname parameter).
 	DEFINE_INPUTFUNC( FIELD_STRING, "Give", InputGive ),
@@ -475,11 +508,20 @@ CHL2_Player::CHL2_Player()
 	// Underhell second hand defaults.
 	m_bLeftArmDeployed = false;
 	m_bHoldingFlare = false;
+	m_flFlareStartTime = 0.0f;
+	m_hHeldFlareEffect = NULL;
+	m_hHeldFlareSprite = NULL;
 	m_bFlareMarker = false;
+	m_bFlareStrikePending = false;
+	m_flNextFlareStrike = 0.0f;
 	m_bFlashlightHolstered = false;
 	m_hCarryingRagdoll = NULL;
-	m_flCarryingRagdollSavedSpeed = 0.0f;
+	m_fSavedSensitivity = 0.0f;
 	m_vecUHFreeAimTarget = vec3_origin;
+	m_bUHWeaponObstructed = false;
+	m_hUHLookGlowTarget = NULL;
+	m_flNextUHLookGlowTime = 0.0f;
+	m_bBulletTimeDisabled = true;
 
 	UH_InitializeInventory();
 	UH_InitializeEndurance();
@@ -882,6 +924,8 @@ void CHL2_Player::PreThink(void)
 	CheckSuitZoom();
 	VPROF_SCOPE_END();
 
+	UH_UpdateLookGlow();
+
 	if (m_lifeState >= LIFE_DYING)
 	{
 		PlayerDeathThink();
@@ -892,7 +936,7 @@ void CHL2_Player::PreThink(void)
 	CheckFlashlight();
 #endif	// HL2_EPISODIC
 
-	// Underhell: drain the flashlight battery while the light is on.
+	// Underhell flashlight battery.
 	UH_UpdateFlashlightBattery();
 
 	// So the correct flags get sent to client asap.
@@ -1028,31 +1072,8 @@ void CHL2_Player::PreThink(void)
 	// Update weapon's ready status
 	UpdateWeaponPosture();
 
-	// Disallow shooting while zooming
-	if ( IsX360() )
-	{
-		if ( IsZooming() )
-		{
-			if( GetActiveWeapon() && !GetActiveWeapon()->IsWeaponZoomed() )
-			{
-				// If not zoomed because of the weapon itself, do not attack.
-				m_nButtons &= ~(IN_ATTACK|IN_ATTACK2);
-			}
-		}
-	}
-	else
-	{
-		if ( m_nButtons & IN_ZOOM )
-		{
-			//FIXME: Held weapons like the grenade get sad when this happens
-	#ifdef HL2_EPISODIC
-			// Episodic allows players to zoom while using a func_tank
-			CBaseCombatWeapon* pWep = GetActiveWeapon();
-			if ( !m_hUseEntity || ( pWep && pWep->IsWeaponVisible() ) )
-	#endif
-			m_nButtons &= ~(IN_ATTACK|IN_ATTACK2);
-		}
-	}
+	// Underhell focus zoom does not consume weapon attack buttons. This keeps
+	// +zoom usable as a focus/FOV control while firing.
 }
 
 void CHL2_Player::PostThink( void )
@@ -1066,6 +1087,10 @@ void CHL2_Player::PostThink( void )
 
 	// Underhell: bleeding drain + passive hunger decay.
 	UH_UpdateBleeding();
+
+	// Keep long guns out of nearby world geometry and drive their authored
+	// lowered/ready viewmodel activities.
+	UH_UpdateWeaponObstruction();
 }
 
 void CHL2_Player::StartAdmireGlovesAnimation( void )
@@ -1213,6 +1238,14 @@ bool CHL2_Player::HandleInteraction(int interactionType, void *data, CBaseCombat
 
 void CHL2_Player::PlayerRunCommand(CUserCmd *ucmd, IMoveHelper *moveHelper)
 {
+	// sub_101E96F0: the held flare strike is secondary fire (+attack2).
+	if ( m_bHoldingFlare && ( ucmd->buttons & IN_ATTACK2 ) )
+	{
+		if ( !( m_nButtons & IN_ATTACK2 ) )
+			UH_StartFlareStrike();
+		ucmd->buttons &= ~IN_ATTACK2;
+	}
+
 	// Handle FL_FROZEN.
 	if ( m_afPhysicsFlags & PFLAG_ONBARNACLE )
 	{
@@ -1489,7 +1522,8 @@ void CHL2_Player::ToggleZoom(void)
 //-----------------------------------------------------------------------------
 void CHL2_Player::StartZooming( void )
 {
-	int iFOV = 25;
+	// sub_102DEE20: focus FOV = default FOV - uh_ironsight_zoom_focus.
+	int iFOV = max( 1, GetDefaultFOV() - uh_ironsight_zoom_focus.GetInt() );
 	if ( SetFOV( this, iFOV, 0.4f ) )
 	{
 		m_HL2Local.m_bZooming = true;
@@ -1925,7 +1959,7 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 
 	case 110:
 	{
-		UH_SetBulletTime( !UH_BulletTimeActive() );
+		if ( !m_bBulletTimeDisabled ) UH_ToggleBulletTime( this );
 		break;
 	}
 
@@ -2250,25 +2284,24 @@ void CHL2_Player::FlashlightTurnOn( void )
 		}
 	}
 
-	// Underhell: the flashlight runs on batteries (m_iUHBatteryCount), not on
-	// suit power like vanilla HL2.
-	if ( UH_GetBatteryCount() <= 0 )
-	{
-		EmitSound( "HL2Player.UseDeny" );
-		return;
-	}
-
+	// A depleted flashlight still switches on; the client renders its weak flicker.
 	AddEffects( EF_DIMLIGHT );
+	m_bFlashlightOn = true;
 	EmitSound( "HL2Player.FlashLightOn" );
 
 	// Underhell: raise the left-arm flashlight viewmodel.
 	UH_UpdateLeftArm();
 
 	// Start draining the current battery.
-	if ( m_flUHBatteryCharge <= 0.0f )
+#ifdef HL2_EPISODIC
+	if ( m_iUHBatteryCount > 0 && m_HL2Local.m_flFlashBattery <= 0.0f )
 	{
+		m_HL2Local.m_flFlashBattery = 100.0f;
 		m_flUHBatteryCharge = 100.0f;
 	}
+#else
+	if ( m_iUHBatteryCount > 0 && m_flUHBatteryCharge <= 0.0f ) m_flUHBatteryCharge = 100.0f;
+#endif
 
 	variant_t flashlighton;
 	flashlighton.SetFloat( m_HL2Local.m_flSuitPower / 100.0f );
@@ -2281,6 +2314,7 @@ void CHL2_Player::FlashlightTurnOn( void )
 void CHL2_Player::FlashlightTurnOff( void )
 {
 	RemoveEffects( EF_DIMLIGHT );
+	m_bFlashlightOn = false;
 	EmitSound( "HL2Player.FlashLightOff" );
 
 	// Underhell: holster the left-arm flashlight viewmodel.
@@ -2737,6 +2771,22 @@ void CHL2_Player::GetAutoaimVector( autoaim_params_t &params )
 {
 	BaseClass::GetAutoaimVector( params );
 
+	// Original sub_101F1D70: free aim replaces the ordinary eye/autoaim
+	// direction with the normalized ray sent by the client.  update_freeaim is
+	// a direction, not a world-space endpoint (Cliento sub_100BC870).
+	static ConVarRef cam_ots_freeaim_enable( "cam_ots_freeaim_enable" );
+	if ( cam_ots_freeaim_enable.IsValid() && cam_ots_freeaim_enable.GetBool() &&
+		 m_vecUHFreeAimTarget.LengthSqr() > 0.0f )
+	{
+		params.m_vecAutoAimDir = m_vecUHFreeAimTarget;
+		VectorNormalize( params.m_vecAutoAimDir );
+		params.m_vecAutoAimPoint = Weapon_ShootPosition() +
+			params.m_vecAutoAimDir * params.m_fMaxDist;
+		params.m_hAutoAimEntity.Set( NULL );
+		params.m_bAutoAimAssisting = false;
+		return;
+	}
+
 	if ( IsX360() )
 	{
 		if( IsInAVehicle() )
@@ -2922,32 +2972,19 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 		return true;
 	}
 
-	// Underhell: one weapon per bucket. Picking up a weapon whose bucket is
-	// already occupied throws the current weapon in that bucket forward
-	// (decode sub_100D02C0: Weapon_Drop with forward * 300) before equipping the
-	// new one. During impulse 101 the old weapon is silently removed instead.
-	if ( !Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
+	// sub_100D02C0: when uh_weapon_category is enabled, only the weapon already
+	// occupying the incoming weapon's script slot/category is thrown. Weapons
+	// in every other slot remain untouched.
+	if ( uh_weapon_category.GetBool() &&
+		 !Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
 	{
-		int slot = pWeapon->GetSlot();
-		CBaseCombatWeapon *pOld = Weapon_GetSlot( slot );
-		if ( pOld != NULL )
+		CBaseCombatWeapon *pOld = Weapon_GetSlot( pWeapon->GetSlot() );
+		if ( pOld )
 		{
-			if ( gEvilImpulse101 )
-			{
-				for ( int i = 0; i < MAX_WEAPONS; i++ )
-				{
-					CBaseCombatWeapon *pW = GetWeapon( i );
-					if ( pW && pW->GetSlot() == slot )
-						UTIL_Remove( pW );
-				}
-			}
-			else
-			{
-				Vector vecForward;
-				AngleVectors( EyeAngles(), &vecForward );
-				Vector vecVel = vecForward * 300.0f;
-				Weapon_Drop( pOld, NULL, &vecVel );
-			}
+			Vector vecForward;
+			EyeVectors( &vecForward );
+			Vector vecVelocity = vecForward * 300.0f;
+			Weapon_Drop( pOld, NULL, &vecVelocity );
 		}
 	}
 
@@ -3137,6 +3174,26 @@ void CHL2_Player::PlayerUse ( void )
 	}
 
 	CBaseEntity *pUseEntity = FindUseEntity();
+
+	// Carryable world things are selected by the crosshair trace, not by the
+	// tangent/radius fallbacks in FindUseEntity. Doors, buttons and friendly
+	// NPCs retain the stock forgiving selection behavior.
+	const char *pszUseClass = pUseEntity ? pUseEntity->GetClassname() : NULL;
+	const bool bCrosshairThing = pszUseClass &&
+		( !Q_strnicmp( pszUseClass, "prop_physics", 12 ) ||
+		  !Q_strnicmp( pszUseClass, "item_", 5 ) ||
+		  !Q_strnicmp( pszUseClass, "weapon_", 7 ) );
+	if ( bCrosshairThing )
+	{
+		Vector vecForward;
+		EyeVectors( &vecForward );
+		trace_t useTrace;
+		UTIL_TraceLine( EyePosition(), EyePosition() + vecForward * PLAYER_USE_RADIUS,
+			MASK_SOLID | CONTENTS_DEBRIS | CONTENTS_PLAYERCLIP,
+			this, COLLISION_GROUP_NONE, &useTrace );
+		if ( useTrace.m_pEnt != pUseEntity )
+			pUseEntity = NULL;
+	}
 
 	bool usedSomething = false;
 
@@ -3549,33 +3606,8 @@ void CHL2_Player::UpdateClientData( void )
 		m_bitsDamageType &= iTimeBasedDamage;
 	}
 
-	// Update Flashlight
-#ifdef HL2_EPISODIC
-	if ( Flashlight_UseLegacyVersion() == false )
-	{
-		if ( FlashlightIsOn() && sv_infinite_aux_power.GetBool() == false )
-		{
-			m_HL2Local.m_flFlashBattery -= FLASH_DRAIN_TIME * gpGlobals->frametime;
-			if ( m_HL2Local.m_flFlashBattery < 0.0f )
-			{
-				FlashlightTurnOff();
-				m_HL2Local.m_flFlashBattery = 0.0f;
-			}
-		}
-		else
-		{
-			m_HL2Local.m_flFlashBattery += FLASH_CHARGE_TIME * gpGlobals->frametime;
-			if ( m_HL2Local.m_flFlashBattery > 100.0f )
-			{
-				m_HL2Local.m_flFlashBattery = 100.0f;
-			}
-		}
-	}
-	else
-	{
-		m_HL2Local.m_flFlashBattery = -1.0f;
-	}
-#endif // HL2_EPISODIC
+	// Underhell battery charge is drained by UH_UpdateFlashlightBattery from
+	// ClientThink. Do not run Episodic's rechargeable flashlight path here.
 
 	BaseClass::UpdateClientData();
 }

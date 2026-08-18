@@ -85,10 +85,13 @@ public:
 	virtual void OnSave( IEntitySaveUtils *pUtils );
 	virtual void OnRestore();
 
-	// Underhell dismemberment. Sever a limb (break its ragdoll constraint) so a
-	// dead body can be shot apart, and accumulate per-hitgroup gib damage.
-	void			UH_SeverLimb( int iPhysicsBone );
-	float			m_flGibDamage[5];			// HITGROUP_HEAD/LEFTARM/RIGHTARM/LEFTLEG/RIGHTLEG
+	// Underhell dismemberment state transferred from the living NPC.
+	bool			m_bUHGibable;
+	int				m_iUHGibType;
+	int				m_iUHPartHealth[5];		// remaining health, not accumulated damage
+	int				m_iUHHelmetHealth;
+	unsigned int	m_nUHSeveredParts;
+	string_t		m_iszUHGibModel[4];
 	Vector			m_vecUHDraggedLastPos;		// original DraggedThink trail anchor
 	bool			m_bUHDragged;
 

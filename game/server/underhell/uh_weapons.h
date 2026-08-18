@@ -40,10 +40,16 @@ class CUHMeleeWeapon : public CBaseHLBludgeonWeapon
 	DECLARE_CLASS( CUHMeleeWeapon, CBaseHLBludgeonWeapon );
 
 public:
-	virtual void	PrimaryAttack( void );	// drains StaminaToDrain, then swings
+	virtual void	PrimaryAttack( void );	// starts wind-up; impact follows MeleeDelayedFire
 	virtual void	SecondaryAttack( void );	// no vanilla secondary swing in Underhell melee
-	virtual float	GetDamageForActivity( Activity hitActivity ) { return m_pDamage->GetFloat(); }
-	virtual float	GetDamage( void ) { return m_pDamage->GetFloat(); }
+	virtual void	ItemPostFrame( void );
+	virtual bool	Holster( CBaseCombatWeapon *pSwitchingTo = NULL );
+	virtual float	GetDamageForActivity( Activity hitActivity ) { return GetDamage(); }
+	virtual float	GetDamage( void )
+	{
+		CBaseCombatCharacter *pOwner = GetOwner();
+		return ( pOwner && pOwner->IsPlayer() ? m_pPlayerDamage : m_pNPCDamage )->GetFloat();
+	}
 	virtual float	GetRange( void ) { return GetWpnData().m_flMeleeRange; }
 	virtual float	GetFireRate( void ) { return GetWpnData().m_flMeleeRoF; }
 
@@ -52,7 +58,10 @@ public:
 	virtual void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 	void			HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 
-	ConVar			*m_pDamage;				// sk_plr_dmg_<weapon> (skill.cfg)
+	ConVar			*m_pPlayerDamage;		// sk_plr_dmg_<weapon> (skill.cfg)
+	ConVar			*m_pNPCDamage;			// sk_npc_dmg_<weapon> (skill.cfg)
+	bool			m_bDelayedMeleeAttack;
+	float			m_flDelayedMeleeAttackTime;
 };
 
 //-----------------------------------------------------------------------------
@@ -66,6 +75,7 @@ class CUHGunWeapon : public CBaseHLCombatWeapon
 	DECLARE_CLASS( CUHGunWeapon, CBaseHLCombatWeapon );
 
 public:
+	virtual void	Precache( void );
 	virtual void	PrimaryAttack( void );
 	virtual void	SecondaryAttack( void );
 	virtual float	GetDamage( void ) { return m_pDamage->GetFloat(); }

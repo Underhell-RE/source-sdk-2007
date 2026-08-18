@@ -33,18 +33,20 @@ void CHL2_Player::InputSetPlayerModel( inputdata_t &inputdata )
 	PrecacheModel( pszModel );
 	SetModel( pszModel );
 
-	// SetModel alone preserves the previous model's sequence index. Player
-	// models commonly map that index to no sequence, which leaves the local
-	// mirror body in its bind pose. Rebind to a valid idle sequence before the
-	// normal PLAYER_IDLE/WALK/ATTACK animation state takes over.
+	// SetModel alone preserves the previous model's sequence number.  Rebind
+	// that number against the new studio header immediately.  Do not call
+	// SetAnimation( PLAYER_IDLE ) here: with no weapon deployed yet the stock
+	// player code looks for the incomplete name "ref_aim_" and falls back to
+	// sequence 0, which is the bind/T pose in Jake's models.  PostThink will
+	// subsequently choose idle/walk/attack every frame.
 	int iIdle = SelectWeightedSequence( ACT_IDLE );
 	if ( iIdle >= 0 )
 	{
+		SetActivity( ACT_IDLE );
 		ResetSequence( iIdle );
 		SetCycle( 0.0f );
 		ResetSequenceInfo();
 	}
-	SetAnimation( PLAYER_IDLE );
 
 	// Only render this body in mirrors/monitors.
 	SetMirrorOnly( true );

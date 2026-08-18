@@ -34,8 +34,9 @@ static bool UH_TryInventoryHealthPickup( CItem *pItem, CBasePlayer *pPlayer, int
 		return false;
 
 	if ( pHL2Player->UH_FindFreeSlot() < 0 )
-		return false;	// inventory full — caller falls back to heal-on-touch
+		return false;
 
+	pItem->FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupItems" );
 	pItem->SetOwnerEntity( pHL2Player );
 	pHL2Player->UH_GiveItem( iItem );
@@ -97,10 +98,10 @@ void CHealthKit::Precache( void )
 //-----------------------------------------------------------------------------
 bool CHealthKit::MyTouch( CBasePlayer *pPlayer )
 {
-	// Underhell: stash into the inventory when there's room, otherwise fall
-	// back to the vanilla heal-on-touch behaviour.
-	if ( UH_TryInventoryHealthPickup( this, pPlayer, UH_ITEM_HEALTHKIT ) )
-		return true;
+	// Original Underhell refuses the pickup when all 28 slots are occupied;
+	// it never falls back to an immediate vanilla heal.
+	if ( dynamic_cast<CHL2_Player *>( pPlayer ) )
+		return UH_TryInventoryHealthPickup( this, pPlayer, UH_ITEM_HEALTHKIT );
 
 	if ( pPlayer->TakeHealth( sk_healthkit.GetFloat(), DMG_GENERIC ) )
 	{
@@ -190,10 +191,9 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		// Underhell: stash into the inventory when there's room, otherwise fall
-		// back to the vanilla heal-on-touch behaviour.
-		if ( UH_TryInventoryHealthPickup( this, pPlayer, UH_ITEM_HEALTH_VIAL ) )
-			return true;
+		// Same full-inventory refusal as the original CHealthVial pickup.
+		if ( dynamic_cast<CHL2_Player *>( pPlayer ) )
+			return UH_TryInventoryHealthPickup( this, pPlayer, UH_ITEM_HEALTH_VIAL );
 
 		if ( pPlayer->TakeHealth( sk_healthvial.GetFloat(), DMG_GENERIC ) )
 		{

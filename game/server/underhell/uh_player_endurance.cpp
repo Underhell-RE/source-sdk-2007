@@ -179,36 +179,32 @@ void CHL2_Player::UH_UpdateEndurance( void )
 //-----------------------------------------------------------------------------
 void CHL2_Player::UH_UpdateFlashlightBattery( void )
 {
-	if ( !FlashlightIsOn() )
+	if ( !FlashlightIsOn() && !m_bNightVisionOn )
 		return;
 
-	// Continuous drain: one battery lasts uh_flashlight_battery_time seconds.
 	float flBatteryLife = uh_flashlight_battery_time.GetFloat();
-	if ( flBatteryLife <= 0.0f )
-		flBatteryLife = 60.0f;
+	if ( flBatteryLife <= 0.0f ) flBatteryLife = 60.0f;
 
-	float flDrain = ( 100.0f / flBatteryLife ) * gpGlobals->frametime;
-	m_flUHBatteryCharge = m_flUHBatteryCharge - flDrain;
+	m_HL2Local.m_flFlashBattery -= ( 100.0f / flBatteryLife ) * gpGlobals->frametime;
+	m_flUHBatteryCharge = m_HL2Local.m_flFlashBattery; // compatibility/save mirror
+	if ( m_HL2Local.m_flFlashBattery > 0.0f ) return;
 
-	if ( m_flUHBatteryCharge <= 0.0f )
+	if ( m_iUHBatteryCount > 0 ) --m_iUHBatteryCount;
+	if ( m_iUHBatteryCount <= 0 )
 	{
-		if ( m_iUHBatteryCount > 0 )
-		{
-			m_iUHBatteryCount = m_iUHBatteryCount - 1;
-		}
+		m_iUHBatteryCount = 0;
+		m_HL2Local.m_flFlashBattery = 0.0f;
+		m_flUHBatteryCharge = 0.0f;
 
-		if ( m_iUHBatteryCount <= 0 )
-		{
-			// Out of batteries: the light goes out.
-			m_iUHBatteryCount = 0;
-			m_flUHBatteryCharge = 0.0f;
-			FlashlightTurnOff();
-			return;
-		}
-
-		// Move on to the next battery.
-		m_flUHBatteryCharge = 100.0f;
+		// Do not switch the flashlight off at zero. The original projected
+		// flashlight has a depleted mode: a very weak, unstable beam. Keeping
+		// EF_DIMLIGHT active lets the client reproduce that flicker.
+		if ( m_bNightVisionOn ) UH_ToggleNightVision();
+		return;
 	}
+
+	m_HL2Local.m_flFlashBattery = 100.0f;
+	m_flUHBatteryCharge = 100.0f;
 }
 
 //-----------------------------------------------------------------------------

@@ -57,7 +57,8 @@ private:
 
 	int		m_iBatteryCount;	// cached m_iUHBatteryCount
 	int		m_iContourTexture;
-	float	m_flAlpha;			// fade alpha (original fades 0.1 per think, sub_100BDF90)
+	float	m_flLastCharge;	// cached m_HL2Local.m_flFlashBattery
+	bool	m_bActive;		// flashlight/night vision/count-change visibility trigger
 };
 
 #endif // HUD_UHBATTERY_H

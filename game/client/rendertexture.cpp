@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 // Implements local hooks into named renderable textures.
@@ -78,6 +78,22 @@ ITexture *GetCameraTexture( void )
 	}
 	
 	return s_pCameraTexture;
+}
+
+extern ITexture *GetAllocatedCustomCameraTexture( int index );
+extern ITexture *GetAllocatedScopeTexture();
+
+ITexture *GetCustomCameraTexture( int index )
+{
+	// Original sub_10129C10 returns the CTextureReference allocated by the
+	// client-render-target singleton directly. Looking it up again by name can
+	// bind the material-system error/placeholder texture during level loading.
+	return GetAllocatedCustomCameraTexture( index );
+}
+
+ITexture *GetScopeTexture( void )
+{
+	return GetAllocatedScopeTexture();
 }
 
 //=============================================================================

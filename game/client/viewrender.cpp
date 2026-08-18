@@ -1,4 +1,4 @@
-//===== Copyright © 1996-2005, Valve Corporation, All rights reserved. ======//
+//===== Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: Responsible for drawing the scene
 //
@@ -58,6 +58,8 @@
 #define USE_MONITORS
 #endif
 #include "rendertexture.h"
+#include "hl2/c_basehlplayer.h"
+#include "baseviewmodel_shared.h"
 #include "viewpostprocess.h"
 #include "viewdebug.h"
 
@@ -1869,6 +1871,9 @@ void CViewRender::RenderView( const CViewSetup &view, int nClearFlags, int whatT
 
 		g_pClientShadowMgr->AdvanceFrame();
 
+		if ( ( whatToDraw & RENDERVIEW_SUPPRESSMONITORRENDERING ) == 0 )
+			DrawScope( view );
+
 	#ifdef USE_MONITORS
 		if ( cl_drawmonitors.GetBool() && 
 			( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() >= 70 ) &&
@@ -2872,6 +2877,52 @@ bool CViewRender::DrawOneMonitor( ITexture *pRenderTarget, int cameraNum, C_Poin
 	return true;
 }
 
+static ConVar r_scope_fov( "r_scope_fov", "10", 0 );
+
+void CViewRender::DrawScope( const CViewSetup &cameraView )
+{
+	C_BaseHLPlayer *pPlayer = dynamic_cast<C_BaseHLPlayer *>( C_BasePlayer::GetLocalPlayer() );
+	if ( !pPlayer )
+		return;
+	C_BaseViewModel *pViewModel = pPlayer->GetViewModel( 0 );
+	if ( !pViewModel || !pPlayer->GetActiveWeapon() )
+		return;
+
+	int iScopeAttachment = pViewModel->LookupAttachment( "Scope" );
+	if ( iScopeAttachment <= 0 )
+		return;
+
+	ITexture *pScopeTarget = GetScopeTexture();
+	if ( !pScopeTarget || IsErrorTexture( pScopeTarget ) )
+		return;
+
+	CViewSetup scopeView = cameraView;
+	if ( !pPlayer->m_bIronSighted )
+	{
+		Vector vecOrigin;
+		QAngle vecAngles;
+		if ( pViewModel->GetAttachment( iScopeAttachment, vecOrigin, vecAngles ) )
+		{
+			scopeView.origin = vecOrigin;
+			scopeView.angles = vecAngles;
+		}
+	}
+	scopeView.x = scopeView.y = 0;
+	scopeView.width = pScopeTarget->GetActualWidth();
+	scopeView.height = pScopeTarget->GetActualHeight();
+	scopeView.fov = r_scope_fov.GetFloat();
+	scopeView.m_bOrtho = false;
+
+	CMatRenderContextPtr pRenderContext( materials );
+	pRenderContext->PushRenderTargetAndViewport( pScopeTarget );
+	pRenderContext.SafeRelease();
+	RenderView( scopeView, VIEW_CLEAR_DEPTH | VIEW_CLEAR_COLOR,
+		RENDERVIEW_SUPPRESSMONITORRENDERING );
+	pRenderContext.GetFrom( materials );
+	pRenderContext->PopRenderTargetAndViewport();
+	m_CurrentView = cameraView;
+}
+
 void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 {
 #ifdef PORTAL
@@ -2885,17 +2936,30 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 	if ( !pCameraEnt )
 		return;
 
-#ifdef _DEBUG
-	g_bRenderingCameraView = true;
-#endif
+	// Reuse the working 1781e2a mirror gate for func_monitor targets too.
+	// Preserve the old value because monitor rendering can be nested in a
+	// reflective-glass pass.
+	const bool bOldMirrorPass = g_bRenderingReflectiveGlass;
+	g_bRenderingReflectiveGlass = true;
 
 	// FIXME: this should check for the ability to do a render target maybe instead.
 	// FIXME: shouldn't have to truck through all of the visible entities for this!!!!
 	ITexture *pCameraTarget = GetCameraTexture();
-	int width = pCameraTarget->GetActualWidth();
-	int height = pCameraTarget->GetActualHeight();
 
 	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
+	bool bLogMonitorPass = false;
+	if ( cl_uh_render_debug.GetBool() )
+	{
+		static float s_flNextMonitorLog = 0.0f;
+		if ( gpGlobals->curtime >= s_flNextMonitorLog )
+		{
+			s_flNextMonitorLog = gpGlobals->curtime + 1.0f;
+			bLogMonitorPass = true;
+			Msg( "[UH render] DrawMonitors begin player=%p mirrorOnly=%d model=%s\n",
+				player, player ? player->IsMirrorOnly() : 0,
+				( player && player->GetModel() ) ? modelinfo->GetModelName( player->GetModel() ) : "<null>" );
+		}
+	}
 	
 	int cameraNum;
 	for ( cameraNum = 0; pCameraEnt != NULL; pCameraEnt = pCameraEnt->m_pNext )
@@ -2903,7 +2967,47 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 		if ( !pCameraEnt->IsActive() || pCameraEnt->IsDormant() )
 			continue;
 
-		if ( !DrawOneMonitor( pCameraTarget, cameraNum, pCameraEnt, cameraView, player, 0, 0, width, height ) )
+		ITexture *pThisTarget = pCameraEnt->UsesCustomRenderTarget()
+			? GetCustomCameraTexture( pCameraEnt->GetRenderTargetIndex() ) : pCameraTarget;
+		if ( !pThisTarget )
+		{
+			Warning( "NULL Texture in Monitor Drawing\n" );
+			continue;
+		}
+		if ( IsErrorTexture( pThisTarget ) )
+		{
+			Warning( "Error Texture in Monitor Drawing\n" );
+			continue;
+		}
+		if ( bLogMonitorPass )
+		{
+			const Vector &camOrigin = pCameraEnt->GetAbsOrigin();
+			const QAngle &camAngles = pCameraEnt->GetAbsAngles();
+			Msg( "[UH render] camera ent=%d active=%d dormant=%d custom=%d index=%d rt=%s size=%dx%d origin=%.1f %.1f %.1f angles=%.1f %.1f %.1f\n",
+				pCameraEnt->entindex(), pCameraEnt->IsActive(), pCameraEnt->IsDormant(),
+				pCameraEnt->UsesCustomRenderTarget(), pCameraEnt->GetRenderTargetIndex(),
+				pThisTarget->GetName(), pThisTarget->GetActualWidth(), pThisTarget->GetActualHeight(),
+				camOrigin.x, camOrigin.y, camOrigin.z, camAngles.x, camAngles.y, camAngles.z );
+
+			if ( pCameraEnt->UsesCustomRenderTarget() )
+			{
+				IMaterial *pMonitorMaterial = materials->FindMaterial( "dev/dev_monitor_256a", TEXTURE_GROUP_WORLD, false );
+				bool bFoundBaseTexture = false;
+				IMaterialVar *pBaseTextureVar = pMonitorMaterial ?
+					pMonitorMaterial->FindVar( "$basetexture", &bFoundBaseTexture, false ) : NULL;
+				ITexture *pMaterialTexture = ( bFoundBaseTexture && pBaseTextureVar ) ?
+					pBaseTextureVar->GetTextureValue() : NULL;
+				Msg( "[UH render] material dev/dev_monitor_256a ptr=%p error=%d shader=%s baseFound=%d base=%s sameRT=%d\n",
+					pMonitorMaterial, IsErrorMaterial( pMonitorMaterial ),
+					pMonitorMaterial ? pMonitorMaterial->GetShaderName() : "<null>",
+					bFoundBaseTexture, pMaterialTexture ? pMaterialTexture->GetName() : "<null>",
+					pMaterialTexture == pThisTarget );
+			}
+		}
+		int width = pThisTarget->GetActualWidth();
+		int height = pThisTarget->GetActualHeight();
+
+		if ( !DrawOneMonitor( pThisTarget, cameraNum, pCameraEnt, cameraView, player, 0, 0, width, height ) )
 			continue;
 
 		++cameraNum;
@@ -2919,9 +3023,7 @@ void CViewRender::DrawMonitors( const CViewSetup &cameraView )
 		pRenderContext->PopRenderTargetAndViewport();
 	}
 
-#ifdef _DEBUG
-	g_bRenderingCameraView = false;
-#endif
+	g_bRenderingReflectiveGlass = bOldMirrorPass;
 
 #endif // USE_MONITORS
 }
@@ -5636,8 +5738,20 @@ void CReflectiveGlassView::Draw()
 	bool bVisOcclusion = r_visocclusion.GetInt();
 	r_visocclusion.SetValue( 0 );
 		   
-	// Underhell: mirror-only entities (player model, ghost apparitions) draw
-	// only during this reflective pass.
+	if ( cl_uh_render_debug.GetBool() )
+	{
+		static float s_flNextMirrorLog = 0.0f;
+		if ( gpGlobals->curtime >= s_flNextMirrorLog )
+		{
+			s_flNextMirrorLog = gpGlobals->curtime + 1.0f;
+			C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
+			Msg( "[UH render] CReflectiveGlassView::Draw player=%p mirrorOnly=%d model=%s\n",
+				pPlayer, pPlayer ? pPlayer->IsMirrorOnly() : 0,
+				( pPlayer && pPlayer->GetModel() ) ? modelinfo->GetModelName( pPlayer->GetModel() ) : "<null>" );
+		}
+	}
+
+	// Working implementation from 1781e2a.
 	g_bRenderingReflectiveGlass = true;
 	BaseClass::Draw();
 	g_bRenderingReflectiveGlass = false;
