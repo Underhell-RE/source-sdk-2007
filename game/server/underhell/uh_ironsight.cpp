@@ -276,14 +276,17 @@ void CHL2_Player::UH_ToggleLaser( void )
 	// The laser sight belongs to the SOCOM path; keeping a global player flag
 	// but allowing every weapon to toggle it made the beam appear on unrelated
 	// pistols, SMGs and rifles.
-	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	CUHGunWeapon *pWeapon = dynamic_cast<CUHGunWeapon *>( GetActiveWeapon() );
 	if ( !pWeapon || !FClassnameIs( pWeapon, "weapon_pistol_socom" ) )
 	{
 		m_bLaserToggleState = false;
 		return;
 	}
 
-	m_bLaserToggleState = !m_bLaserToggleState;
+	// Keep the compatibility command on the same authoritative path as
+	// IN_ATTACK2: weapon state, sprite lifecycle and sequences 12/13 must toggle
+	// together rather than changing only the player's network HUD bit.
+	pWeapon->SecondaryAttack();
 }
 
 //-----------------------------------------------------------------------------

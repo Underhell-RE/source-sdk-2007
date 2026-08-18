@@ -70,6 +70,7 @@ class CUHGunWeapon : public CBaseHLCombatWeapon
 	DECLARE_CLASS( CUHGunWeapon, CBaseHLCombatWeapon );
 
 public:
+	virtual void	Precache( void );
 	virtual void	PrimaryAttack( void );
 	virtual void	SecondaryAttack( void );
 	virtual float	GetDamage( void ) { return m_pDamage->GetFloat(); }

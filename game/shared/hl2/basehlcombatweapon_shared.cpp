@@ -291,8 +291,10 @@ float CBaseHLCombatWeapon::CalcViewmodelBob( void )
 		return 0.0f;// just use old value
 	}
 
-	//Find the speed of the player
-	float speed = player->GetLocalVelocity().Length2D();
+	// Underhell keeps the movement on the weapon rather than punching the
+	// camera. Include vertical velocity so the existing positional viewmodel
+	// bob continues through jumps and falls.
+	float speed = player->GetLocalVelocity().Length();
 
 	//FIXME: This maximum speed value must come from the server.
 	//		 MaxSpeed() is not sufficient for dealing with sprinting - jdw

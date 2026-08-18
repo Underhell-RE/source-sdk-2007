@@ -19,6 +19,8 @@
 #include "rumble_shared.h"
 #include "ai_basenpc.h"
 #include "hl2_player.h"
+#include "baseviewmodel_shared.h"
+#include "sprite.h"
 #include "uh_weapons.h"
 #include "underhell/uh_bullettime.h"
 #include "hl2/weapon_rpg.h"
@@ -147,6 +149,17 @@ void CUHMeleeWeapon::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatC
 		BaseClass::Operator_HandleAnimEvent( pEvent, pOperator );
 		break;
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: SOCOM's original Precache path (sub_1027B980) explicitly loads
+// sprites/laserpointer.vmt. Keeping it here is harmless for the thin sibling
+// classes and guarantees SpriteCreate never performs a late model load.
+//-----------------------------------------------------------------------------
+void CUHGunWeapon::Precache( void )
+{
+	BaseClass::Precache();
+	PrecacheModel( "sprites/laserpointer.vmt" );
 }
 
 //-----------------------------------------------------------------------------
@@ -281,10 +294,30 @@ void CUHGunWeapon::SecondaryAttack( void )
 		}
 		else if ( !m_hLaserDot.Get() )
 		{
-			m_hLaserDot = CreateLaserDot( pOwner->Weapon_ShootPosition(), this, true );
+			// The original SOCOM precaches laserpointer.vmt and owns a removable
+			// sprite handle. env_laserdot uses redglow1.vmt and is the RPG path,
+			// not the SOCOM visual.
+			CSprite *pDot = CSprite::SpriteCreate( "sprites/laserpointer.vmt",
+				pOwner->Weapon_ShootPosition(), false );
+			if ( pDot )
+			{
+				pDot->SetTransparency( kRenderWorldGlow, 255, 255, 255, 255,
+					kRenderFxNoDissipation );
+				pDot->SetScale( 0.15f );
+				pDot->SetGlowProxySize( 1.0f );
+				pDot->SetOwnerEntity( this );
+				m_hLaserDot = pDot;
+			}
 		}
 
-		SendWeaponAnim( m_bSocomLaserOn ? (Activity)12 : (Activity)13 );
+		// Original sub_1027B9E0 selects SOCOM viewmodel sequence 12/13 with a
+		// zero blend time. They are sequence indices, not global Activity ids.
+		CBaseViewModel *pViewModel = pOwner->GetViewModel();
+		if ( pViewModel )
+		{
+			pViewModel->SendViewModelMatchingSequence( m_bSocomLaserOn ? 12 : 13 );
+			SetWeaponIdleTime( gpGlobals->curtime + pViewModel->SequenceDuration() );
+		}
 		m_flNextSecondaryAttack = gpGlobals->curtime + 0.2f;
 		return;
 	}
@@ -380,7 +413,7 @@ void CUHGunWeapon::ItemPostFrame( void )
 			Vector dir = pOwner->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );
 			trace_t tr;
 			UTIL_TraceLine( start, start + dir * MAX_TRACE_LENGTH, MASK_SHOT, pOwner, COLLISION_GROUP_NONE, &tr );
-			SetLaserDotPosition( m_hLaserDot.Get(), tr.endpos, tr.plane.normal );
+			m_hLaserDot->SetAbsOrigin( tr.endpos + tr.plane.normal * 0.5f );
 		}
 	}
 
