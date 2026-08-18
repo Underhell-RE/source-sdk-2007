@@ -86,6 +86,7 @@ ConVar sv_autojump( "sv_autojump", "0" );
 ConVar hl2_walkspeed( "hl2_walkspeed", "150" );
 ConVar hl2_normspeed( "hl2_normspeed", "190" );
 ConVar hl2_sprintspeed( "hl2_sprintspeed", "320" );
+extern ConVar uh_ironsight_zoom_focus;
 
 ConVar hl2_darkness_flashlight_factor ( "hl2_darkness_flashlight_factor", "1" );
 
@@ -1071,31 +1072,8 @@ void CHL2_Player::PreThink(void)
 	// Update weapon's ready status
 	UpdateWeaponPosture();
 
-	// Disallow shooting while zooming
-	if ( IsX360() )
-	{
-		if ( IsZooming() )
-		{
-			if( GetActiveWeapon() && !GetActiveWeapon()->IsWeaponZoomed() )
-			{
-				// If not zoomed because of the weapon itself, do not attack.
-				m_nButtons &= ~(IN_ATTACK|IN_ATTACK2);
-			}
-		}
-	}
-	else
-	{
-		if ( m_nButtons & IN_ZOOM )
-		{
-			//FIXME: Held weapons like the grenade get sad when this happens
-	#ifdef HL2_EPISODIC
-			// Episodic allows players to zoom while using a func_tank
-			CBaseCombatWeapon* pWep = GetActiveWeapon();
-			if ( !m_hUseEntity || ( pWep && pWep->IsWeaponVisible() ) )
-	#endif
-			m_nButtons &= ~(IN_ATTACK|IN_ATTACK2);
-		}
-	}
+	// Underhell focus zoom does not consume weapon attack buttons. This keeps
+	// +zoom usable as a focus/FOV control while firing.
 }
 
 void CHL2_Player::PostThink( void )
@@ -1544,7 +1522,8 @@ void CHL2_Player::ToggleZoom(void)
 //-----------------------------------------------------------------------------
 void CHL2_Player::StartZooming( void )
 {
-	int iFOV = 25;
+	// sub_102DEE20: focus FOV = default FOV - uh_ironsight_zoom_focus.
+	int iFOV = max( 1, GetDefaultFOV() - uh_ironsight_zoom_focus.GetInt() );
 	if ( SetFOV( this, iFOV, 0.4f ) )
 	{
 		m_HL2Local.m_bZooming = true;

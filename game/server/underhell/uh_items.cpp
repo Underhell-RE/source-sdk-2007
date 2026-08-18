@@ -21,6 +21,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+extern ConVar sk_battery;
+
 // skill convar used by the radiocracker detonation (defined in hl2_gamerules.cpp)
 extern ConVar sk_plr_dmg_smg1_grenade;
 
@@ -549,14 +551,16 @@ bool CItemHeavyArmor::MyTouch( CBasePlayer *pPlayer )
 	if ( !pHL2Player )
 		return false;
 
-	if ( pHL2Player->ArmorValue() >= 200 )
+	// Original shared armor helper refuses every armor pickup at 100+, even
+	// though heavy armor itself can raise the cap to 200.
+	if ( !pHL2Player->IsSuitEquipped() || pHL2Player->ArmorValue() >= 100 )
 		return false;
 
 	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
 	SetOwnerEntity( pHL2Player );
 
-	pHL2Player->IncrementArmorValue( 45, 200 );
+	pHL2Player->IncrementArmorValue( (int)( sk_battery.GetFloat() * 45.0f ), 200 );
 	UTIL_Remove( this );
 
 	return true;
@@ -642,14 +646,14 @@ static bool UH_GiveArmorPickup( CBasePlayer *pPlayer, CBaseEntity *pItem, int iA
 	if ( !pHL2Player )
 		return false;
 
-	if ( pHL2Player->ArmorValue() >= iMax )
+	if ( !pHL2Player->IsSuitEquipped() || pHL2Player->ArmorValue() >= 100 )
 		return false;
 
 	CItem *pWorldItem = dynamic_cast<CItem *>( pItem );
 	if ( pWorldItem ) pWorldItem->FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
 	pItem->SetOwnerEntity( pHL2Player );
-	pHL2Player->IncrementArmorValue( iAmount, iMax );
+	pHL2Player->IncrementArmorValue( (int)( sk_battery.GetFloat() * (float)iAmount ), iMax );
 	UTIL_Remove( pItem );
 
 	return true;
@@ -726,14 +730,14 @@ bool CItemArmor::MyTouch( CBasePlayer *pPlayer )
 		return false;
 
 	// Original gate: only pick up while armour is below full.
-	if ( pHL2Player->ArmorValue() >= 100 )
+	if ( !pHL2Player->IsSuitEquipped() || pHL2Player->ArmorValue() >= 100 )
 		return false;
 
 	FirePlayerPickupOutput( pHL2Player );
 	pHL2Player->EmitSound( "HL2Player.PickupArmor" );
 	SetOwnerEntity( pHL2Player );
 
-	pHL2Player->IncrementArmorValue( 10, 100 );
+	pHL2Player->IncrementArmorValue( (int)( sk_battery.GetFloat() * 10.0f ), 100 );
 	UTIL_Remove( this );
 
 	return true;

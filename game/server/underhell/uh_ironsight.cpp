@@ -13,11 +13,9 @@
 //   - CHL2_Player::m_bIronSighted     — authoritative flag (accuracy + HUD).
 //   - CHL2_Player::m_fIronsightedTime — last toggle time (debounce).
 //
-// The FOV zoom is a mild multiplier (uh_ironsight_zoom, default 0.9 — the
-// original does FOV = GetDefaultFOV() * uh_ironsight_zoom). Despite its name,
-// uh_ironsight_zoom_focus is NOT subtracted from the FOV: the original writes
-// it to m_flMaxspeed (hexrays sub_100EA7B0 → player offset 4132, the networked
-// m_flMaxspeed), so it is the aim-walk speed while sighted.
+// Ironsight FOV uses uh_ironsight_zoom (default 0.9). The separate +zoom focus
+// subtracts uh_ironsight_zoom_focus (40) from default FOV. Ironsight movement
+// switches to hl2_walkspeed and restores hl2_normspeed.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -36,12 +34,10 @@
 static ConVar uh_ironsight_zoom( "uh_ironsight_zoom", "0.9", 0,
 	"FOV multiplier when ironsighted (sighted FOV = defaultFOV * this)." );
 
-// Despite the name, this is the aim-walk speed while ironsighted, NOT a FOV
-// value: sub_101ECF40 writes it to m_flMaxspeed on enter and restores
-// hl2_walkspeed on leave. (The original help text claims it is subtracted from
-// the default FOV — that is stale; the code uses it as a move speed.)
-static ConVar uh_ironsight_zoom_focus( "uh_ironsight_zoom_focus", "40", FCVAR_ARCHIVE,
-	"Aim-walk speed while ironsighted (original writes this to m_flMaxspeed)." );
+// Suit +zoom subtracts this value from the default FOV (sub_102DEE20).
+// Ironsight itself uses hl2_walkspeed/hl2_normspeed for movement.
+ConVar uh_ironsight_zoom_focus( "uh_ironsight_zoom_focus", "40", FCVAR_ARCHIVE,
+	"Amount subtracted from default FOV by the +zoom focus control." );
 
 // FOV transition duration in seconds (original passes a data-section constant,
 // flt_1063C554, that Hex-Rays could not resolve — reconstructed to match the
@@ -52,6 +48,7 @@ static ConVar uh_ironsight_zoom_focus( "uh_ironsight_zoom_focus", "40", FCVAR_AR
 #define UH_IRONSIGHT_TOGGLE_DELAY 0.1f
 
 extern ConVar hl2_walkspeed;
+extern ConVar hl2_normspeed;
 
 // Enter slightly earlier than we leave to prevent the animation oscillating
 // when the muzzle sits exactly on a wall plane.
@@ -180,10 +177,9 @@ void CHL2_Player::UH_ToggleIronsight( void )
 
 		m_bIronSighted = true;
 
-		// Aim-walk slowdown (original writes uh_ironsight_zoom_focus to
-		// m_flMaxspeed if it is lower than the current speed).
-		if ( uh_ironsight_zoom_focus.GetFloat() < MaxSpeed() )
-			SetMaxSpeed( uh_ironsight_zoom_focus.GetFloat() );
+		// sub_101ECF40 enters aim movement at hl2_walkspeed (150).
+		if ( hl2_walkspeed.GetFloat() < MaxSpeed() )
+			SetMaxSpeed( hl2_walkspeed.GetFloat() );
 	}
 	else
 	{
@@ -198,9 +194,9 @@ void CHL2_Player::UH_ToggleIronsight( void )
 		m_iFOV = 0;
 		m_Local.m_flFOVRate = UH_IRONSIGHT_FOV_TIME;
 
-		// Restore walk speed (original restores hl2_walkspeed if it is higher).
-		if ( hl2_walkspeed.GetFloat() > MaxSpeed() )
-			SetMaxSpeed( hl2_walkspeed.GetFloat() );
+		// Leaving ironsight restores hl2_normspeed (190).
+		if ( hl2_normspeed.GetFloat() > MaxSpeed() )
+			SetMaxSpeed( hl2_normspeed.GetFloat() );
 	}
 
 	m_fIronsightedTime = gpGlobals->curtime;
@@ -230,8 +226,8 @@ void CHL2_Player::UH_DisableIronsight( void )
 	m_iFOV = 0;
 	m_Local.m_flFOVRate = UH_IRONSIGHT_FOV_TIME;
 
-	if ( hl2_walkspeed.GetFloat() > MaxSpeed() )
-		SetMaxSpeed( hl2_walkspeed.GetFloat() );
+	if ( hl2_normspeed.GetFloat() > MaxSpeed() )
+		SetMaxSpeed( hl2_normspeed.GetFloat() );
 
 	m_fIronsightedTime = gpGlobals->curtime;
 }
