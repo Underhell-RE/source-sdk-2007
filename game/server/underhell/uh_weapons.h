@@ -40,8 +40,10 @@ class CUHMeleeWeapon : public CBaseHLBludgeonWeapon
 	DECLARE_CLASS( CUHMeleeWeapon, CBaseHLBludgeonWeapon );
 
 public:
-	virtual void	PrimaryAttack( void );	// drains StaminaToDrain, then swings
+	virtual void	PrimaryAttack( void );	// starts wind-up; impact follows MeleeDelayedFire
 	virtual void	SecondaryAttack( void );	// no vanilla secondary swing in Underhell melee
+	virtual void	ItemPostFrame( void );
+	virtual bool	Holster( CBaseCombatWeapon *pSwitchingTo = NULL );
 	virtual float	GetDamageForActivity( Activity hitActivity ) { return m_pDamage->GetFloat(); }
 	virtual float	GetDamage( void ) { return m_pDamage->GetFloat(); }
 	virtual float	GetRange( void ) { return GetWpnData().m_flMeleeRange; }
@@ -53,6 +55,8 @@ public:
 	void			HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 
 	ConVar			*m_pDamage;				// sk_plr_dmg_<weapon> (skill.cfg)
+	bool			m_bDelayedMeleeAttack;
+	float			m_flDelayedMeleeAttackTime;
 };
 
 //-----------------------------------------------------------------------------

@@ -88,7 +88,7 @@ void CHL2_Player::UH_DoKickStrike( void )
 	// Original sub_101F0050 calls GetAutoaimVector( 1.0, 72.0 ), so the leg
 	// follows the same bounded free-aim ray as firearms instead of raw eye
 	// pitch.  Using EyeVectors here allowed upward kicks into ceilings.
-	Vector vecForward = GetAutoaimVector( 1.0f, UH_KICK_REACH );
+	Vector vecForward = static_cast<CBasePlayer *>( this )->GetAutoaimVector( 1.0f, UH_KICK_REACH );
 
 	Vector vecOrigin = EyePosition();
 	trace_t tr;

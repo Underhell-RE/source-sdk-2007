@@ -81,7 +81,7 @@ void CHL2_Player::UH_UpdateWeaponObstruction( void )
 
 	const float flDistance = m_bUHWeaponObstructed ?
 		UH_WEAPON_OBSTRUCTION_LEAVE : UH_WEAPON_OBSTRUCTION_ENTER;
-	Vector vecDirection = GetAutoaimVector( AUTOAIM_SCALE_DEFAULT, flDistance );
+	Vector vecDirection = static_cast<CBasePlayer *>( this )->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT, flDistance );
 	Vector vecStart = Weapon_ShootPosition();
 
 	trace_t tr;

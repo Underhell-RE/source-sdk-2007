@@ -47,9 +47,12 @@ public:
 protected:
 	virtual	void	ImpactEffect( trace_t &trace );
 
+	// Underhell melee begins its animation immediately but resolves the trace
+	// after the script's MeleeDelayedFire interval.
+	void			Swing( int bIsSecondary, bool bSkipAnimation = false, bool bSkipTiming = false );
+
 private:
 	bool			ImpactWater( const Vector &start, const Vector &end );
-	void			Swing( int bIsSecondary );
 	void			Hit( trace_t &traceHit, Activity nHitActivity, bool bIsSecondary );
 	Activity		ChooseIntersectionPointAndActivity( trace_t &hitTrace, const Vector &mins, const Vector &maxs, CBasePlayer *pOwner );
 };

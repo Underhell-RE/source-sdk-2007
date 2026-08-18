@@ -47,7 +47,38 @@ void CUHMeleeWeapon::PrimaryAttack( void )
 			? "Player.Voice.Melee.Exhausted" : "Player.Voice.Melee" );
 	}
 
-	BaseClass::PrimaryAttack();
+	// Original sub_102B0A00 starts ACT_VM_HITCENTER now, but sub_102AFCC0
+	// does not invoke the hit trace until MeleeDelayedFire has elapsed.
+	m_bDelayedMeleeAttack = true;
+	m_flDelayedMeleeAttackTime = gpGlobals->curtime + GetWpnData().m_flMeleeDelayedFire;
+	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
+	m_flNextSecondaryAttack = m_flNextPrimaryAttack;
+
+	SendWeaponAnim( GetPrimaryAttackActivity() );
+	if ( pPlayer )
+	{
+		pPlayer->SetAnimation( PLAYER_ATTACK1 );
+		pPlayer->RumbleEffect( RUMBLE_CROWBAR_SWING, 0, RUMBLE_FLAG_RESTART );
+	}
+}
+
+void CUHMeleeWeapon::ItemPostFrame( void )
+{
+	if ( m_bDelayedMeleeAttack && gpGlobals->curtime >= m_flDelayedMeleeAttackTime )
+	{
+		m_bDelayedMeleeAttack = false;
+		// The animation and refire timers were established at wind-up start.
+		// Resolve only the actual trace, damage, impact and swing sound now.
+		Swing( false, true, true );
+	}
+
+	BaseClass::ItemPostFrame();
+}
+
+bool CUHMeleeWeapon::Holster( CBaseCombatWeapon *pSwitchingTo )
+{
+	m_bDelayedMeleeAttack = false;
+	return BaseClass::Holster( pSwitchingTo );
 }
 
 void CUHMeleeWeapon::SecondaryAttack( void )
@@ -654,7 +685,7 @@ ConVar sk_plr_dmg_bfg_minigun( "sk_plr_dmg_bfg_minigun", "50" );
 	END_SEND_TABLE() \
 	LINK_ENTITY_TO_CLASS( _entityName, _className ); \
 	PRECACHE_WEAPON_REGISTER( _entityName ); \
-	_className::_className() { m_pDamage = &_damageConVar; }
+	_className::_className() { m_pDamage = &_damageConVar; m_bDelayedMeleeAttack = false; m_flDelayedMeleeAttackTime = 0.0f; }
 
 //-----------------------------------------------------------------------------
 // Melee
