@@ -55,7 +55,9 @@ void CUHMeleeWeapon::PrimaryAttack( void )
 	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
 	m_flNextSecondaryAttack = m_flNextPrimaryAttack;
 
-	SendWeaponAnim( GetPrimaryAttackActivity() );
+	// sub_102B0A00 sends activity 195 = ACT_VM_MISSCENTER for the wind-up.
+	// ACT_VM_HITCENTER (189) is selected only later by the delayed trace.
+	SendWeaponAnim( ACT_VM_MISSCENTER );
 	if ( pPlayer )
 	{
 		pPlayer->SetAnimation( PLAYER_ATTACK1 );

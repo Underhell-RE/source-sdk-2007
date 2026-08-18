@@ -435,6 +435,18 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 	}
 #endif
 
+	// Cliento sub_10014D80 treats the kick/leg viewmodel (index 2) separately:
+	// it may follow downward pitch, but upward pitch is clamped to level and it
+	// never enters the weapon ironsight/free-aim path.
+	if ( ViewModelIndex() == 2 )
+	{
+		if ( vmangles[PITCH] < 0.0f )
+			vmangles[PITCH] = 0.0f;
+		SetLocalOrigin( vmorigin );
+		SetLocalAngles( vmangles );
+		return;
+	}
+
 	// Underhell ironsight (VDC "Adding Ironsights", jorg40/Cin — matches the
 	// original client CalcViewModelView sub_10014D80):
 	//
@@ -443,7 +455,9 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 	// First apply the weapon's ExpOffset (position + orientation) to the hip
 	// origin and slide the viewmodel to the eye, driven by m_bExpSighted.
 #if defined( CLIENT_DLL )
-	UH_CalcExpWpnOffsets( owner, vmorigin, vmangles );
+	if ( ViewModelIndex() != 1 )
+	{
+		UH_CalcExpWpnOffsets( owner, vmorigin, vmangles );
 
 	// Interpolate m_expFactor toward the target (1 = sighted, 0 = hip).
 	// The original is time-based ((curtime - m_fIronsightedTime) / gMoveTime,
@@ -460,6 +474,7 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 	// Scale the offset from the hip position toward the eye position.
 	Vector difPos = vmorigin - eyePosition;
 	vmorigin = eyePosition + difPos * m_expFactor;
+	}
 
 	// sub_10014D80: hip-fire/free-aim is the only path which receives the
 	// active weapon's normal viewmodel bob.  The original calls the weapon's

@@ -50,6 +50,24 @@ ConVar xc_uncrouch_on_jump( "xc_uncrouch_on_jump", "1", FCVAR_ARCHIVE, "Uncrouch
 ConVar player_limit_jump_speed( "player_limit_jump_speed", "1", FCVAR_REPLICATED );
 #endif
 
+#if defined( CLIENT_DLL )
+// Original Underhell client movement oscillation (Cliento sub_100AA7E0).
+// It uses full XYZ velocity, unlike the weapon's ordinary 2D walking bob, so
+// jumping and falling retain subtle motion instead of locking the gun to the
+// screen. The original defaults make Z rotation zero but vertical velocity
+// still drives the X/Y oscillation amplitudes.
+static ConVar cl_viewbob_enabled( "cl_viewbob_enabled", "1", 0, "Oscillation Toggle", true, 0.0f, true, 1.0f );
+static ConVar cl_viewbob_frequency_x( "cl_viewbob_frequency_x", "10", 0, "Angular Frequency on X" );
+static ConVar cl_viewbob_frequency_y( "cl_viewbob_frequency_y", "10", 0, "Angular Frequency on Y" );
+static ConVar cl_viewbob_frequency_z( "cl_viewbob_frequency_z", "0", 0, "Angular Frequency on Z" );
+static ConVar cl_viewbob_magnitude_x( "cl_viewbob_magnitude_x", "0.005", 0, "Magnitude on X" );
+static ConVar cl_viewbob_magnitude_y( "cl_viewbob_magnitude_y", "0.001", 0, "Magnitude on Y" );
+static ConVar cl_viewbob_magnitude_z( "cl_viewbob_magnitude_z", "0", 0, "Magnitude on Z" );
+static ConVar cl_viewbob_phase_x( "cl_viewbob_phase_x", "0" );
+static ConVar cl_viewbob_phase_y( "cl_viewbob_phase_y", "0" );
+static ConVar cl_viewbob_phase_z( "cl_viewbob_phase_z", "0" );
+#endif
+
 // option_duck_method is a carrier convar. Its sole purpose is to serve an easy-to-flip
 // convar which is ONLY set by the X360 controller menu to tell us which way to bind the
 // duck controls. Its value is meaningless anytime we don't have the options window open.
@@ -4412,6 +4430,18 @@ void CGameMovement::PlayerMove( void )
 	VPROF( "CGameMovement::PlayerMove" );
 
 	CheckParameters();
+
+#if defined( CLIENT_DLL )
+	if ( cl_viewbob_enabled.GetBool() && !player->IsInAVehicle() )
+	{
+		const float flSpeed = player->GetAbsVelocity().Length();
+		QAngle vecOscillation(
+			flSpeed * sin( cl_viewbob_frequency_x.GetFloat() * gpGlobals->curtime + cl_viewbob_phase_x.GetFloat() ) * cl_viewbob_magnitude_x.GetFloat() * 0.01f,
+			flSpeed * sin( cl_viewbob_frequency_y.GetFloat() * gpGlobals->curtime + cl_viewbob_phase_y.GetFloat() ) * cl_viewbob_magnitude_y.GetFloat() * 0.01f,
+			flSpeed * sin( cl_viewbob_frequency_z.GetFloat() * gpGlobals->curtime + cl_viewbob_phase_z.GetFloat() ) * cl_viewbob_magnitude_z.GetFloat() * 0.01f );
+		player->ViewPunch( vecOscillation );
+	}
+#endif
 	
 	// clear output applied velocity
 	mv->m_outWishVel.Init();
