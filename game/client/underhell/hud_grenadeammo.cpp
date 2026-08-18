@@ -39,7 +39,20 @@ public:
 			SetDisplayValue( ammo );
 		}
 	}
-	bool ShouldDraw() { return m_iAmmo > 0 && CHudElement::ShouldDraw(); }
+	bool ShouldDraw()
+	{
+		// Do not gate the first OnThink behind m_iAmmo: hidden VGUI panels are
+		// not guaranteed to think, leaving the constructor value -1 forever.
+		C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
+		int ammoType = GetAmmoDef()->Index( "grenade" );
+		int ammo = ( player && ammoType >= 0 ) ? player->GetAmmoCount( ammoType ) : 0;
+		if ( ammo != m_iAmmo )
+		{
+			m_iAmmo = ammo;
+			SetDisplayValue( ammo );
+		}
+		return ammo > 0 && CHudElement::ShouldDraw();
+	}
 	void Paint()
 	{
 		BaseClass::Paint();
@@ -49,10 +62,17 @@ public:
 			vgui::surface()->DrawSetTextureFile( m_iTexture, "sprites/hud/weapons/frag", 1, false );
 		}
 		vgui::surface()->DrawSetTexture( m_iTexture );
-		vgui::surface()->DrawSetColor( 255, 255, 255, 255 );
-		vgui::surface()->DrawTexturedRect( 2, 2, 34, 34 );
+		// Exact packed colour in original Paint sub_101ADB40: 0xfffc7f02.
+		vgui::surface()->DrawSetColor( 2, 127, 252, 255 );
+		// contourwide/contourtall are right/bottom coordinates, not dimensions.
+		vgui::surface()->DrawTexturedRect( (int)m_fContourX, (int)m_fContourY,
+			(int)m_fContourWide, (int)m_fContourTall );
 	}
 private:
+	CPanelAnimationVarAliasType( float, m_fContourX, "contourx", "0", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_fContourY, "contoury", "0", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_fContourTall, "contourtall", "32", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_fContourWide, "contourwide", "32", "proportional_float" );
 	int m_iAmmo;
 	int m_iTexture;
 };

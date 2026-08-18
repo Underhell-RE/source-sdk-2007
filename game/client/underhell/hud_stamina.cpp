@@ -115,9 +115,11 @@ void CHudStamina::Paint()
 
 	vgui::surface()->DrawSetColor( 255, 255, 255, 255 );
 	vgui::surface()->DrawSetTexture( m_iIconTexture );
+	// Original sub_100CACD0 passes iconwide/icontall as the right/bottom
+	// coordinates directly; they are not width/height values.
 	vgui::surface()->DrawTexturedRect(
 		(int)m_fIconX, (int)m_fIconY,
-		(int)( m_fIconX + m_fIconWide ), (int)( m_fIconY + m_fIconTall ) );
+		(int)m_fIconWide, (int)m_fIconTall );
 
 	float flChunkStep = m_flBarChunkWidth + m_flBarChunkGap;
 	int chunkCount = ( flChunkStep > 0.0f ) ? (int)( m_flBarWidth / flChunkStep ) : 0;
