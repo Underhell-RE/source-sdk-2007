@@ -438,12 +438,10 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 	// Underhell ironsight (VDC "Adding Ironsights", jorg40/Cin — matches the
 	// original client CalcViewModelView sub_10014D80):
 	//
-	// The original does NOT apply the vanilla viewmodel bob or view lag
-	// (AddViewmodelBob / CalcViewModelLag). The lag's pitch-lateral term
-	// pushes a sighted gun sideways as the view pitches up/down, so the
-	// original skips both — only the ~10% view shake survives. Then it applies
-	// the weapon's ExpOffset (position + orientation) to the hip origin and
-	// slides the viewmodel to the eye, driven by the networked m_bExpSighted.
+	// The original never applies CalcViewModelLag.  It applies weapon bob only
+	// later in the unsighted free-aim path, so the sighted gun remains stable.
+	// First apply the weapon's ExpOffset (position + orientation) to the hip
+	// origin and slide the viewmodel to the eye, driven by m_bExpSighted.
 #if defined( CLIENT_DLL )
 	UH_CalcExpWpnOffsets( owner, vmorigin, vmangles );
 
@@ -463,11 +461,15 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 	Vector difPos = vmorigin - eyePosition;
 	vmorigin = eyePosition + difPos * m_expFactor;
 
-	// sub_10014D80: point the unsighted model through the normalized free-aim
-	// cursor. Its origin remains unchanged and the real camera still turns.
+	// sub_10014D80: hip-fire/free-aim is the only path which receives the
+	// active weapon's normal viewmodel bob.  The original calls the weapon's
+	// AddViewmodelBob virtual after calculating the free-aim ray, then replaces
+	// the bobbed angles with the ray angles; consequently walking moves the gun
+	// position slightly, but does not wobble the aim direction.
 	Vector2D vecCursor;
 	if ( !m_bExpSighted && UH_FreeAimGetCursor( vecCursor ) )
 	{
+		QAngle aimAngles = vmangles;
 		int nScreenWide = 0, nScreenTall = 0;
 		engine->GetScreenSize( nScreenWide, nScreenTall );
 		if ( nScreenWide > 0 && nScreenTall > 0 )
@@ -477,13 +479,30 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 				(int)( ( vecCursor.x * 0.25f + 0.5f ) * nScreenWide ),
 				(int)( ( vecCursor.y * 0.25f + 0.5f ) * nScreenTall ),
 				owner->GetFOV(), eyePosition, eyeAngles, vecPickingRay );
-			VectorAngles( vecPickingRay, vmangles );
+			VectorAngles( vecPickingRay, aimAngles );
 		}
+
+		CBaseCombatWeapon *pWeapon = GetOwningWeapon();
+		if ( pWeapon && !prediction->InPrediction() )
+			pWeapon->AddViewmodelBob( this, vmorigin, vmangles );
+
+		vmangles = aimAngles;
 	}
 #endif
 
 	SetLocalOrigin( vmorigin );
 	SetLocalAngles( vmangles );
+
+#if defined( CLIENT_DLL )
+	// The original freezes ACT_VM_IDLE at cycle zero while sighted.  This is
+	// why the hip weapon retains its subtle authored idle movement whereas the
+	// sight picture is absolutely still (Cliento sub_10014D80).
+	if ( m_bExpSighted && GetOwningWeapon() &&
+		 GetSequenceActivity( GetSequence() ) == ACT_VM_IDLE )
+	{
+		SetCycle( 0.0f );
+	}
+#endif
 
 #endif
 }
