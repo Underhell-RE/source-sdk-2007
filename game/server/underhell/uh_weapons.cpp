@@ -146,6 +146,10 @@ void CUHGunWeapon::PrimaryAttack( void )
 	if ( !pPlayer )
 		return;
 
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+	if ( pHL2Player && pHL2Player->UH_IsWeaponObstructed() )
+		return;
+
 	// Semi-auto gate (decode sub_102B18E0): in semi mode the shot is only fired
 	// while the trigger latch is set; PrimaryAttack consumes it so a held
 	// trigger fires a single shot. WeaponIdle() re-arms it on release.

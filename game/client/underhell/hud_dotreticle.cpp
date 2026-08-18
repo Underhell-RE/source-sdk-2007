@@ -121,8 +121,12 @@ void CHudDotReticle::Paint()
 			ScreenToWorld( (int)( ( cursor.x * 0.25f + 0.5f ) * wide ),
 				(int)( ( cursor.y * 0.25f + 0.5f ) * tall ), pPlayer->GetFOV(),
 				pPlayer->EyePosition(), pPlayer->EyeAngles(), ray );
-			Vector target = pPlayer->EyePosition() + ray * MAX_TRACE_LENGTH;
-			engine->ClientCmd( VarArgs( "update_freeaim %f %f %f", target.x, target.y, target.z ) );
+			UH_FreeAimClampDirection( pPlayer->EyeAngles(), ray );
+
+			// Original sub_100BC870 sends the normalized ray itself.  Sending a
+			// world-space endpoint made server attacks interpret huge coordinates
+			// as a direction, which is why the kick could strike the ceiling.
+			engine->ClientCmd( VarArgs( "update_freeaim %f %f %f", ray.x, ray.y, ray.z ) );
 		}
 	}
 

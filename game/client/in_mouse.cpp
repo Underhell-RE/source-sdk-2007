@@ -135,6 +135,27 @@ bool UH_FreeAimGetCursor( Vector2D &cursor )
 	return true;
 }
 
+// Cliento sub_10014D80: never let the free-aim ray turn behind the player's
+// horizontal facing plane.  Without this clamp, looking almost straight up or
+// down lets the cursor flip the weapon (and the kick viewmodel) over the head.
+void UH_FreeAimClampDirection( const QAngle &viewAngles, Vector &direction )
+{
+	Vector horizontalForward;
+	AngleVectors( viewAngles, &horizontalForward );
+	horizontalForward.z = 0.0f;
+	if ( VectorNormalize( horizontalForward ) == 0.0f )
+		return;
+
+	if ( DotProduct( horizontalForward, direction ) < 0.1f )
+	{
+		Vector cross, tangent;
+		CrossProduct( horizontalForward, direction, cross );
+		CrossProduct( cross, horizontalForward, tangent );
+		direction = tangent + horizontalForward * 0.1f;
+		VectorNormalize( direction );
+	}
+}
+
 static ConVar m_customaccel( "m_customaccel", "0", FCVAR_ARCHIVE, "Custom mouse acceleration (0 disable, 1 to enable, 2 enable with separate yaw/pitch rescale)."\
 	"\nFormula: mousesensitivity = ( rawmousedelta^m_customaccel_exponent ) * m_customaccel_scale + sensitivity"\
 	"\nIf mode is 2, then x and y sensitivity are scaled by m_pitch and m_yaw respectively.", true, 0, false, 0.0f );

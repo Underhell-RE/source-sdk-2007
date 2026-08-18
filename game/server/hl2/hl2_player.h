@@ -419,6 +419,8 @@ public:
 	// sub_101ECF40.
 	//-----------------------------------------------------------------------------
 	bool				UH_IsIronSighted( void ) const { return m_bIronSighted; }
+	bool				UH_IsWeaponObstructed( void ) const { return m_bUHWeaponObstructed; }
+	void				UH_UpdateWeaponObstruction( void );
 	void				UH_ToggleIronsight( void );
 	void				UH_DisableIronsight( void );	// force off (no debounce/sound) — weapon switch / drop
 
@@ -558,6 +560,7 @@ private:
 	CNetworkVar( int, m_iBleedCounter );	// bleeding state (0 = clean, >0 = bleeding).
 	CNetworkVar( float, m_flUHBatteryCharge );	// 0..100 charge of the current flashlight battery
 	CNetworkVar( bool, m_bIronSighted );		// ironsight active (accuracy + FOV zoom)
+	bool				m_bUHWeaponObstructed;	// automatic near-wall lowered pose
 	CNetworkVar( float, m_fIronsightedTime );	// last ironsight toggle time
 
 	// Underhell gear (original CBasePlayer members: m_bHavePistolSilencer @3371,

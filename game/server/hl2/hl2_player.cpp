@@ -352,6 +352,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_THINKFUNC( UH_KickThink ),
 	DEFINE_FIELD( m_flUHBatteryCharge, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bIronSighted, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bUHWeaponObstructed, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIronsightedTime, FIELD_TIME ),
 	DEFINE_FIELD( m_bHavePistolSilencer, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bHaveRifleSilencer, FIELD_BOOLEAN ),
@@ -514,6 +515,7 @@ CHL2_Player::CHL2_Player()
 	m_hCarryingRagdoll = NULL;
 	m_fSavedSensitivity = 0.0f;
 	m_vecUHFreeAimTarget = vec3_origin;
+	m_bUHWeaponObstructed = false;
 	m_hUHLookGlowTarget = NULL;
 	m_flNextUHLookGlowTime = 0.0f;
 	m_bBulletTimeDisabled = true;
@@ -1105,6 +1107,10 @@ void CHL2_Player::PostThink( void )
 
 	// Underhell: bleeding drain + passive hunger decay.
 	UH_UpdateBleeding();
+
+	// Keep long guns out of nearby world geometry and drive their authored
+	// lowered/ready viewmodel activities.
+	UH_UpdateWeaponObstruction();
 }
 
 void CHL2_Player::StartAdmireGlovesAnimation( void )
@@ -2783,6 +2789,22 @@ void CHL2_Player::NotifyScriptsOfDeath( void )
 void CHL2_Player::GetAutoaimVector( autoaim_params_t &params )
 {
 	BaseClass::GetAutoaimVector( params );
+
+	// Original sub_101F1D70: free aim replaces the ordinary eye/autoaim
+	// direction with the normalized ray sent by the client.  update_freeaim is
+	// a direction, not a world-space endpoint (Cliento sub_100BC870).
+	static ConVarRef cam_ots_freeaim_enable( "cam_ots_freeaim_enable" );
+	if ( cam_ots_freeaim_enable.IsValid() && cam_ots_freeaim_enable.GetBool() &&
+		 m_vecUHFreeAimTarget.LengthSqr() > 0.0f )
+	{
+		params.m_vecAutoAimDir = m_vecUHFreeAimTarget;
+		VectorNormalize( params.m_vecAutoAimDir );
+		params.m_vecAutoAimPoint = Weapon_ShootPosition() +
+			params.m_vecAutoAimDir * params.m_fMaxDist;
+		params.m_hAutoAimEntity.Set( NULL );
+		params.m_bAutoAimAssisting = false;
+		return;
+	}
 
 	if ( IsX360() )
 	{

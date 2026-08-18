@@ -479,6 +479,7 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 				(int)( ( vecCursor.x * 0.25f + 0.5f ) * nScreenWide ),
 				(int)( ( vecCursor.y * 0.25f + 0.5f ) * nScreenTall ),
 				owner->GetFOV(), eyePosition, eyeAngles, vecPickingRay );
+			UH_FreeAimClampDirection( eyeAngles, vecPickingRay );
 			VectorAngles( vecPickingRay, aimAngles );
 		}
 

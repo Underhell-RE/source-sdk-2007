@@ -53,6 +53,66 @@ static ConVar uh_ironsight_zoom_focus( "uh_ironsight_zoom_focus", "40", FCVAR_AR
 
 extern ConVar hl2_walkspeed;
 
+// Enter slightly earlier than we leave to prevent the animation oscillating
+// when the muzzle sits exactly on a wall plane.
+#define UH_WEAPON_OBSTRUCTION_ENTER 36.0f
+#define UH_WEAPON_OBSTRUCTION_LEAVE 44.0f
+
+//-----------------------------------------------------------------------------
+// Purpose: Drive the weapon's authored lowered pose when its barrel is close
+// to solid geometry. Underhell's player/weapon path uses the ordinary
+// ACT_VM_IDLE_LOWERED / ACT_VM_LOWERED_TO_IDLE activities plus the separate
+// hard-lowered player state; this proximity test supplies the missing runtime
+// trigger in the reconstructed SDK.
+//-----------------------------------------------------------------------------
+void CHL2_Player::UH_UpdateWeaponObstruction( void )
+{
+	CBaseHLCombatWeapon *pWeapon = dynamic_cast<CBaseHLCombatWeapon *>( GetActiveWeapon() );
+	if ( !IsAlive() || !pWeapon || pWeapon->GetWpnData().m_bMeleeWeapon ||
+		 !pWeapon->CanLower() )
+	{
+		if ( m_bUHWeaponObstructed )
+		{
+			m_bUHWeaponObstructed = false;
+			Weapon_Ready();
+		}
+		return;
+	}
+
+	const float flDistance = m_bUHWeaponObstructed ?
+		UH_WEAPON_OBSTRUCTION_LEAVE : UH_WEAPON_OBSTRUCTION_ENTER;
+	Vector vecDirection = GetAutoaimVector( AUTOAIM_SCALE_DEFAULT, flDistance );
+	Vector vecStart = Weapon_ShootPosition();
+
+	trace_t tr;
+	UTIL_TraceHull( vecStart, vecStart + vecDirection * flDistance,
+		Vector( -2.0f, -2.0f, -2.0f ), Vector( 2.0f, 2.0f, 2.0f ),
+		MASK_SHOT, this, COLLISION_GROUP_NONE, &tr );
+
+	const bool bObstructed = tr.startsolid || tr.fraction < 1.0f;
+	if ( bObstructed == m_bUHWeaponObstructed )
+		return;
+
+	m_bUHWeaponObstructed = bObstructed;
+	if ( bObstructed )
+	{
+		UH_DisableIronsight();
+		Weapon_Lower();
+		if ( pWeapon->SelectWeightedSequence( ACT_VM_IDLE_TO_LOWERED ) != ACTIVITY_NOT_AVAILABLE )
+			pWeapon->SendWeaponAnim( ACT_VM_IDLE_TO_LOWERED );
+		else
+			pWeapon->SendWeaponAnim( ACT_VM_IDLE_LOWERED );
+	}
+	else
+	{
+		Weapon_Ready();
+		if ( pWeapon->SelectWeightedSequence( ACT_VM_LOWERED_TO_IDLE ) != ACTIVITY_NOT_AVAILABLE )
+			pWeapon->SendWeaponAnim( ACT_VM_LOWERED_TO_IDLE );
+		else
+			pWeapon->SendWeaponAnim( ACT_VM_IDLE );
+	}
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Toggle ironsight (called from the "ironsight_toggle" client
 // command). Mirrors sub_101ECF40: debounce, drop sprint, toggle the networked
@@ -80,10 +140,11 @@ void CHL2_Player::UH_ToggleIronsight( void )
 	//  - not a melee weapon (weapon script "MeleeWeapon" flag → info.m_bMeleeWeapon,
 	//    hexrays sub_100D0E00 reads weapon-info offset 1832). No escape clause:
 	//    a melee weapon can never sight.
-	//  - the original also gates on a weapon flag @1144 (likely "weapon lowered")
-	//    and m_bHardLowered, each with an "|| m_bIronSighted" escape so you can
-	//    always UN-sight while lowered. TODO: both are not ported yet (no-ops).
+	//  - lowered/hard-lowered blocks entering sight, with an escape allowing an
+	//    already sighted player to leave it.
 	if ( pWeapon->GetWpnData().m_bMeleeWeapon )
+		return;
+	if ( m_bUHWeaponObstructed && !m_bIronSighted )
 		return;
 
 	// Can't sight while sprinting — drop sprint first.
